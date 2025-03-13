@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { analyzeBloodSample } from '../utils/analysisUtils';
 
 export type CellType = 'RBC' | 'Platelet' | 'Abnormal';
 
@@ -45,77 +46,26 @@ export const AnalysisProvider: React.FC<{children: ReactNode}> = ({ children }) 
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const startAnalysis = () => {
+  const startAnalysis = async () => {
+    if (!originalImage) return;
+    
     setIsAnalyzing(true);
     setError(null);
     
-    // In a real app, this would be the point where you'd send the image to your CNN model
-    // For demo purposes, we'll simulate analysis with a timeout
-    setTimeout(() => {
-      setIsAnalyzing(false);
-      
-      // Simulate analysis result
-      if (originalImage) {
-        const result: AnalysisResult = {
-          image: originalImage,
-          processedImage: originalImage, // In a real app, this would be different
-          cellCounts: {
-            normal: {
-              rbc: Math.floor(Math.random() * 5000) + 3000,
-              platelets: Math.floor(Math.random() * 300) + 150
-            },
-            abnormal: {
-              rbc: Math.floor(Math.random() * 500),
-              platelets: Math.floor(Math.random() * 30)
-            },
-            total: 0 // Will be calculated
-          },
-          abnormalityRate: Math.random() * 20,
-          possibleConditions: [],
-          recommendations: [],
-          analysisDate: new Date()
-        };
-        
-        // Calculate totals
-        result.cellCounts.total = 
-          result.cellCounts.normal.rbc + 
-          result.cellCounts.normal.platelets + 
-          result.cellCounts.abnormal.rbc + 
-          result.cellCounts.abnormal.platelets;
-        
-        // Determine possible conditions based on abnormality rate
-        if (result.abnormalityRate > 15) {
-          result.possibleConditions = ['Leukemia', 'Lymphoma', 'Myelodysplastic syndrome'];
-          result.recommendations = [
-            'Urgent hematology consultation recommended',
-            'Bone marrow biopsy should be considered',
-            'Additional blood tests including flow cytometry'
-          ];
-        } else if (result.abnormalityRate > 10) {
-          result.possibleConditions = ['Potential blood disorder', 'Early-stage myeloproliferative disorder'];
-          result.recommendations = [
-            'Follow-up with hematology within 2 weeks',
-            'Complete blood count with differential',
-            'Peripheral blood smear examination'
-          ];
-        } else if (result.abnormalityRate > 5) {
-          result.possibleConditions = ['Mild abnormalities', 'Possible reactive changes'];
-          result.recommendations = [
-            'Repeat blood test in 1 month',
-            'Clinical correlation with patient symptoms',
-            'Monitor for changes in blood parameters'
-          ];
-        } else {
-          result.possibleConditions = ['No significant abnormalities detected'];
-          result.recommendations = [
-            'Routine follow-up as clinically indicated',
-            'No immediate hematological intervention required'
-          ];
-        }
-        
-        setAnalysisResult(result);
+    try {
+      // Use the real model analysis
+      const result = await analyzeBloodSample(originalImage);
+      setAnalysisResult(result);
+    } catch (error) {
+      console.error('Analysis error:', error);
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('An unknown error occurred during analysis');
       }
-    }, 3000);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const resetAnalysis = () => {

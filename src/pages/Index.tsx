@@ -6,6 +6,7 @@ import ImageUploader from '../components/ImageUploader';
 import AnalysisResults from '../components/AnalysisResults';
 import ReportGenerator from '../components/ReportGenerator';
 import Footer from '../components/Footer';
+import ModelLoader from '../components/ModelLoader';
 
 const AnalysisWorkflow: React.FC = () => {
   const { analysisResult, isAnalyzing } = useAnalysis();
@@ -15,6 +16,8 @@ const AnalysisWorkflow: React.FC = () => {
       <Header />
       
       <main className="container mx-auto px-4 flex-1 max-w-6xl">
+        <ModelLoader />
+        
         {!analysisResult && <ImageUploader />}
         
         {isAnalyzing && (
@@ -25,7 +28,7 @@ const AnalysisWorkflow: React.FC = () => {
             </div>
             <h3 className="text-xl font-display font-medium mb-2">Analyzing Blood Sample</h3>
             <p className="text-medical-dark text-opacity-70">
-              Our CNN model is processing the image to identify and classify blood cells...
+              Analyzing with loaded CNN model to identify and classify blood cells...
             </p>
           </div>
         )}

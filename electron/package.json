@@ -1,0 +1,15 @@
+
+{
+  "name": "blood-cell-analyzer",
+  "version": "1.0.0",
+  "description": "Blood Cell Analyzer Desktop Application",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "latest"
+  }
+}
