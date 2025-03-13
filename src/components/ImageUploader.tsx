@@ -4,7 +4,7 @@ import { useAnalysis } from '../contexts/AnalysisContext';
 import { handleImageUpload } from '../utils/analysisUtils';
 import { Button } from '@/components/ui/button';
 import { Upload, ImagePlus, X, Microscope } from 'lucide-react';
-import { toast } from '@/components/ui/sonner';
+import { toast } from 'sonner';
 
 const ImageUploader: React.FC = () => {
   const { setOriginalImage, startAnalysis, originalImage, isAnalyzing } = useAnalysis();
