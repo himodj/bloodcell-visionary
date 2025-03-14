@@ -1,11 +1,12 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useAnalysis } from '../contexts/AnalysisContext';
 import { formatReportDate, generateReportId, generatePdfReport, determineSeverity, formatNumber } from '../utils/analysisUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { FilePlus, Printer, FileText, LayoutGrid } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -16,11 +17,11 @@ import {
 import { toast } from 'sonner';
 
 const ReportGenerator: React.FC = () => {
-  const { analysisResult, updateReportLayout } = useAnalysis();
+  const { analysisResult, updateReportLayout, updateNotes } = useAnalysis();
   
   if (!analysisResult) return null;
   
-  const { abnormalityRate, recommendations, analysisDate, reportLayout, cellCounts, possibleConditions, processedImage } = analysisResult;
+  const { abnormalityRate, recommendations, analysisDate, reportLayout, cellCounts, possibleConditions, processedImage, notes } = analysisResult;
   const severity = determineSeverity(abnormalityRate);
   const reportId = generateReportId();
   
@@ -37,6 +38,10 @@ const ReportGenerator: React.FC = () => {
   const handleLayoutChange = (layout: string) => {
     updateReportLayout(layout as 'standard' | 'compact' | 'detailed');
     toast.success(`Report layout changed to ${layout}`);
+  };
+
+  const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    updateNotes(e.target.value);
   };
   
   const getSeverityLabel = (severity: string) => {
@@ -58,6 +63,19 @@ const ReportGenerator: React.FC = () => {
     };
     return colors[severity] || colors.normal;
   };
+
+  // Notes section component to include in all layouts
+  const NotesSection = () => (
+    <div className="mt-4">
+      <h4 className="font-medium mb-2 text-medical-dark">Notes</h4>
+      <Textarea 
+        placeholder="Add your observations or additional information here..." 
+        className="min-h-[100px]"
+        value={notes || ''}
+        onChange={handleNotesChange}
+      />
+    </div>
+  );
 
   return (
     <div className="animate-fade-in">
@@ -197,6 +215,8 @@ const ReportGenerator: React.FC = () => {
             
             <Separator className="my-4" />
             
+            <NotesSection />
+            
             <div className="text-xs text-medical-dark text-opacity-50 mt-6">
               <p>
                 This report was generated using BloodCellVision CNN analysis system. Results should be
@@ -263,6 +283,18 @@ const ReportGenerator: React.FC = () => {
                     </li>
                   ))}
                 </ul>
+              </div>
+              
+              <Separator className="my-1" />
+              
+              <div>
+                <h5 className="text-xs font-medium mb-1">Notes:</h5>
+                <Textarea 
+                  placeholder="Add your observations here..." 
+                  className="min-h-[60px] text-xs p-2"
+                  value={notes || ''}
+                  onChange={handleNotesChange}
+                />
               </div>
               
               <div className="text-xxs text-medical-dark text-opacity-50 mt-2 text-center">
@@ -377,6 +409,8 @@ const ReportGenerator: React.FC = () => {
                     ))}
                   </ul>
                 </div>
+                
+                <NotesSection />
               </div>
             </div>
             

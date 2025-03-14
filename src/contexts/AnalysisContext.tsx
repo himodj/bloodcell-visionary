@@ -47,6 +47,7 @@ export interface AnalysisResult {
   analysisDate: Date;
   detectedCells: DetectedCell[];
   reportLayout: 'standard' | 'compact' | 'detailed';
+  notes: string; // Added notes field
 }
 
 interface AnalysisContextType {
@@ -62,6 +63,7 @@ interface AnalysisContextType {
   updateReportLayout: (layout: 'standard' | 'compact' | 'detailed') => void;
   updateRecommendations: (recommendations: string[]) => void;
   updatePossibleConditions: (conditions: string[]) => void;
+  updateNotes: (notes: string) => void; // Added function to update notes
 }
 
 const AnalysisContext = createContext<AnalysisContextType | undefined>(undefined);
@@ -128,6 +130,15 @@ export const AnalysisProvider: React.FC<{children: ReactNode}> = ({ children }) 
     }
   };
 
+  const updateNotes = (notes: string) => {
+    if (analysisResult) {
+      setAnalysisResult({
+        ...analysisResult,
+        notes
+      });
+    }
+  };
+
   return (
     <AnalysisContext.Provider
       value={{
@@ -142,7 +153,8 @@ export const AnalysisProvider: React.FC<{children: ReactNode}> = ({ children }) 
         setError,
         updateReportLayout,
         updateRecommendations,
-        updatePossibleConditions
+        updatePossibleConditions,
+        updateNotes
       }}
     >
       {children}
