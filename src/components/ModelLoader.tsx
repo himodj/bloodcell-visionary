@@ -1,16 +1,22 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Database, Check, AlertCircle } from 'lucide-react';
+import { Database, Check, AlertCircle, Download } from 'lucide-react';
 
 const ModelLoader: React.FC = () => {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isElectron, setIsElectron] = useState(false);
+
+  // Check if we're in Electron on component mount
+  useEffect(() => {
+    setIsElectron(!!window.electron?.isElectron);
+  }, []);
 
   const handleLoadModel = async () => {
     // Check if we're in Electron environment
-    if (!window.electron) {
+    if (!isElectron) {
       toast.error("This feature is only available in the desktop app");
       console.warn("Model loading is only available in Electron environment");
       return;
@@ -36,10 +42,10 @@ const ModelLoader: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center gap-4 mb-6">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
       <Button 
         onClick={handleLoadModel}
-        disabled={isLoading}
+        disabled={isLoading || !isElectron}
         className={`${isModelLoaded ? 'bg-green-500' : 'bg-medical-blue'} text-white hover:opacity-90 transition-all`}
       >
         {isLoading ? (
@@ -62,11 +68,22 @@ const ModelLoader: React.FC = () => {
         </span>
       )}
       
-      {!window.electron && (
-        <span className="text-sm text-amber-600 flex items-center">
-          <AlertCircle size={14} className="mr-1" />
-          Model loading requires desktop app
-        </span>
+      {!isElectron && (
+        <div className="text-sm text-amber-600 flex items-center p-2 bg-amber-50 rounded border border-amber-200">
+          <AlertCircle size={14} className="mr-2 flex-shrink-0" />
+          <span>
+            Model loading requires desktop app. 
+            <a 
+              href="https://github.com/yourusername/blood-cell-analyzer/releases" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-blue-600 hover:underline ml-1 inline-flex items-center"
+            >
+              <Download size={12} className="mr-1" />
+              Download
+            </a>
+          </span>
+        </div>
       )}
     </div>
   );

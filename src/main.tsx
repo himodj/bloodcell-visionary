@@ -6,12 +6,12 @@ import './index.css';
 import { initializeModel } from './utils/analysisUtils';
 import { toast } from 'sonner';
 
-// Check if we're running in Electron
-const isElectron = window.electron !== undefined;
+// Check if we're running in Electron - make sure this works correctly
+const isElectron = typeof window !== 'undefined' && window.electron?.isElectron === true;
 
 // Define a global function to load model that can be called from UI
 (window as any).loadModel = async () => {
-  if (isElectron) {
+  if (isElectron && window.electron) {
     try {
       const modelPath = await window.electron.selectModel();
       if (modelPath) {
