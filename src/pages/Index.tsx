@@ -28,7 +28,7 @@ const AnalysisWorkflow: React.FC = () => {
             </div>
             <h3 className="text-xl font-display font-medium mb-2">Analyzing Blood Sample</h3>
             <p className="text-medical-dark text-opacity-70">
-              Analyzing with loaded CNN model to identify and classify blood cells...
+              Detecting and classifying blood cells: Basophils, Eosinophils, Erythroblasts, Immature Granulocytes, Lymphocytes, Monocytes, Neutrophils, and Platelets...
             </p>
           </div>
         )}

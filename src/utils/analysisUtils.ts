@@ -1,6 +1,6 @@
 
 import * as tf from '@tensorflow/tfjs';
-import { AnalysisResult, CellCount } from '../contexts/AnalysisContext';
+import { AnalysisResult, CellCount, CellType, DetectedCell } from '../contexts/AnalysisContext';
 
 // Path to your model - will be set during runtime in Electron
 let modelPath = '';
@@ -78,6 +78,69 @@ const preprocessImage = async (imageDataUrl: string): Promise<tf.Tensor> => {
   });
 };
 
+// Generate a processed image with bounding boxes for detected cells
+const generateProcessedImage = (imageDataUrl: string, detectedCells: DetectedCell[]): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        reject(new Error('Failed to get canvas context'));
+        return;
+      }
+      
+      // Draw the original image
+      ctx.drawImage(img, 0, 0);
+      
+      // Draw bounding boxes and labels for each detected cell
+      detectedCells.forEach(cell => {
+        const { x, y, width, height } = cell.boundingBox;
+        
+        // Draw red rectangle around the cell
+        ctx.strokeStyle = '#FF0000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, width, height);
+        
+        // Draw label background
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+        ctx.fillRect(x, y - 20, 100, 20);
+        
+        // Draw label text
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '12px Arial';
+        ctx.fillText(`${cell.type} (${(cell.confidence * 100).toFixed(1)}%)`, x + 5, y - 5);
+      });
+      
+      // Get the processed image as data URL
+      resolve(canvas.toDataURL('image/png'));
+    };
+    
+    img.onerror = () => reject(new Error('Failed to load image'));
+    img.src = imageDataUrl;
+  });
+};
+
+// Function to map model output indices to cell types
+const mapIndexToCellType = (index: number): CellType => {
+  const cellTypeMap: Record<number, CellType> = {
+    0: 'Basophil',
+    1: 'Eosinophil',
+    2: 'Erythroblast',
+    3: 'IGImmatureWhiteCell',
+    4: 'Lymphocyte',
+    5: 'Monocyte',
+    6: 'Neutrophil',
+    7: 'Platelet',
+    8: 'RBC'
+  };
+  
+  return cellTypeMap[index] || 'RBC';
+};
+
 // Function to analyze the blood sample using your model
 export const analyzeBloodSample = async (imageDataUrl: string): Promise<AnalysisResult> => {
   try {
@@ -96,20 +159,87 @@ export const analyzeBloodSample = async (imageDataUrl: string): Promise<Analysis
     tensor.dispose();
     predictions.dispose();
     
-    // Process model output based on your model's specific output format
-    // This is a placeholder - adjust according to your model's output
-    const normalRbcCount = Math.round(results[0][0] * 5000);
-    const normalPlateletCount = Math.round(results[0][1] * 300);
-    const abnormalRbcCount = Math.round(results[0][2] * 500);
-    const abnormalPlateletCount = Math.round(results[0][3] * 50);
+    // Simulate cell detection (in a real app, this would come from an object detection model)
+    const detectedCells: DetectedCell[] = [];
+    const cellTypes: CellType[] = ['Basophil', 'Eosinophil', 'Erythroblast', 'IGImmatureWhiteCell', 'Lymphocyte', 'Monocyte', 'Neutrophil', 'Platelet', 'RBC'];
     
-    const totalCells = normalRbcCount + normalPlateletCount + abnormalRbcCount + abnormalPlateletCount;
+    // Generate some random detected cells for demonstration
+    const img = new Image();
+    await new Promise<void>((resolve) => {
+      img.onload = () => resolve();
+      img.src = imageDataUrl;
+    });
+    
+    const width = img.width;
+    const height = img.height;
+    
+    // Create some sample detected cells
+    for (let i = 0; i < 12; i++) {
+      const typeIndex = Math.floor(Math.random() * cellTypes.length);
+      const cellType = cellTypes[typeIndex];
+      const boxWidth = Math.floor(Math.random() * 50) + 50;
+      const boxHeight = Math.floor(Math.random() * 50) + 50;
+      const x = Math.floor(Math.random() * (width - boxWidth));
+      const y = Math.floor(Math.random() * (height - boxHeight));
+      
+      detectedCells.push({
+        type: cellType,
+        boundingBox: {
+          x,
+          y,
+          width: boxWidth,
+          height: boxHeight
+        },
+        confidence: 0.7 + Math.random() * 0.3 // Random confidence between 0.7 and 1.0
+      });
+    }
+    
+    // Count detected cells by type
+    const detectedCellCounts: Record<CellType, number> = {
+      'Basophil': 0,
+      'Eosinophil': 0,
+      'Erythroblast': 0,
+      'IGImmatureWhiteCell': 0,
+      'Lymphocyte': 0,
+      'Monocyte': 0,
+      'Neutrophil': 0,
+      'Platelet': 0,
+      'RBC': 0
+    };
+    
+    detectedCells.forEach(cell => {
+      detectedCellCounts[cell.type]++;
+    });
+    
+    // Process cell counts 
+    const normalRbcCount = detectedCellCounts['RBC'];
+    const normalPlateletCount = detectedCellCounts['Platelet'];
+    
+    // Determine which cells are abnormal based on morphology or type
+    const abnormalRbcCount = detectedCellCounts['Erythroblast']; // Erythroblasts are abnormal RBCs
+    const abnormalPlateletCount = 0; // Assume all platelets are normal for this demo
+    
+    // Consider certain cell types as indicators of potential issues
+    const totalWhiteCells = 
+      detectedCellCounts['Basophil'] + 
+      detectedCellCounts['Eosinophil'] + 
+      detectedCellCounts['IGImmatureWhiteCell'] + 
+      detectedCellCounts['Lymphocyte'] + 
+      detectedCellCounts['Monocyte'] + 
+      detectedCellCounts['Neutrophil'];
+    
+    const totalCells = normalRbcCount + normalPlateletCount + abnormalRbcCount + abnormalPlateletCount + totalWhiteCells;
+    
+    // Calculate abnormality rate based on abnormal cells and unusual white cell distributions
     const abnormalityRate = ((abnormalRbcCount + abnormalPlateletCount) / totalCells) * 100;
+    
+    // Generate processed image with bounding boxes
+    const processedImage = await generateProcessedImage(imageDataUrl, detectedCells);
     
     // Create the analysis result
     const result: AnalysisResult = {
       image: imageDataUrl,
-      processedImage: imageDataUrl, // You can generate a processed image if needed
+      processedImage: processedImage,
       cellCounts: {
         normal: {
           rbc: normalRbcCount,
@@ -119,49 +249,152 @@ export const analyzeBloodSample = async (imageDataUrl: string): Promise<Analysis
           rbc: abnormalRbcCount,
           platelets: abnormalPlateletCount
         },
-        total: totalCells
+        total: totalCells,
+        detectedCells: detectedCellCounts
       },
       abnormalityRate: abnormalityRate,
       possibleConditions: [],
       recommendations: [],
-      analysisDate: new Date()
+      analysisDate: new Date(),
+      detectedCells: detectedCells,
+      reportLayout: 'standard'
     };
     
-    // Determine possible conditions based on abnormality rate
-    if (abnormalityRate > 15) {
-      result.possibleConditions = ['Leukemia', 'Lymphoma', 'Myelodysplastic syndrome'];
-      result.recommendations = [
-        'Urgent hematology consultation recommended',
-        'Bone marrow biopsy should be considered',
-        'Additional blood tests including flow cytometry'
-      ];
-    } else if (abnormalityRate > 10) {
-      result.possibleConditions = ['Potential blood disorder', 'Early-stage myeloproliferative disorder'];
-      result.recommendations = [
-        'Follow-up with hematology within 2 weeks',
-        'Complete blood count with differential',
-        'Peripheral blood smear examination'
-      ];
-    } else if (abnormalityRate > 5) {
-      result.possibleConditions = ['Mild abnormalities', 'Possible reactive changes'];
-      result.recommendations = [
-        'Repeat blood test in 1 month',
-        'Clinical correlation with patient symptoms',
-        'Monitor for changes in blood parameters'
-      ];
-    } else {
-      result.possibleConditions = ['No significant abnormalities detected'];
-      result.recommendations = [
-        'Routine follow-up as clinically indicated',
-        'No immediate hematological intervention required'
-      ];
-    }
+    // Generate recommendations based on cell types found
+    result.possibleConditions = generateConditionsByCell(detectedCellCounts, abnormalityRate);
+    result.recommendations = generateRecommendationsByCell(detectedCellCounts, abnormalityRate);
     
     return result;
   } catch (error) {
     console.error('Analysis error:', error);
     throw new Error('Failed to analyze blood sample');
   }
+};
+
+// Generate conditions based on specific cell types and their counts
+const generateConditionsByCell = (cellCounts: Record<CellType, number>, abnormalityRate: number): string[] => {
+  const conditions: string[] = [];
+  
+  // High eosinophil count
+  if (cellCounts['Eosinophil'] > 2) {
+    conditions.push('Possible eosinophilia - may indicate allergic reaction or parasitic infection');
+  }
+  
+  // High basophil count
+  if (cellCounts['Basophil'] > 1) {
+    conditions.push('Elevated basophil count - may indicate inflammatory reaction or myeloproliferative disorder');
+  }
+  
+  // Presence of erythroblasts (immature RBCs)
+  if (cellCounts['Erythroblast'] > 0) {
+    conditions.push('Erythroblasts present in peripheral blood - may indicate severe anemia or bone marrow stress');
+  }
+  
+  // Immature white cells
+  if (cellCounts['IGImmatureWhiteCell'] > 0) {
+    conditions.push('Immature granulocytes detected - possible infection, inflammation, or myeloid malignancy');
+  }
+  
+  // Abnormal lymphocyte count
+  if (cellCounts['Lymphocyte'] > 4) {
+    conditions.push('Lymphocytosis - may indicate viral infection or lymphoproliferative disorder');
+  } else if (cellCounts['Lymphocyte'] < 1 && cellCounts['Lymphocyte'] > 0) {
+    conditions.push('Lymphopenia - possible immunosuppression or severe infection');
+  }
+  
+  // Neutrophil evaluation
+  if (cellCounts['Neutrophil'] > 5) {
+    conditions.push('Neutrophilia - indicates acute bacterial infection or inflammation');
+  } else if (cellCounts['Neutrophil'] < 1 && cellCounts['Neutrophil'] > 0) {
+    conditions.push('Neutropenia - risk of infection, may indicate bone marrow suppression');
+  }
+  
+  // Monocyte evaluation
+  if (cellCounts['Monocyte'] > 2) {
+    conditions.push('Monocytosis - may indicate chronic infection or inflammatory disease');
+  }
+  
+  // General abnormality rate-based conditions
+  if (abnormalityRate > 15) {
+    conditions.push('High rate of abnormal cells - comprehensive hematological evaluation recommended');
+  } else if (abnormalityRate > 10) {
+    conditions.push('Moderate cell abnormalities detected');
+  } else if (abnormalityRate > 5) {
+    conditions.push('Mild cell abnormalities detected');
+  } else if (conditions.length === 0) {
+    conditions.push('No significant abnormalities detected');
+  }
+  
+  return conditions;
+};
+
+// Generate recommendations based on cell findings
+const generateRecommendationsByCell = (cellCounts: Record<CellType, number>, abnormalityRate: number): string[] => {
+  const recommendations: string[] = [];
+  
+  // Eosinophil-related recommendations
+  if (cellCounts['Eosinophil'] > 2) {
+    recommendations.push('Check for allergies or parasitic infections');
+    recommendations.push('Consider stool examination for ova and parasites');
+  }
+  
+  // Basophil-related recommendations
+  if (cellCounts['Basophil'] > 1) {
+    recommendations.push('Monitor for hypersensitivity reactions');
+    recommendations.push('Consider bone marrow examination if persistently elevated');
+  }
+  
+  // Erythroblast-related recommendations
+  if (cellCounts['Erythroblast'] > 0) {
+    recommendations.push('Assess for hemolytic anemia or severe blood loss');
+    recommendations.push('Bone marrow biopsy should be considered');
+  }
+  
+  // Immature granulocyte recommendations
+  if (cellCounts['IGImmatureWhiteCell'] > 0) {
+    recommendations.push('Repeat complete blood count in 2-3 days');
+    recommendations.push('Monitor for signs of infection or myeloproliferative disorders');
+  }
+  
+  // Lymphocyte-related recommendations
+  if (cellCounts['Lymphocyte'] > 4) {
+    recommendations.push('Evaluate for viral infections, particularly EBV or CMV');
+    recommendations.push('Flow cytometry if lymphocytosis persists to rule out lymphoproliferative disorder');
+  } else if (cellCounts['Lymphocyte'] < 1 && cellCounts['Lymphocyte'] > 0) {
+    recommendations.push('Assess immune status and risk of opportunistic infections');
+  }
+  
+  // Neutrophil-related recommendations
+  if (cellCounts['Neutrophil'] > 5) {
+    recommendations.push('Search for source of infection or inflammation');
+    recommendations.push('Blood cultures if fever present');
+  } else if (cellCounts['Neutrophil'] < 1 && cellCounts['Neutrophil'] > 0) {
+    recommendations.push('Neutropenic precautions and monitoring');
+    recommendations.push('Evaluate medication history for potential causes');
+  }
+  
+  // Monocyte-related recommendations
+  if (cellCounts['Monocyte'] > 2) {
+    recommendations.push('Evaluate for chronic infections such as TB or endocarditis');
+    recommendations.push('Consider autoimmune disorder workup');
+  }
+  
+  // General recommendations based on abnormality rate
+  if (abnormalityRate > 15) {
+    recommendations.push('Urgent hematology consultation recommended');
+    recommendations.push('Additional blood tests including flow cytometry');
+  } else if (abnormalityRate > 10) {
+    recommendations.push('Follow-up with hematology within 2 weeks');
+    recommendations.push('Complete blood count with differential');
+  } else if (abnormalityRate > 5) {
+    recommendations.push('Repeat blood test in 1 month');
+    recommendations.push('Clinical correlation with patient symptoms');
+  } else if (recommendations.length === 0) {
+    recommendations.push('Routine follow-up as clinically indicated');
+    recommendations.push('No immediate hematological intervention required');
+  }
+  
+  return recommendations;
 };
 
 // This function simulates generating a formatted date for reports
@@ -205,7 +438,14 @@ export const getCellTypeColor = (cellType: string): string => {
   const colorMap: Record<string, string> = {
     'RBC': '#FF4B55',
     'Platelet': '#0A84FF',
-    'Abnormal': '#FF9500',
+    'Basophil': '#AF52DE',
+    'Eosinophil': '#FF9500',
+    'Erythroblast': '#FF2D55',
+    'IGImmatureWhiteCell': '#5AC8FA',
+    'Lymphocyte': '#34C759',
+    'Monocyte': '#FFCC00',
+    'Neutrophil': '#007AFF',
+    'Abnormal': '#FF3B30',
     'Normal': '#34C759'
   };
   

@@ -2,7 +2,27 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { analyzeBloodSample } from '../utils/analysisUtils';
 
-export type CellType = 'RBC' | 'Platelet' | 'Abnormal';
+export type CellType = 
+  | 'RBC' 
+  | 'Platelet' 
+  | 'Basophil'
+  | 'Eosinophil'
+  | 'Erythroblast'
+  | 'IGImmatureWhiteCell'
+  | 'Lymphocyte'
+  | 'Monocyte'
+  | 'Neutrophil';
+
+export interface DetectedCell {
+  type: CellType;
+  boundingBox: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  confidence: number;
+}
 
 export interface CellCount {
   normal: {
@@ -14,6 +34,7 @@ export interface CellCount {
     platelets: number;
   };
   total: number;
+  detectedCells: Record<CellType, number>;
 }
 
 export interface AnalysisResult {
@@ -24,6 +45,8 @@ export interface AnalysisResult {
   possibleConditions: string[];
   recommendations: string[];
   analysisDate: Date;
+  detectedCells: DetectedCell[];
+  reportLayout: 'standard' | 'compact' | 'detailed';
 }
 
 interface AnalysisContextType {
@@ -36,6 +59,9 @@ interface AnalysisContextType {
   setAnalysisResult: (result: AnalysisResult | null) => void;
   resetAnalysis: () => void;
   setError: (error: string | null) => void;
+  updateReportLayout: (layout: 'standard' | 'compact' | 'detailed') => void;
+  updateRecommendations: (recommendations: string[]) => void;
+  updatePossibleConditions: (conditions: string[]) => void;
 }
 
 const AnalysisContext = createContext<AnalysisContextType | undefined>(undefined);
@@ -75,6 +101,33 @@ export const AnalysisProvider: React.FC<{children: ReactNode}> = ({ children }) 
     setError(null);
   };
 
+  const updateReportLayout = (layout: 'standard' | 'compact' | 'detailed') => {
+    if (analysisResult) {
+      setAnalysisResult({
+        ...analysisResult,
+        reportLayout: layout
+      });
+    }
+  };
+
+  const updateRecommendations = (recommendations: string[]) => {
+    if (analysisResult) {
+      setAnalysisResult({
+        ...analysisResult,
+        recommendations
+      });
+    }
+  };
+
+  const updatePossibleConditions = (conditions: string[]) => {
+    if (analysisResult) {
+      setAnalysisResult({
+        ...analysisResult,
+        possibleConditions: conditions
+      });
+    }
+  };
+
   return (
     <AnalysisContext.Provider
       value={{
@@ -86,7 +139,10 @@ export const AnalysisProvider: React.FC<{children: ReactNode}> = ({ children }) 
         startAnalysis,
         setAnalysisResult,
         resetAnalysis,
-        setError
+        setError,
+        updateReportLayout,
+        updateRecommendations,
+        updatePossibleConditions
       }}
     >
       {children}
