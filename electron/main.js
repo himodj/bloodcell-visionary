@@ -12,12 +12,13 @@ function createWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      nodeIntegration: false,
+      contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
     },
   });
 
+  // Determine the appropriate URL to load
   const startUrl = isDev
     ? 'http://localhost:5173' // Vite dev server
     : url.format({
@@ -26,6 +27,7 @@ function createWindow() {
         slashes: true,
       });
 
+  console.log('Loading URL:', startUrl);
   mainWindow.loadURL(startUrl);
 
   if (isDev) {

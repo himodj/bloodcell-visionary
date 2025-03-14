@@ -5,11 +5,36 @@
   "description": "Blood Cell Analyzer Desktop Application",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dev": "concurrently \"cd .. && npm run dev\" \"electron .\"",
+    "build": "cd .. && npm run build && electron-builder"
+  },
+  "build": {
+    "appId": "com.bloodcellanalyzer.app",
+    "productName": "Blood Cell Analyzer",
+    "files": [
+      "main.js",
+      "preload.js",
+      "../dist/**/*"
+    ],
+    "directories": {
+      "output": "../electron-dist"
+    },
+    "mac": {
+      "category": "public.app-category.medical"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "electron": "latest"
+    "electron": "latest",
+    "electron-builder": "latest",
+    "concurrently": "latest"
   }
 }
