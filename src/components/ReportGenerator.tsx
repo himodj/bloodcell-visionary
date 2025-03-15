@@ -21,9 +21,29 @@ const ReportGenerator: React.FC = () => {
   
   if (!analysisResult) return null;
   
-  const { abnormalityRate, recommendations, analysisDate, reportLayout, cellCounts, possibleConditions, processedImage, notes } = analysisResult;
+  const { abnormalityRate, recommendations, analysisDate, reportLayout, cellCounts, possibleConditions, processedImage, notes, detectedCells } = analysisResult;
   const severity = determineSeverity(abnormalityRate);
   const reportId = generateReportId();
+  
+  // Calculate average confidence level
+  const confidenceLevel = detectedCells.length > 0 
+    ? (detectedCells.reduce((sum, cell) => sum + cell.confidence, 0) / detectedCells.length * 100).toFixed(1) 
+    : "N/A";
+  
+  // Get most frequent cell types (up to 3)
+  const getCellTypeCounts = () => {
+    const counts: Record<string, number> = {};
+    detectedCells.forEach(cell => {
+      counts[cell.type] = (counts[cell.type] || 0) + 1;
+    });
+    
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([type, count]) => `${type} (${count})`);
+  };
+  
+  const mostFrequentCellTypes = getCellTypeCounts();
   
   const handlePrintReport = () => {
     generatePdfReport(analysisResult);
@@ -77,9 +97,37 @@ const ReportGenerator: React.FC = () => {
     </div>
   );
 
+  // Lab report specific print styles
+  const printStyles = `
+    @media print {
+      body {
+        margin: 0;
+        padding: 0;
+        background: white;
+      }
+      #print-content {
+        width: 210mm; /* A4 width */
+        min-height: 297mm; /* A4 height */
+        padding: 15mm;
+        margin: 0;
+        border: none;
+        box-shadow: none;
+        background: white;
+        page-break-after: always;
+      }
+      .no-print, .no-print * {
+        display: none !important;
+      }
+      .print-only {
+        display: block !important;
+      }
+    }
+  `;
+
   return (
     <div className="animate-fade-in">
-      <div className="flex items-center justify-between mb-4">
+      <style>{printStyles}</style>
+      <div className="flex items-center justify-between mb-4 no-print">
         <h2 className="text-xl font-display font-medium flex items-center">
           <FileText size={20} className="mr-2 text-medical-blue" />
           Lab Report
@@ -166,6 +214,27 @@ const ReportGenerator: React.FC = () => {
             
             <Separator className="my-4" />
             
+            {/* Added sections for detected cell types and confidence level */}
+            <div className="mb-6">
+              <h4 className="font-medium mb-2 text-medical-dark">Detected Cell Types</h4>
+              <div className="text-sm space-y-2">
+                {mostFrequentCellTypes.map((cellType, index) => (
+                  <p key={index} className="text-medical-dark">
+                    {cellType}
+                  </p>
+                ))}
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <h4 className="font-medium mb-2 text-medical-dark">Analysis Confidence</h4>
+              <div className="text-sm">
+                <p className="text-medical-dark">Confidence Level: {confidenceLevel}%</p>
+              </div>
+            </div>
+            
+            <Separator className="my-4" />
+            
             <div className="mb-6">
               <h4 className="font-medium mb-3 text-medical-dark">Findings</h4>
               <div className="text-sm space-y-2">
@@ -222,6 +291,28 @@ const ReportGenerator: React.FC = () => {
                 }}>
                   {getSeverityLabel(severity)} ({abnormalityRate.toFixed(1)}%)
                 </span>
+              </div>
+              
+              <Separator className="my-1" />
+              
+              {/* Added detected cell types */}
+              <div>
+                <h5 className="text-xs font-medium mb-1">Detected Cell Types:</h5>
+                <div className="text-xs space-y-1">
+                  {mostFrequentCellTypes.map((cellType, index) => (
+                    <div key={index} className="text-medical-dark">
+                      {cellType}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Added confidence level */}
+              <div>
+                <h5 className="text-xs font-medium mb-1">Analysis Confidence:</h5>
+                <div className="text-xs">
+                  <span className="text-medical-dark">Confidence Level: {confidenceLevel}%</span>
+                </div>
               </div>
               
               <Separator className="my-1" />
@@ -318,12 +409,30 @@ const ReportGenerator: React.FC = () => {
                         {formatNumber(cellCounts.total)}
                       </span>
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-medical-dark text-opacity-70">Confidence:</span>
+                      <span className="font-medium">
+                        {confidenceLevel}%
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
               
               <div className="md:col-span-2">
                 <h4 className="font-medium mb-3 text-medical-dark border-b pb-2">Clinical Interpretation</h4>
+                
+                {/* Added detected cell types */}
+                <div className="mb-4">
+                  <h5 className="text-sm font-medium mb-2 text-medical-dark">Detected Cell Types:</h5>
+                  <ul className="list-disc pl-6 text-sm space-y-2">
+                    {mostFrequentCellTypes.map((cellType, index) => (
+                      <li key={index} className="text-medical-dark">
+                        {cellType}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
                 
                 <div className="mb-4">
                   <h5 className="text-sm font-medium mb-2 text-medical-dark">Findings:</h5>
