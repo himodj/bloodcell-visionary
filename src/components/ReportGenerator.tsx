@@ -142,49 +142,24 @@ const ReportGenerator: React.FC = () => {
           </div>
           
           <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <h4 className="font-medium mb-2 text-medical-dark">Sample Information</h4>
-                <div className="text-sm space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-medical-dark text-opacity-70">Analysis Date:</span>
-                    <span>{formatReportDate(analysisDate)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-medical-dark text-opacity-70">Abnormality Rate:</span>
-                    <span className="font-medium" style={{ color: getSeverityColor(severity) }}>
-                      {abnormalityRate.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-medical-dark text-opacity-70">Assessment:</span>
-                    <span className="font-medium" style={{ color: getSeverityColor(severity) }}>
-                      {getSeverityLabel(severity)}
-                    </span>
-                  </div>
+            <div className="mb-6">
+              <h4 className="font-medium mb-2 text-medical-dark">Sample Information</h4>
+              <div className="text-sm space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-medical-dark text-opacity-70">Analysis Date:</span>
+                  <span>{formatReportDate(analysisDate)}</span>
                 </div>
-              </div>
-              
-              <div>
-                <h4 className="font-medium mb-2 text-medical-dark">Cell Count Summary</h4>
-                <div className="text-sm space-y-2">
-                  {Object.entries(cellCounts.detectedCells)
-                    .filter(([_, count]) => count > 0)
-                    .sort(([_, countA], [__, countB]) => countB - countA)
-                    .slice(0, 4) // Show top 4 cell types
-                    .map(([cellType, count], index) => (
-                      <div key={index} className="flex justify-between">
-                        <span className="text-medical-dark text-opacity-70">{cellType}:</span>
-                        <span>{formatNumber(count)}</span>
-                      </div>
-                    ))
-                  }
-                  <div className="flex justify-between">
-                    <span className="text-medical-dark text-opacity-70">Total Cells:</span>
-                    <span className="font-medium">
-                      {formatNumber(cellCounts.total)}
-                    </span>
-                  </div>
+                <div className="flex justify-between">
+                  <span className="text-medical-dark text-opacity-70">Abnormality Rate:</span>
+                  <span className="font-medium" style={{ color: getSeverityColor(severity) }}>
+                    {abnormalityRate.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-medical-dark text-opacity-70">Assessment:</span>
+                  <span className="font-medium" style={{ color: getSeverityColor(severity) }}>
+                    {getSeverityLabel(severity)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -247,18 +222,6 @@ const ReportGenerator: React.FC = () => {
                 }}>
                   {getSeverityLabel(severity)} ({abnormalityRate.toFixed(1)}%)
                 </span>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                {Object.entries(cellCounts.detectedCells)
-                  .filter(([_, count]) => count > 0)
-                  .map(([cellType, count], index) => (
-                    <div key={index} className="flex justify-between">
-                      <span className="text-medical-dark text-opacity-70">{cellType}:</span>
-                      <span>{formatNumber(count)}</span>
-                    </div>
-                  ))
-                }
               </div>
               
               <Separator className="my-1" />
@@ -360,33 +323,7 @@ const ReportGenerator: React.FC = () => {
               </div>
               
               <div className="md:col-span-2">
-                <h4 className="font-medium mb-3 text-medical-dark border-b pb-2">Detailed Cell Analysis</h4>
-                
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  {Object.entries(cellCounts.detectedCells)
-                    .filter(([_, count]) => count > 0)
-                    .map(([cellType, count], index) => (
-                      <div key={index} className="bg-gray-50 p-3 rounded border">
-                        <div className="flex items-center mb-2">
-                          <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: getSeverityColor(severity) }}></div>
-                          <h5 className="font-medium text-sm">{cellType}</h5>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-medical-dark text-opacity-70">Count:</span>
-                          <span className="font-medium">{formatNumber(count)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-medical-dark text-opacity-70">Percentage:</span>
-                          <span className="font-medium">
-                            {((count / cellCounts.total) * 100).toFixed(1)}%
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  }
-                </div>
-                
-                <h4 className="font-medium mb-3 text-medical-dark border-b pb-2 mt-6">Clinical Interpretation</h4>
+                <h4 className="font-medium mb-3 text-medical-dark border-b pb-2">Clinical Interpretation</h4>
                 
                 <div className="mb-4">
                   <h5 className="text-sm font-medium mb-2 text-medical-dark">Findings:</h5>
