@@ -123,21 +123,227 @@ const generateProcessedImage = (imageDataUrl: string, detectedCells: DetectedCel
   });
 };
 
-// Function to map model output indices to cell types
-const mapIndexToCellType = (index: number): CellType => {
-  const cellTypeMap: Record<number, CellType> = {
-    0: 'Basophil',
-    1: 'Eosinophil',
-    2: 'Erythroblast',
-    3: 'IGImmatureWhiteCell',
-    4: 'Lymphocyte',
-    5: 'Monocyte',
-    6: 'Neutrophil',
-    7: 'Platelet',
-    8: 'RBC'
-  };
+// Generate conditions based on specific cell types and their counts
+const generateConditionsByCell = (cellCounts: Record<CellType, number>, abnormalityRate: number): string[] => {
+  const conditions: string[] = [];
   
-  return cellTypeMap[index] || 'RBC';
+  // High eosinophil count
+  if (cellCounts['Eosinophil'] > 2) {
+    conditions.push('Possible eosinophilia - may indicate allergic reaction or parasitic infection');
+  }
+  
+  // High basophil count
+  if (cellCounts['Basophil'] > 1) {
+    conditions.push('Elevated basophil count - may indicate inflammatory reaction or myeloproliferative disorder');
+  }
+  
+  // Presence of erythroblasts (immature RBCs)
+  if (cellCounts['Erythroblast'] > 0) {
+    conditions.push('Erythroblasts present in peripheral blood - may indicate severe anemia or bone marrow stress');
+  }
+  
+  // Immature white cells
+  if (cellCounts['IGImmatureWhiteCell'] > 0) {
+    conditions.push('Immature granulocytes detected - possible infection, inflammation, or myeloid malignancy');
+  }
+  
+  // Abnormal lymphocyte count
+  if (cellCounts['Lymphocyte'] > 4) {
+    conditions.push('Lymphocytosis - may indicate viral infection or lymphoproliferative disorder');
+  } else if (cellCounts['Lymphocyte'] < 1 && cellCounts['Lymphocyte'] > 0) {
+    conditions.push('Lymphopenia - possible immunosuppression or severe infection');
+  }
+  
+  // Neutrophil evaluation
+  if (cellCounts['Neutrophil'] > 5) {
+    conditions.push('Neutrophilia - indicates acute bacterial infection or inflammation');
+  } else if (cellCounts['Neutrophil'] < 1 && cellCounts['Neutrophil'] > 0) {
+    conditions.push('Neutropenia - risk of infection, may indicate bone marrow suppression');
+  }
+  
+  // Monocyte evaluation
+  if (cellCounts['Monocyte'] > 2) {
+    conditions.push('Monocytosis - may indicate chronic infection or inflammatory disease');
+  }
+  
+  // General abnormality rate-based conditions
+  if (abnormalityRate > 15) {
+    conditions.push('High rate of abnormal cells - comprehensive hematological evaluation recommended');
+  } else if (abnormalityRate > 10) {
+    conditions.push('Moderate cell abnormalities detected');
+  } else if (abnormalityRate > 5) {
+    conditions.push('Mild cell abnormalities detected');
+  } else if (conditions.length === 0) {
+    conditions.push('No significant abnormalities detected');
+  }
+  
+  return conditions;
+};
+
+// Generate recommendations based on cell findings
+const generateRecommendations = (detectedCells: Record<CellType, number>, abnormalityRate: number): string[] => {
+  const recommendations: string[] = [];
+  
+  // Eosinophil-specific recommendations
+  if (detectedCells['Eosinophil'] > 0) {
+    recommendations.push(`Eosinophil detected [${detectedCells['Eosinophil']} cells]: Check for allergies or parasitic infections`);
+    if (detectedCells['Eosinophil'] > 2) {
+      recommendations.push(`Elevated Eosinophil count [${detectedCells['Eosinophil']} cells]: Consider stool examination for ova and parasites`);
+    }
+  }
+  
+  // Basophil-specific recommendations
+  if (detectedCells['Basophil'] > 0) {
+    recommendations.push(`Basophil detected [${detectedCells['Basophil']} cells]: Monitor for hypersensitivity reactions`);
+    if (detectedCells['Basophil'] > 1) {
+      recommendations.push(`Elevated Basophil count [${detectedCells['Basophil']} cells]: Consider bone marrow examination if persistently elevated`);
+    }
+  }
+  
+  // Erythroblast-specific recommendations
+  if (detectedCells['Erythroblast'] > 0) {
+    recommendations.push(`Erythroblast detected [${detectedCells['Erythroblast']} cells]: Assess for hemolytic anemia or severe blood loss`);
+    recommendations.push(`Erythroblast present [${detectedCells['Erythroblast']} cells]: Bone marrow biopsy should be considered`);
+  }
+  
+  // Immature granulocyte recommendations
+  if (detectedCells['IGImmatureWhiteCell'] > 0) {
+    recommendations.push(`Immature Granulocytes [${detectedCells['IGImmatureWhiteCell']} cells]: Repeat complete blood count in 2-3 days`);
+    recommendations.push(`Immature Granulocytes [${detectedCells['IGImmatureWhiteCell']} cells]: Monitor for signs of infection or myeloproliferative disorders`);
+  }
+  
+  // Lymphocyte-specific recommendations
+  if (detectedCells['Lymphocyte'] > 0) {
+    if (detectedCells['Lymphocyte'] > 4) {
+      recommendations.push(`Elevated Lymphocyte count [${detectedCells['Lymphocyte']} cells]: Evaluate for viral infections, particularly EBV or CMV`);
+      recommendations.push(`Lymphocytosis [${detectedCells['Lymphocyte']} cells]: Flow cytometry if lymphocytosis persists to rule out lymphoproliferative disorder`);
+    } else if (detectedCells['Lymphocyte'] < 1) {
+      recommendations.push(`Low Lymphocyte count [${detectedCells['Lymphocyte']} cells]: Assess immune status and risk of opportunistic infections`);
+    }
+  }
+  
+  // Neutrophil-specific recommendations
+  if (detectedCells['Neutrophil'] > 0) {
+    if (detectedCells['Neutrophil'] > 5) {
+      recommendations.push(`Elevated Neutrophil count [${detectedCells['Neutrophil']} cells]: Search for source of infection or inflammation`);
+      recommendations.push(`Neutrophilia [${detectedCells['Neutrophil']} cells]: Blood cultures if fever present`);
+    } else if (detectedCells['Neutrophil'] < 1) {
+      recommendations.push(`Low Neutrophil count [${detectedCells['Neutrophil']} cells]: Neutropenic precautions and monitoring`);
+      recommendations.push(`Neutropenia [${detectedCells['Neutrophil']} cells]: Evaluate medication history for potential causes`);
+    }
+  }
+  
+  // Monocyte-specific recommendations
+  if (detectedCells['Monocyte'] > 0) {
+    if (detectedCells['Monocyte'] > 2) {
+      recommendations.push(`Elevated Monocyte count [${detectedCells['Monocyte']} cells]: Evaluate for chronic infections such as TB or endocarditis`);
+      recommendations.push(`Monocytosis [${detectedCells['Monocyte']} cells]: Consider autoimmune disorder workup`);
+    }
+  }
+  
+  // Red blood cell specific recommendations
+  if (detectedCells['RBC'] > 0) {
+    recommendations.push(`Red Blood Cells detected [${detectedCells['RBC']} cells]: Evaluate for morphological abnormalities`);
+  }
+  
+  // Platelet specific recommendations
+  if (detectedCells['Platelet'] > 0) {
+    recommendations.push(`Platelets detected [${detectedCells['Platelet']} cells]: Assess for clumping or abnormal morphology`);
+  }
+  
+  // General recommendations based on abnormality rate
+  if (abnormalityRate > 15) {
+    recommendations.push(`High abnormality rate [${abnormalityRate.toFixed(1)}%]: Urgent hematology consultation recommended`);
+    recommendations.push(`Severe abnormalities [${abnormalityRate.toFixed(1)}%]: Additional blood tests including flow cytometry`);
+  } else if (abnormalityRate > 10) {
+    recommendations.push(`Moderate abnormality rate [${abnormalityRate.toFixed(1)}%]: Follow-up with hematology within 2 weeks`);
+    recommendations.push(`Moderate abnormalities [${abnormalityRate.toFixed(1)}%]: Complete blood count with differential`);
+  } else if (abnormalityRate > 5) {
+    recommendations.push(`Mild abnormality rate [${abnormalityRate.toFixed(1)}%]: Repeat blood test in 1 month`);
+    recommendations.push(`Mild abnormalities [${abnormalityRate.toFixed(1)}%]: Clinical correlation with patient symptoms`);
+  } else if (recommendations.length === 0) {
+    recommendations.push(`No significant abnormality [${abnormalityRate.toFixed(1)}%]: Routine follow-up as clinically indicated`);
+    recommendations.push(`Normal findings [${abnormalityRate.toFixed(1)}%]: No immediate hematological intervention required`);
+  }
+  
+  return recommendations;
+};
+
+// Generate possible conditions based on cell counts
+const generatePossibleConditions = (detectedCells: Record<CellType, number>, abnormalityRate: number): string[] => {
+  const conditions: string[] = [];
+  
+  // High eosinophil count
+  if (detectedCells['Eosinophil'] > 0) {
+    if (detectedCells['Eosinophil'] > 2) {
+      conditions.push(`Eosinophilia [${detectedCells['Eosinophil']} cells] - may indicate allergic reaction or parasitic infection`);
+    } else {
+      conditions.push(`Eosinophil present [${detectedCells['Eosinophil']} cells] - monitor for allergic conditions`);
+    }
+  }
+  
+  // High basophil count
+  if (detectedCells['Basophil'] > 0) {
+    if (detectedCells['Basophil'] > 1) {
+      conditions.push(`Elevated basophil count [${detectedCells['Basophil']} cells] - may indicate inflammatory reaction or myeloproliferative disorder`);
+    } else {
+      conditions.push(`Basophil present [${detectedCells['Basophil']} cells] - within normal range`);
+    }
+  }
+  
+  // Presence of erythroblasts (immature RBCs)
+  if (detectedCells['Erythroblast'] > 0) {
+    conditions.push(`Erythroblasts present [${detectedCells['Erythroblast']} cells] - may indicate severe anemia or bone marrow stress`);
+  }
+  
+  // Immature white cells
+  if (detectedCells['IGImmatureWhiteCell'] > 0) {
+    conditions.push(`Immature granulocytes detected [${detectedCells['IGImmatureWhiteCell']} cells] - possible infection, inflammation, or myeloid malignancy`);
+  }
+  
+  // Abnormal lymphocyte count
+  if (detectedCells['Lymphocyte'] > 0) {
+    if (detectedCells['Lymphocyte'] > 4) {
+      conditions.push(`Lymphocytosis [${detectedCells['Lymphocyte']} cells] - may indicate viral infection or lymphoproliferative disorder`);
+    } else if (detectedCells['Lymphocyte'] < 1) {
+      conditions.push(`Lymphopenia [${detectedCells['Lymphocyte']} cells] - possible immunosuppression or severe infection`);
+    } else {
+      conditions.push(`Lymphocyte count [${detectedCells['Lymphocyte']} cells] - within normal range`);
+    }
+  }
+  
+  // Neutrophil evaluation
+  if (detectedCells['Neutrophil'] > 0) {
+    if (detectedCells['Neutrophil'] > 5) {
+      conditions.push(`Neutrophilia [${detectedCells['Neutrophil']} cells] - indicates acute bacterial infection or inflammation`);
+    } else if (detectedCells['Neutrophil'] < 1) {
+      conditions.push(`Neutropenia [${detectedCells['Neutrophil']} cells] - risk of infection, may indicate bone marrow suppression`);
+    } else {
+      conditions.push(`Neutrophil count [${detectedCells['Neutrophil']} cells] - within normal range`);
+    }
+  }
+  
+  // Monocyte evaluation
+  if (detectedCells['Monocyte'] > 0) {
+    if (detectedCells['Monocyte'] > 2) {
+      conditions.push(`Monocytosis [${detectedCells['Monocyte']} cells] - may indicate chronic infection or inflammatory disease`);
+    } else {
+      conditions.push(`Monocyte count [${detectedCells['Monocyte']} cells] - within normal range`);
+    }
+  }
+  
+  // General abnormality rate-based conditions
+  if (abnormalityRate > 15) {
+    conditions.push(`High rate of abnormal cells [${abnormalityRate.toFixed(1)}%] - comprehensive hematological evaluation recommended`);
+  } else if (abnormalityRate > 10) {
+    conditions.push(`Moderate cell abnormalities detected [${abnormalityRate.toFixed(1)}%]`);
+  } else if (abnormalityRate > 5) {
+    conditions.push(`Mild cell abnormalities detected [${abnormalityRate.toFixed(1)}%]`);
+  } else if (conditions.length === 0) {
+    conditions.push(`No significant abnormalities detected [${abnormalityRate.toFixed(1)}%]`);
+  }
+  
+  return conditions;
 };
 
 // Mock analysis function that will be replaced with real ML model in production
@@ -231,189 +437,6 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
     reportLayout: 'standard',
     notes: '' // Initialize with empty notes
   };
-};
-
-// Generate conditions based on specific cell types and their counts
-const generateConditionsByCell = (cellCounts: Record<CellType, number>, abnormalityRate: number): string[] => {
-  const conditions: string[] = [];
-  
-  // High eosinophil count
-  if (cellCounts['Eosinophil'] > 2) {
-    conditions.push('Possible eosinophilia - may indicate allergic reaction or parasitic infection');
-  }
-  
-  // High basophil count
-  if (cellCounts['Basophil'] > 1) {
-    conditions.push('Elevated basophil count - may indicate inflammatory reaction or myeloproliferative disorder');
-  }
-  
-  // Presence of erythroblasts (immature RBCs)
-  if (cellCounts['Erythroblast'] > 0) {
-    conditions.push('Erythroblasts present in peripheral blood - may indicate severe anemia or bone marrow stress');
-  }
-  
-  // Immature white cells
-  if (cellCounts['IGImmatureWhiteCell'] > 0) {
-    conditions.push('Immature granulocytes detected - possible infection, inflammation, or myeloid malignancy');
-  }
-  
-  // Abnormal lymphocyte count
-  if (cellCounts['Lymphocyte'] > 4) {
-    conditions.push('Lymphocytosis - may indicate viral infection or lymphoproliferative disorder');
-  } else if (cellCounts['Lymphocyte'] < 1 && cellCounts['Lymphocyte'] > 0) {
-    conditions.push('Lymphopenia - possible immunosuppression or severe infection');
-  }
-  
-  // Neutrophil evaluation
-  if (cellCounts['Neutrophil'] > 5) {
-    conditions.push('Neutrophilia - indicates acute bacterial infection or inflammation');
-  } else if (cellCounts['Neutrophil'] < 1 && cellCounts['Neutrophil'] > 0) {
-    conditions.push('Neutropenia - risk of infection, may indicate bone marrow suppression');
-  }
-  
-  // Monocyte evaluation
-  if (cellCounts['Monocyte'] > 2) {
-    conditions.push('Monocytosis - may indicate chronic infection or inflammatory disease');
-  }
-  
-  // General abnormality rate-based conditions
-  if (abnormalityRate > 15) {
-    conditions.push('High rate of abnormal cells - comprehensive hematological evaluation recommended');
-  } else if (abnormalityRate > 10) {
-    conditions.push('Moderate cell abnormalities detected');
-  } else if (abnormalityRate > 5) {
-    conditions.push('Mild cell abnormalities detected');
-  } else if (conditions.length === 0) {
-    conditions.push('No significant abnormalities detected');
-  }
-  
-  return conditions;
-};
-
-// Generate recommendations based on cell findings
-const generateRecommendations = (detectedCells: Record<CellType, number>, abnormalityRate: number): string[] => {
-  const recommendations: string[] = [];
-  
-  // Eosinophil-related recommendations
-  if (detectedCells['Eosinophil'] > 2) {
-    recommendations.push('Check for allergies or parasitic infections');
-    recommendations.push('Consider stool examination for ova and parasites');
-  }
-  
-  // Basophil-related recommendations
-  if (detectedCells['Basophil'] > 1) {
-    recommendations.push('Monitor for hypersensitivity reactions');
-    recommendations.push('Consider bone marrow examination if persistently elevated');
-  }
-  
-  // Erythroblast-related recommendations
-  if (detectedCells['Erythroblast'] > 0) {
-    recommendations.push('Assess for hemolytic anemia or severe blood loss');
-    recommendations.push('Bone marrow biopsy should be considered');
-  }
-  
-  // Immature granulocyte recommendations
-  if (detectedCells['IGImmatureWhiteCell'] > 0) {
-    recommendations.push('Repeat complete blood count in 2-3 days');
-    recommendations.push('Monitor for signs of infection or myeloproliferative disorders');
-  }
-  
-  // Lymphocyte-related recommendations
-  if (detectedCells['Lymphocyte'] > 4) {
-    recommendations.push('Evaluate for viral infections, particularly EBV or CMV');
-    recommendations.push('Flow cytometry if lymphocytosis persists to rule out lymphoproliferative disorder');
-  } else if (detectedCells['Lymphocyte'] < 1 && detectedCells['Lymphocyte'] > 0) {
-    recommendations.push('Assess immune status and risk of opportunistic infections');
-  }
-  
-  // Neutrophil-related recommendations
-  if (detectedCells['Neutrophil'] > 5) {
-    recommendations.push('Search for source of infection or inflammation');
-    recommendations.push('Blood cultures if fever present');
-  } else if (detectedCells['Neutrophil'] < 1 && detectedCells['Neutrophil'] > 0) {
-    recommendations.push('Neutropenic precautions and monitoring');
-    recommendations.push('Evaluate medication history for potential causes');
-  }
-  
-  // Monocyte-related recommendations
-  if (detectedCells['Monocyte'] > 2) {
-    recommendations.push('Evaluate for chronic infections such as TB or endocarditis');
-    recommendations.push('Consider autoimmune disorder workup');
-  }
-  
-  // General recommendations based on abnormality rate
-  if (abnormalityRate > 15) {
-    recommendations.push('Urgent hematology consultation recommended');
-    recommendations.push('Additional blood tests including flow cytometry');
-  } else if (abnormalityRate > 10) {
-    recommendations.push('Follow-up with hematology within 2 weeks');
-    recommendations.push('Complete blood count with differential');
-  } else if (abnormalityRate > 5) {
-    recommendations.push('Repeat blood test in 1 month');
-    recommendations.push('Clinical correlation with patient symptoms');
-  } else if (recommendations.length === 0) {
-    recommendations.push('Routine follow-up as clinically indicated');
-    recommendations.push('No immediate hematological intervention required');
-  }
-  
-  return recommendations;
-};
-
-// Generate possible conditions based on cell counts
-const generatePossibleConditions = (detectedCells: Record<CellType, number>, abnormalityRate: number): string[] => {
-  const conditions: string[] = [];
-  
-  // High eosinophil count
-  if (detectedCells['Eosinophil'] > 2) {
-    conditions.push('Possible eosinophilia - may indicate allergic reaction or parasitic infection');
-  }
-  
-  // High basophil count
-  if (detectedCells['Basophil'] > 1) {
-    conditions.push('Elevated basophil count - may indicate inflammatory reaction or myeloproliferative disorder');
-  }
-  
-  // Presence of erythroblasts (immature RBCs)
-  if (detectedCells['Erythroblast'] > 0) {
-    conditions.push('Erythroblasts present in peripheral blood - may indicate severe anemia or bone marrow stress');
-  }
-  
-  // Immature white cells
-  if (detectedCells['IGImmatureWhiteCell'] > 0) {
-    conditions.push('Immature granulocytes detected - possible infection, inflammation, or myeloid malignancy');
-  }
-  
-  // Abnormal lymphocyte count
-  if (detectedCells['Lymphocyte'] > 4) {
-    conditions.push('Lymphocytosis - may indicate viral infection or lymphoproliferative disorder');
-  } else if (detectedCells['Lymphocyte'] < 1 && detectedCells['Lymphocyte'] > 0) {
-    conditions.push('Lymphopenia - possible immunosuppression or severe infection');
-  }
-  
-  // Neutrophil evaluation
-  if (detectedCells['Neutrophil'] > 5) {
-    conditions.push('Neutrophilia - indicates acute bacterial infection or inflammation');
-  } else if (detectedCells['Neutrophil'] < 1 && detectedCells['Neutrophil'] > 0) {
-    conditions.push('Neutropenia - risk of infection, may indicate bone marrow suppression');
-  }
-  
-  // Monocyte evaluation
-  if (detectedCells['Monocyte'] > 2) {
-    conditions.push('Monocytosis - may indicate chronic infection or inflammatory disease');
-  }
-  
-  // General abnormality rate-based conditions
-  if (abnormalityRate > 15) {
-    conditions.push('High rate of abnormal cells - comprehensive hematological evaluation recommended');
-  } else if (abnormalityRate > 10) {
-    conditions.push('Moderate cell abnormalities detected');
-  } else if (abnormalityRate > 5) {
-    conditions.push('Mild cell abnormalities detected');
-  } else if (conditions.length === 0) {
-    conditions.push('No significant abnormalities detected');
-  }
-  
-  return conditions;
 };
 
 // This function simulates generating a formatted date for reports

@@ -24,6 +24,11 @@ const AnalysisResults: React.FC = () => {
     color: getCellTypeColor(type)
   })).filter(item => item.value > 0);
   
+  // Calculate average confidence level
+  const avgConfidence = detectedCells.length > 0
+    ? (detectedCells.reduce((sum, cell) => sum + cell.confidence, 0) / detectedCells.length * 100).toFixed(1)
+    : "N/A";
+  
   const getSeverityColor = (severity: string) => {
     const colors: Record<string, string> = {
       normal: '#34C759',
@@ -111,6 +116,11 @@ const AnalysisResults: React.FC = () => {
               }
               
               <div className="py-3 flex justify-between items-center">
+                <span className="text-sm text-medical-dark text-opacity-70">Analysis Confidence:</span>
+                <span className="font-medium text-medical-dark">{avgConfidence}%</span>
+              </div>
+              
+              <div className="py-3 flex justify-between items-center">
                 <span className="text-sm text-medical-dark text-opacity-70">Abnormality rate:</span>
                 <div className="flex items-center">
                   <div 
@@ -176,6 +186,37 @@ const AnalysisResults: React.FC = () => {
         </Card>
       </div>
       
+      <Card className="medical-card overflow-hidden mb-6 border-l-4" style={{ borderLeftColor: getSeverityColor(severity) }}>
+        <div className="p-4 bg-opacity-5 flex items-center justify-between" style={{ backgroundColor: `${getSeverityColor(severity)}20` }}>
+          <div className="flex items-center">
+            <AlertTriangle size={18} style={{ color: getSeverityColor(severity) }} className="mr-2" />
+            <h3 className="font-display font-medium text-medical-dark">Detected Cell Types</h3>
+          </div>
+        </div>
+        <CardContent className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {detectedCells.length > 0 ? (
+              detectedCells
+                .sort((a, b) => b.confidence - a.confidence)
+                .slice(0, 10)
+                .map((cell, index) => (
+                  <div key={index} className="flex items-center">
+                    <div 
+                      className="w-3 h-3 rounded-full mr-2" 
+                      style={{ backgroundColor: getCellTypeColor(cell.type) }}
+                    ></div>
+                    <span className="text-medical-dark">
+                      {cell.type} - {(cell.confidence * 100).toFixed(1)}% confidence
+                    </span>
+                  </div>
+                ))
+            ) : (
+              <p className="text-medical-dark text-opacity-70">No specific cells detected</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+      
       {abnormalityRate > 0 && (
         <Card className="medical-card overflow-hidden mb-6 border-l-4" style={{ borderLeftColor: getSeverityColor(severity) }}>
           <div className="p-4 bg-opacity-5 flex items-center justify-between" style={{ backgroundColor: `${getSeverityColor(severity)}20` }}>
@@ -209,7 +250,7 @@ const AnalysisResults: React.FC = () => {
         <div className="p-4 bg-medical-blue bg-opacity-5 border-b border-medical-blue border-opacity-10 flex items-center justify-between">
           <h3 className="font-display font-medium flex items-center text-medical-dark">
             <Circle size={16} className="text-medical-blue mr-2" />
-            Recommendations
+            Cell-Specific Recommendations
           </h3>
           <Button 
             variant="ghost" 

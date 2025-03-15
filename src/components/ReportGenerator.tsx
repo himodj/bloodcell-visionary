@@ -17,7 +17,7 @@ import {
 import { toast } from 'sonner';
 
 const ReportGenerator: React.FC = () => {
-  const { analysisResult, updateReportLayout, updateNotes } = useAnalysis();
+  const { analysisResult, updateReportLayout, updateNotes, updateRecommendations } = useAnalysis();
   
   if (!analysisResult) return null;
   
@@ -30,7 +30,7 @@ const ReportGenerator: React.FC = () => {
     ? (detectedCells.reduce((sum, cell) => sum + cell.confidence, 0) / detectedCells.length * 100).toFixed(1) 
     : "N/A";
   
-  // Get most frequent cell types (up to 3)
+  // Get most frequent cell types
   const getCellTypeCounts = () => {
     const counts: Record<string, number> = {};
     detectedCells.forEach(cell => {
@@ -39,14 +39,13 @@ const ReportGenerator: React.FC = () => {
     
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
       .map(([type, count]) => `${type} (${count})`);
   };
   
   const mostFrequentCellTypes = getCellTypeCounts();
   
   const handlePrintReport = () => {
-    generatePdfReport(analysisResult);
+    window.print();
     toast.success('Preparing report for printing');
   };
   
@@ -62,6 +61,17 @@ const ReportGenerator: React.FC = () => {
 
   const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     updateNotes(e.target.value);
+  };
+  
+  const handleEditRecommendations = () => {
+    const currentRecs = recommendations.join('\n');
+    const newRecs = prompt('Edit recommendations (one per line):', currentRecs);
+    
+    if (newRecs !== null) {
+      const recArray = newRecs.split('\n').filter(rec => rec.trim() !== '');
+      updateRecommendations(recArray);
+      toast.success('Recommendations updated');
+    }
   };
   
   const getSeverityLabel = (severity: string) => {
@@ -100,20 +110,16 @@ const ReportGenerator: React.FC = () => {
   // Lab report specific print styles
   const printStyles = `
     @media print {
+      @page {
+        size: A4;
+        margin: 15mm;
+      }
       body {
         margin: 0;
         padding: 0;
         background: white;
-      }
-      #print-content {
-        width: 210mm; /* A4 width */
-        min-height: 297mm; /* A4 height */
-        padding: 15mm;
-        margin: 0;
-        border: none;
-        box-shadow: none;
-        background: white;
-        page-break-after: always;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
       .no-print, .no-print * {
         display: none !important;
@@ -121,13 +127,35 @@ const ReportGenerator: React.FC = () => {
       .print-only {
         display: block !important;
       }
+      #root > div > header,
+      #root > div > main > div.animate-fade-in,
+      #root > div > main > div.grid,
+      #root > div > footer,
+      button, 
+      .select,
+      .controls-container {
+        display: none !important;
+      }
+      #print-content {
+        display: block !important;
+        width: 100%;
+        height: auto;
+        overflow: visible;
+        box-shadow: none;
+        border: none;
+      }
+      #print-content * {
+        color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
     }
   `;
 
   return (
     <div className="animate-fade-in">
       <style>{printStyles}</style>
-      <div className="flex items-center justify-between mb-4 no-print">
+      <div className="flex items-center justify-between mb-4 no-print controls-container">
         <h2 className="text-xl font-display font-medium flex items-center">
           <FileText size={20} className="mr-2 text-medical-blue" />
           Lab Report
@@ -209,12 +237,18 @@ const ReportGenerator: React.FC = () => {
                     {getSeverityLabel(severity)}
                   </span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-medical-dark text-opacity-70">Analysis Confidence:</span>
+                  <span className="font-medium">
+                    {confidenceLevel}%
+                  </span>
+                </div>
               </div>
             </div>
             
             <Separator className="my-4" />
             
-            {/* Added sections for detected cell types and confidence level */}
+            {/* Detected cell types section */}
             <div className="mb-6">
               <h4 className="font-medium mb-2 text-medical-dark">Detected Cell Types</h4>
               <div className="text-sm space-y-2">
@@ -223,13 +257,6 @@ const ReportGenerator: React.FC = () => {
                     {cellType}
                   </p>
                 ))}
-              </div>
-            </div>
-            
-            <div className="mb-6">
-              <h4 className="font-medium mb-2 text-medical-dark">Analysis Confidence</h4>
-              <div className="text-sm">
-                <p className="text-medical-dark">Confidence Level: {confidenceLevel}%</p>
               </div>
             </div>
             
@@ -246,8 +273,19 @@ const ReportGenerator: React.FC = () => {
               </div>
             </div>
             
-            <div>
-              <h4 className="font-medium mb-3 text-medical-dark">Recommendations</h4>
+            <div className="mb-6">
+              <h4 className="font-medium mb-3 text-medical-dark flex items-center justify-between">
+                <span>Cell-Specific Recommendations</span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleEditRecommendations}
+                  className="text-xs no-print"
+                >
+                  <Edit3 size={14} className="mr-1" />
+                  Edit
+                </Button>
+              </h4>
               <ul className="list-disc pl-6 text-sm space-y-2">
                 {recommendations.map((recommendation, index) => (
                   <li key={index} className="text-medical-dark">
@@ -295,7 +333,7 @@ const ReportGenerator: React.FC = () => {
               
               <Separator className="my-1" />
               
-              {/* Added detected cell types */}
+              {/* Detected cell types */}
               <div>
                 <h5 className="text-xs font-medium mb-1">Detected Cell Types:</h5>
                 <div className="text-xs space-y-1">
@@ -307,7 +345,7 @@ const ReportGenerator: React.FC = () => {
                 </div>
               </div>
               
-              {/* Added confidence level */}
+              {/* Analysis confidence */}
               <div>
                 <h5 className="text-xs font-medium mb-1">Analysis Confidence:</h5>
                 <div className="text-xs">
@@ -320,7 +358,7 @@ const ReportGenerator: React.FC = () => {
               <div>
                 <h5 className="text-xs font-medium mb-1">Key Findings:</h5>
                 <ul className="list-disc pl-4 text-xs space-y-1">
-                  {possibleConditions.slice(0, 3).map((condition, index) => (
+                  {possibleConditions.map((condition, index) => (
                     <li key={index} className="text-medical-dark">
                       {condition}
                     </li>
@@ -329,9 +367,20 @@ const ReportGenerator: React.FC = () => {
               </div>
               
               <div>
-                <h5 className="text-xs font-medium mb-1">Recommendations:</h5>
+                <h5 className="text-xs font-medium flex items-center justify-between mb-1">
+                  <span>Cell-Specific Recommendations:</span>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleEditRecommendations}
+                    className="text-xs no-print"
+                  >
+                    <Edit3 size={10} className="mr-1" />
+                    Edit
+                  </Button>
+                </h5>
                 <ul className="list-disc pl-4 text-xs space-y-1">
-                  {recommendations.slice(0, 3).map((recommendation, index) => (
+                  {recommendations.map((recommendation, index) => (
                     <li key={index} className="text-medical-dark">
                       {recommendation}
                     </li>
@@ -422,7 +471,7 @@ const ReportGenerator: React.FC = () => {
               <div className="md:col-span-2">
                 <h4 className="font-medium mb-3 text-medical-dark border-b pb-2">Clinical Interpretation</h4>
                 
-                {/* Added detected cell types */}
+                {/* Detected cell types */}
                 <div className="mb-4">
                   <h5 className="text-sm font-medium mb-2 text-medical-dark">Detected Cell Types:</h5>
                   <ul className="list-disc pl-6 text-sm space-y-2">
@@ -446,7 +495,18 @@ const ReportGenerator: React.FC = () => {
                 </div>
                 
                 <div>
-                  <h5 className="text-sm font-medium mb-2 text-medical-dark">Clinical Recommendations:</h5>
+                  <h5 className="text-sm font-medium flex items-center justify-between mb-2">
+                    <span>Cell-Specific Recommendations:</span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={handleEditRecommendations}
+                      className="text-xs no-print"
+                    >
+                      <Edit3 size={14} className="mr-1" />
+                      Edit
+                    </Button>
+                  </h5>
                   <ul className="list-disc pl-6 text-sm space-y-2">
                     {recommendations.map((recommendation, index) => (
                       <li key={index} className="text-medical-dark">
