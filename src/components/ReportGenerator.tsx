@@ -5,8 +5,9 @@ import { formatReportDate, generateReportId, generatePdfReport, determineSeverit
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { FilePlus, Printer, FileText, LayoutGrid } from 'lucide-react';
+import { FilePlus, Printer, FileText, LayoutGrid, PenLine } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -18,6 +19,13 @@ import { toast } from 'sonner';
 
 const ReportGenerator: React.FC = () => {
   const { analysisResult, updateReportLayout, updateNotes, updateRecommendations } = useAnalysis();
+  
+  // Add patient information state
+  const [patientName, setPatientName] = useState('');
+  const [patientAge, setPatientAge] = useState('');
+  const [patientGender, setPatientGender] = useState('');
+  const [customAbnormalityRate, setCustomAbnormalityRate] = useState<string>('');
+  const [customAssessment, setCustomAssessment] = useState<string>('');
   
   if (!analysisResult) return null;
   
@@ -104,6 +112,48 @@ const ReportGenerator: React.FC = () => {
         value={notes || ''}
         onChange={handleNotesChange}
       />
+    </div>
+  );
+
+  // Patient information section for all layouts
+  const PatientInfoSection = () => (
+    <div className="mb-4">
+      <h4 className="font-medium mb-2 text-medical-dark">Patient Information</h4>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label className="text-sm text-medical-dark mb-1 block">Patient Name</label>
+          <Input 
+            placeholder="Enter patient name" 
+            value={patientName} 
+            onChange={(e) => setPatientName(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-sm text-medical-dark mb-1 block">Age</label>
+          <Input 
+            placeholder="Enter age" 
+            type="number"
+            value={patientAge} 
+            onChange={(e) => setPatientAge(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-sm text-medical-dark mb-1 block">Gender</label>
+          <Select 
+            value={patientGender} 
+            onValueChange={setPatientGender}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select gender" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="male">Male</SelectItem>
+              <SelectItem value="female">Female</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
     </div>
   );
 
@@ -218,6 +268,11 @@ const ReportGenerator: React.FC = () => {
           </div>
           
           <CardContent className="p-4">
+            {/* Patient Information */}
+            <PatientInfoSection />
+            
+            <Separator className="my-4" />
+            
             <div className="mb-6">
               <h4 className="font-medium mb-2 text-medical-dark">Sample Information</h4>
               <div className="text-sm space-y-2">
@@ -225,17 +280,28 @@ const ReportGenerator: React.FC = () => {
                   <span className="text-medical-dark text-opacity-70">Analysis Date:</span>
                   <span>{formatReportDate(analysisDate)}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-medical-dark text-opacity-70">Abnormality Rate:</span>
-                  <span className="font-medium" style={{ color: getSeverityColor(severity) }}>
-                    {abnormalityRate.toFixed(1)}%
-                  </span>
+                  <div className="flex items-center">
+                    <Input 
+                      className="w-24 h-7 text-sm mr-2 inline-block"
+                      value={customAbnormalityRate || abnormalityRate.toFixed(1)}
+                      onChange={(e) => setCustomAbnormalityRate(e.target.value)}
+                      placeholder={abnormalityRate.toFixed(1)}
+                    />
+                    <span className="font-medium">%</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-medical-dark text-opacity-70">Assessment:</span>
-                  <span className="font-medium" style={{ color: getSeverityColor(severity) }}>
-                    {getSeverityLabel(severity)}
-                  </span>
+                  <div className="flex items-center">
+                    <Input 
+                      className="w-40 h-7 text-sm"
+                      value={customAssessment || getSeverityLabel(severity)}
+                      onChange={(e) => setCustomAssessment(e.target.value)}
+                      placeholder={getSeverityLabel(severity)}
+                    />
+                  </div>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-medical-dark text-opacity-70">Analysis Confidence:</span>
@@ -252,11 +318,15 @@ const ReportGenerator: React.FC = () => {
             <div className="mb-6">
               <h4 className="font-medium mb-2 text-medical-dark">Detected Cell Types</h4>
               <div className="text-sm space-y-2">
-                {mostFrequentCellTypes.map((cellType, index) => (
-                  <p key={index} className="text-medical-dark">
-                    {cellType}
-                  </p>
-                ))}
+                {mostFrequentCellTypes.length > 0 ? (
+                  mostFrequentCellTypes.map((cellType, index) => (
+                    <p key={index} className="text-medical-dark">
+                      {cellType}
+                    </p>
+                  ))
+                ) : (
+                  <p className="text-medical-dark">No cells detected</p>
+                )}
               </div>
             </div>
             
@@ -282,7 +352,7 @@ const ReportGenerator: React.FC = () => {
                   onClick={handleEditRecommendations}
                   className="text-xs no-print"
                 >
-                  <Edit3 size={14} className="mr-1" />
+                  <PenLine size={14} className="mr-1" />
                   Edit
                 </Button>
               </h4>
@@ -321,14 +391,62 @@ const ReportGenerator: React.FC = () => {
           
           <CardContent className="p-3">
             <div className="flex flex-col space-y-3">
+              {/* Patient Information - Compact */}
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div>
+                  <label className="block text-medical-dark mb-1">Patient Name</label>
+                  <Input 
+                    className="h-7 text-xs"
+                    placeholder="Enter name" 
+                    value={patientName} 
+                    onChange={(e) => setPatientName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-medical-dark mb-1">Age</label>
+                  <Input 
+                    className="h-7 text-xs"
+                    placeholder="Age" 
+                    type="number"
+                    value={patientAge} 
+                    onChange={(e) => setPatientAge(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-medical-dark mb-1">Gender</label>
+                  <Select 
+                    value={patientGender} 
+                    onValueChange={setPatientGender}
+                  >
+                    <SelectTrigger className="h-7 text-xs">
+                      <SelectValue placeholder="Gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
               <div className="flex items-center justify-between text-xs border-b pb-2">
                 <span>Generated: {formatReportDate(analysisDate)}</span>
-                <span className="font-medium px-2 py-1 rounded" style={{ 
-                  backgroundColor: `${getSeverityColor(severity)}20`,
-                  color: getSeverityColor(severity)
-                }}>
-                  {getSeverityLabel(severity)} ({abnormalityRate.toFixed(1)}%)
-                </span>
+                <div className="flex items-center">
+                  <Input 
+                    className="w-16 h-6 text-xs mr-1"
+                    value={customAbnormalityRate || abnormalityRate.toFixed(1)}
+                    onChange={(e) => setCustomAbnormalityRate(e.target.value)}
+                    placeholder={abnormalityRate.toFixed(1)}
+                  />
+                  <span>% - </span>
+                  <Input 
+                    className="w-32 h-6 text-xs ml-1"
+                    value={customAssessment || getSeverityLabel(severity)}
+                    onChange={(e) => setCustomAssessment(e.target.value)}
+                    placeholder={getSeverityLabel(severity)}
+                  />
+                </div>
               </div>
               
               <Separator className="my-1" />
@@ -337,11 +455,15 @@ const ReportGenerator: React.FC = () => {
               <div>
                 <h5 className="text-xs font-medium mb-1">Detected Cell Types:</h5>
                 <div className="text-xs space-y-1">
-                  {mostFrequentCellTypes.map((cellType, index) => (
-                    <div key={index} className="text-medical-dark">
-                      {cellType}
-                    </div>
-                  ))}
+                  {mostFrequentCellTypes.length > 0 ? (
+                    mostFrequentCellTypes.map((cellType, index) => (
+                      <div key={index} className="text-medical-dark">
+                        {cellType}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-medical-dark">No cells detected</div>
+                  )}
                 </div>
               </div>
               
@@ -375,7 +497,7 @@ const ReportGenerator: React.FC = () => {
                     onClick={handleEditRecommendations}
                     className="text-xs no-print"
                   >
-                    <Edit3 size={10} className="mr-1" />
+                    <PenLine size={10} className="mr-1" />
                     Edit
                   </Button>
                 </h5>
@@ -427,6 +549,48 @@ const ReportGenerator: React.FC = () => {
           </div>
           
           <CardContent className="p-4">
+            {/* Patient Information for detailed layout */}
+            <div className="mb-4">
+              <h4 className="font-medium mb-2 text-medical-dark">Patient Information</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-sm text-medical-dark mb-1 block">Patient Name</label>
+                  <Input 
+                    placeholder="Enter patient name" 
+                    value={patientName} 
+                    onChange={(e) => setPatientName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-medical-dark mb-1 block">Age</label>
+                  <Input 
+                    placeholder="Enter age" 
+                    type="number"
+                    value={patientAge} 
+                    onChange={(e) => setPatientAge(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-medical-dark mb-1 block">Gender</label>
+                  <Select 
+                    value={patientGender} 
+                    onValueChange={setPatientGender}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+            
+            <Separator className="my-4" />
+            
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               <div className="md:col-span-1">
                 {processedImage && (
@@ -440,17 +604,26 @@ const ReportGenerator: React.FC = () => {
                 <div className="bg-gray-50 p-3 rounded border">
                   <h4 className="font-medium text-sm mb-2 text-medical-dark">Assessment Summary</h4>
                   <div className="text-sm space-y-2">
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center">
                       <span className="text-medical-dark text-opacity-70">Status:</span>
-                      <span className="font-medium" style={{ color: getSeverityColor(severity) }}>
-                        {getSeverityLabel(severity)}
-                      </span>
+                      <Input 
+                        className="w-32 h-7 text-sm"
+                        value={customAssessment || getSeverityLabel(severity)}
+                        onChange={(e) => setCustomAssessment(e.target.value)}
+                        placeholder={getSeverityLabel(severity)}
+                      />
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center">
                       <span className="text-medical-dark text-opacity-70">Abnormality:</span>
-                      <span className="font-medium" style={{ color: getSeverityColor(severity) }}>
-                        {abnormalityRate.toFixed(1)}%
-                      </span>
+                      <div className="flex items-center">
+                        <Input 
+                          className="w-20 h-7 text-sm mr-1"
+                          value={customAbnormalityRate || abnormalityRate.toFixed(1)}
+                          onChange={(e) => setCustomAbnormalityRate(e.target.value)}
+                          placeholder={abnormalityRate.toFixed(1)}
+                        />
+                        <span>%</span>
+                      </div>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-medical-dark text-opacity-70">Total Cells:</span>
@@ -475,11 +648,15 @@ const ReportGenerator: React.FC = () => {
                 <div className="mb-4">
                   <h5 className="text-sm font-medium mb-2 text-medical-dark">Detected Cell Types:</h5>
                   <ul className="list-disc pl-6 text-sm space-y-2">
-                    {mostFrequentCellTypes.map((cellType, index) => (
-                      <li key={index} className="text-medical-dark">
-                        {cellType}
-                      </li>
-                    ))}
+                    {mostFrequentCellTypes.length > 0 ? (
+                      mostFrequentCellTypes.map((cellType, index) => (
+                        <li key={index} className="text-medical-dark">
+                          {cellType}
+                        </li>
+                      ))
+                    ) : (
+                      <li className="text-medical-dark">No cells detected</li>
+                    )}
                   </ul>
                 </div>
                 
@@ -503,7 +680,7 @@ const ReportGenerator: React.FC = () => {
                       onClick={handleEditRecommendations}
                       className="text-xs no-print"
                     >
-                      <Edit3 size={14} className="mr-1" />
+                      <PenLine size={14} className="mr-1" />
                       Edit
                     </Button>
                   </h5>
