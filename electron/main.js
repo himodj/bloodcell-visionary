@@ -74,3 +74,52 @@ ipcMain.handle('get-model-dir', async (event, modelJsonPath) => {
   const modelDir = path.dirname(modelJsonPath);
   return modelDir;
 });
+
+// New handler for TensorFlow.js model format checking
+ipcMain.handle('check-model-format', async (event, modelPath) => {
+  try {
+    // Check if it's a .h5 file
+    if (modelPath.endsWith('.h5')) {
+      return { format: 'h5', path: modelPath };
+    }
+    
+    // Check if it's a model.json file
+    if (modelPath.endsWith('.json')) {
+      const content = fs.readFileSync(modelPath, 'utf8');
+      try {
+        const json = JSON.parse(content);
+        if (json.format === 'layers-model' || json.modelTopology) {
+          // It's a valid TensorFlow.js model JSON
+          return { format: 'tfjs', path: modelPath };
+        }
+      } catch (e) {
+        // Invalid JSON or not a TensorFlow.js model
+        return { error: 'Not a valid TensorFlow.js model JSON file' };
+      }
+    }
+    
+    return { error: 'Unsupported model format' };
+  } catch (error) {
+    return { error: error.message };
+  }
+});
+
+// Handler to load model file contents
+ipcMain.handle('read-model-file', async (event, filePath) => {
+  try {
+    const content = fs.readFileSync(filePath);
+    return { success: true, data: content.toString('base64') };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Handler to read files in directory
+ipcMain.handle('read-model-dir', async (event, dirPath) => {
+  try {
+    const files = fs.readdirSync(dirPath);
+    return files.map(file => path.join(dirPath, file));
+  } catch (error) {
+    return { error: error.message };
+  }
+});

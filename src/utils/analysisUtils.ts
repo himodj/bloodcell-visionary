@@ -1,3 +1,4 @@
+
 import * as tf from '@tensorflow/tfjs';
 import { AnalysisResult, CellCount, CellType, DetectedCell } from '../contexts/AnalysisContext';
 
@@ -10,12 +11,61 @@ let model: tf.LayersModel | null = null;
 // Function to initialize the model with a local path
 export const initializeModel = async (path: string): Promise<void> => {
   try {
+    console.log('Loading model from path:', path);
     modelPath = path;
-    model = await tf.loadLayersModel(`file://${path}`);
-    console.log('Model loaded successfully from:', path);
+    
+    // Check if we're in Electron environment
+    if (window.electron) {
+      // First check the model format
+      const formatCheck = await window.electron.checkModelFormat(path);
+      
+      if (formatCheck.error) {
+        throw new Error(formatCheck.error);
+      }
+      
+      if (formatCheck.format === 'h5') {
+        // For H5 files, we need to warn the user that this format is not directly supported in the browser
+        throw new Error('H5 format is not supported in the browser. Please convert your model to TensorFlow.js format using the tfjs-converter.');
+      } else if (formatCheck.format === 'tfjs') {
+        // For TensorFlow.js JSON models
+        const modelUrl = `file://${path}`;
+        console.log('Loading TensorFlow.js model from:', modelUrl);
+        
+        // For loading from file:// URLs, we need to handle sharded weights files
+        try {
+          model = await tf.loadLayersModel(modelUrl);
+          console.log('Model loaded successfully');
+        } catch (error) {
+          console.error('Error loading model directly:', error);
+          
+          // If direct loading fails, we need to manually load the model files
+          const modelDir = await window.electron.getModelDir(path);
+          const files = await window.electron.readModelDir(modelDir);
+          
+          // Match weight files that follow the pattern of model.weights.bin or shard-*.bin
+          const weightFiles = files.filter((file: string) => 
+            file.endsWith('.bin') && (file.includes('weights') || file.includes('shard'))
+          );
+          
+          if (weightFiles.length === 0) {
+            throw new Error('No weight files found for the model');
+          }
+          
+          console.log('Found weight files:', weightFiles);
+          throw new Error('Model loading requires additional implementation for sharded weights. Please convert your model to a single-file format.');
+        }
+      }
+    } else {
+      // Browser environment - try to load directly if it's a URL
+      if (path.startsWith('http') || path.startsWith('blob')) {
+        model = await tf.loadLayersModel(path);
+      } else {
+        throw new Error('Local file paths are only supported in the Electron app. In the browser, provide a URL to the model.');
+      }
+    }
   } catch (error) {
     console.error('Failed to load model:', error);
-    throw new Error('Failed to load the model. Please check the file path.');
+    throw new Error(`Failed to load the model. ${error instanceof Error ? error.message : 'Please check the file path.'}`);
   }
 };
 
