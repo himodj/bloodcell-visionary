@@ -28,6 +28,8 @@ function createWindow() {
       });
 
   console.log('Loading URL:', startUrl);
+  console.log('Environment:', process.env.NODE_ENV);
+  
   mainWindow.loadURL(startUrl);
 
   if (isDev) {
