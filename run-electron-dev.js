@@ -19,8 +19,11 @@ exec('npm install', (error, stdout, stderr) => {
   }
   
   console.log('Starting Electron app in development mode...');
+  // Set NODE_ENV for Windows and Unix compatibly
+  const setEnvCmd = process.platform === 'win32' ? 'set NODE_ENV=development&&' : 'NODE_ENV=development';
+  
   // Start the Electron app in development mode
-  const electronProcess = exec('npm run dev', (error, stdout, stderr) => {
+  const electronProcess = exec(`${setEnvCmd} npm run dev`, (error, stdout, stderr) => {
     if (error) {
       console.error(`Error starting Electron app: ${error}`);
       return;

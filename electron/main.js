@@ -20,7 +20,7 @@ function createWindow() {
 
   // Determine the appropriate URL to load
   const startUrl = isDev
-    ? 'http://localhost:5173' // Vite dev server
+    ? 'http://localhost:8080' // Vite dev server (updated port to 8080)
     : url.format({
         pathname: path.join(__dirname, '../dist/index.html'),
         protocol: 'file:',
