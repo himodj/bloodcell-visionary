@@ -1,4 +1,3 @@
-
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -15,9 +14,22 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
+      // Enable camera access in the WebContents
+      webSecurity: true,
     },
     title: "BloodCell Analyzer",
     icon: path.join(__dirname, 'icon.ico')
+  });
+
+  // Request permission for camera access
+  mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+    if (permission === 'media') {
+      // Allow camera access
+      return callback(true);
+    }
+    
+    // Deny other permissions
+    callback(false);
   });
 
   // Determine the appropriate URL to load

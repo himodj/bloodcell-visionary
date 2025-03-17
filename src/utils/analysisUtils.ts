@@ -72,7 +72,7 @@ export const initializeModel = async (path: string, forceH5 = false): Promise<vo
   }
 };
 
-// Function to handle image upload
+// Function to handle image upload and resize to 360x360
 export const handleImageUpload = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     if (!file.type.match('image.*')) {
@@ -83,7 +83,14 @@ export const handleImageUpload = (file: File): Promise<string> => {
     const reader = new FileReader();
     reader.onload = (e) => {
       if (e.target?.result) {
-        resolve(e.target.result as string);
+        // Resize the image to 360x360 before returning
+        resizeImageTo360x360(e.target.result as string)
+          .then(resizedImageDataUrl => {
+            resolve(resizedImageDataUrl);
+          })
+          .catch(error => {
+            reject(error);
+          });
       } else {
         reject(new Error('Error reading file'));
       }
@@ -93,16 +100,63 @@ export const handleImageUpload = (file: File): Promise<string> => {
   });
 };
 
-// Function to preprocess the image for the model
+// New function to resize an image to exactly 360x360
+const resizeImageTo360x360 = (imageDataUrl: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 360;
+      canvas.height = 360;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        reject(new Error('Failed to get canvas context'));
+        return;
+      }
+      
+      // Calculate aspect ratio to determine positioning for center crop
+      const sourceWidth = img.width;
+      const sourceHeight = img.height;
+      
+      let sourceX = 0;
+      let sourceY = 0;
+      let sourceSize = Math.min(sourceWidth, sourceHeight);
+      
+      // Center the crop
+      if (sourceWidth > sourceHeight) {
+        sourceX = (sourceWidth - sourceHeight) / 2;
+      } else {
+        sourceY = (sourceHeight - sourceWidth) / 2;
+      }
+      
+      // Draw only the center square portion of the image, scaled to 360x360
+      ctx.drawImage(
+        img,
+        sourceX, sourceY, sourceSize, sourceSize, // Source rectangle (center square)
+        0, 0, 360, 360 // Destination rectangle (full 360x360 canvas)
+      );
+      
+      // Get the resized image as data URL
+      const resizedImageDataUrl = canvas.toDataURL('image/png');
+      resolve(resizedImageDataUrl);
+    };
+    
+    img.onerror = () => reject(new Error('Failed to load image'));
+    img.src = imageDataUrl;
+  });
+};
+
+// Update preprocessImage to use the exact 360x360 dimensions
 const preprocessImage = async (imageDataUrl: string): Promise<tf.Tensor> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
       // Create a canvas to resize and process the image
       const canvas = document.createElement('canvas');
-      // Set dimensions based on your model's input requirements
-      canvas.width = 224;  // Adjust to your model's requirements
-      canvas.height = 224; // Adjust to your model's requirements
+      // Set dimensions to 360x360 as required by the model
+      canvas.width = 360;
+      canvas.height = 360;
       const ctx = canvas.getContext('2d');
       
       if (!ctx) {
@@ -404,6 +458,9 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
   console.log('Analyzing blood sample with model path:', modelPath);
   console.log('Is H5 model:', isH5Model);
   
+  // Ensure the image is exactly 360x360 before analysis
+  const resizedImageUrl = await resizeImageTo360x360(imageUrl);
+  
   // Simulate processing delay
   await new Promise(resolve => setTimeout(resolve, 1500));
   
@@ -477,10 +534,10 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
   // Create mock possible conditions based on cell counts
   const possibleConditions = generatePossibleConditions(detectedCells, abnormalityRate);
   
-  // Create and return the analysis result object
+  // Create and return the analysis result object, using the resized image
   return {
-    image: imageUrl,
-    processedImage: await generateProcessedImage(imageUrl, detections),
+    image: resizedImageUrl, // Use the properly sized image
+    processedImage: await generateProcessedImage(resizedImageUrl, detections),
     cellCounts,
     abnormalityRate,
     possibleConditions,
@@ -546,5 +603,4 @@ export const getCellTypeColor = (cellType: string): string => {
   
   return colorMap[cellType] || '#8E8E93';
 };
-
 
