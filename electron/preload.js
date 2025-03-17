@@ -5,6 +5,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electron', {
   selectModel: () => ipcRenderer.invoke('select-model'),
+  getDefaultModelPath: () => ipcRenderer.invoke('get-default-model-path'),
   getModelDir: (modelJsonPath) => ipcRenderer.invoke('get-model-dir', modelJsonPath),
   checkModelFormat: (modelPath) => ipcRenderer.invoke('check-model-format', modelPath),
   readModelFile: (filePath) => ipcRenderer.invoke('read-model-file', filePath),

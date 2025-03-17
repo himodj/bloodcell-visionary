@@ -10,17 +10,36 @@ import { toast } from 'sonner';
 const isElectron = typeof window !== 'undefined' && window.electron?.isElectron === true;
 
 // Define a global function to load model that can be called from UI
-(window as any).loadModel = async () => {
+(window as any).loadModel = async (modelPath?: string) => {
   if (isElectron && window.electron) {
     try {
-      const modelPath = await window.electron.selectModel();
-      if (modelPath) {
-        console.log('Selected model path:', modelPath);
-        await initializeModel(modelPath);
+      let selectedModelPath = modelPath;
+      
+      // If no model path was provided, prompt user to select one
+      if (!selectedModelPath) {
+        selectedModelPath = await window.electron.selectModel();
+      }
+      
+      if (selectedModelPath) {
+        console.log('Selected model path:', selectedModelPath);
+        
+        const formatCheck = await window.electron.checkModelFormat(selectedModelPath);
+        if (formatCheck.error) {
+          toast.error(`Model format check failed: ${formatCheck.error}`);
+          return false;
+        }
+        
+        if (formatCheck.format === 'h5') {
+          // For H5 files, we'll try to load it directly
+          // Later we can implement conversion if needed
+          toast.info('H5 format detected. Attempting to load directly...');
+        }
+        
+        await initializeModel(selectedModelPath);
         console.log('Model initialized successfully');
         return true;
       } else {
-        console.log('No model selected by user');
+        console.log('No model selected or found');
         return false;
       }
     } catch (error) {

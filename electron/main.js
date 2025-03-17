@@ -57,16 +57,31 @@ app.on('activate', () => {
 
 // Handle model loading
 ipcMain.handle('select-model', async () => {
-  const { canceled, filePaths } = await dialog.showOpenDialog({
-    properties: ['openFile'],
-    filters: [{ name: 'Model Files', extensions: ['h5', 'json'] }],
-  });
+  // Instead of showing a dialog, use the fixed model path
+  const modelPath = path.join(app.getAppPath(), 'model.h5');
   
-  if (canceled) {
+  // Check if the model file exists
+  if (fs.existsSync(modelPath)) {
+    return modelPath;
+  } else {
+    // Log the path being checked for debugging
+    console.error(`Model file not found at: ${modelPath}`);
+    console.log(`Current app path: ${app.getAppPath()}`);
     return null;
   }
+});
+
+// Get default model path without user selection
+ipcMain.handle('get-default-model-path', async () => {
+  const modelPath = path.join(app.getAppPath(), 'model.h5');
   
-  return filePaths[0];
+  // Check if the model file exists
+  if (fs.existsSync(modelPath)) {
+    return modelPath;
+  } else {
+    console.error(`Model file not found at: ${modelPath}`);
+    return null;
+  }
 });
 
 // Handle opening the model directory

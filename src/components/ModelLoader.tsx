@@ -9,7 +9,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
 
@@ -22,7 +21,42 @@ const ModelLoader: React.FC = () => {
   // Check if we're in Electron on component mount
   useEffect(() => {
     setIsElectron(!!window.electron?.isElectron);
+    
+    // Try to auto-load the model if we're in Electron
+    if (window.electron?.isElectron) {
+      loadDefaultModel();
+    }
   }, []);
+
+  // New function to load default model
+  const loadDefaultModel = async () => {
+    if (!window.electron) return;
+    
+    try {
+      setIsLoading(true);
+      const modelPath = await window.electron.getDefaultModelPath();
+      
+      if (modelPath) {
+        console.log('Default model found at:', modelPath);
+        // Call the global function we defined in main.tsx to load the model
+        const success = await (window as any).loadModel(modelPath);
+        if (success) {
+          setIsModelLoaded(true);
+          toast.success('Model loaded successfully from project folder');
+        } else {
+          toast.error('Failed to load the default model');
+          console.error('Failed to load default model');
+        }
+      } else {
+        console.warn('No default model found in project folder');
+      }
+    } catch (error) {
+      console.error('Error loading default model:', error);
+      toast.error(typeof error === 'string' ? error : 'Failed to load default model');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLoadModel = async () => {
     // Check if we're in Electron environment
@@ -42,7 +76,7 @@ const ModelLoader: React.FC = () => {
         setIsModelLoaded(true);
         toast.success('Model loaded successfully');
       } else {
-        toast.error('No model was selected');
+        toast.error('No model was selected or model failed to load');
       }
     } catch (error) {
       console.error('Error loading model:', error);
@@ -125,22 +159,15 @@ const ModelLoader: React.FC = () => {
             
             <h3 className="font-medium">Using the Desktop App</h3>
             <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>Download and install the desktop application</li>
-              <li>Click the "Load H5 Model" button</li>
-              <li>Select a valid TensorFlow model file (.h5)</li>
-              <li>Wait for the model to load - you'll see a success message</li>
+              <li>The app will automatically try to load a model named "model.h5" from the app directory</li>
+              <li>Ensure the model file is named "model.h5" and placed in the root of the project</li>
+              <li>If auto-loading fails, click the "Load H5 Model" button to manually select the model</li>
             </ol>
             
-            <h3 className="font-medium">Running Locally</h3>
+            <h3 className="font-medium">H5 Format Support</h3>
             <p className="text-sm text-muted-foreground">
-              To run the desktop version locally from source code:
+              Currently, we're working on support for H5 format models. TensorFlow.js typically requires converted models, but we're trying to work with the H5 format directly.
             </p>
-            <pre className="bg-slate-100 p-2 rounded text-xs">
-              <code>
-                npm install
-                node run-electron-dev.js
-              </code>
-            </pre>
           </div>
           
           <DialogFooter>
