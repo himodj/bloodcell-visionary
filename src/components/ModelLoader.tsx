@@ -11,6 +11,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 const ModelLoader: React.FC = () => {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
@@ -19,6 +20,7 @@ const ModelLoader: React.FC = () => {
   const [showModelHelp, setShowModelHelp] = useState(false);
   const [modelPath, setModelPath] = useState<string | null>(null);
   const [isH5Model, setIsH5Model] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Check if we're in Electron on component mount
   useEffect(() => {
@@ -37,6 +39,7 @@ const ModelLoader: React.FC = () => {
     
     try {
       setIsLoading(true);
+      setLoadError(null);
       const modelPath = await window.electron.getDefaultModelPath();
       
       if (modelPath) {
@@ -54,15 +57,20 @@ const ModelLoader: React.FC = () => {
           setIsModelLoaded(true);
           toast.success('Model loaded successfully from: ' + modelPath);
         } else {
+          setLoadError('Found model but failed to load. Check console for details.');
           toast.error('Found model but failed to load. Check console for details.');
         }
       } else {
-        console.warn('No model.h5 found. Please check model.h5 exists in project root.');
+        const errorMsg = 'No model.h5 found. Please check model.h5 exists in project root.';
+        console.warn(errorMsg);
+        setLoadError(errorMsg);
         toast.warning('Model not found. Place model.h5 in the root directory of the application.');
       }
     } catch (error) {
       console.error('Error loading default model:', error);
-      toast.error(typeof error === 'string' ? error : 'Failed to load default model');
+      const errorMessage = typeof error === 'string' ? error : 'Failed to load default model';
+      setLoadError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -78,6 +86,7 @@ const ModelLoader: React.FC = () => {
     }
 
     setIsLoading(true);
+    setLoadError(null);
     
     try {
       // Call the global function we defined in main.tsx
@@ -86,11 +95,14 @@ const ModelLoader: React.FC = () => {
         setIsModelLoaded(true);
         toast.success('Model loaded successfully');
       } else {
+        setLoadError('No model was selected or model failed to load');
         toast.error('No model was selected or model failed to load');
       }
     } catch (error) {
       console.error('Error loading model:', error);
-      toast.error(typeof error === 'string' ? error : 'Failed to load model');
+      const errorMessage = typeof error === 'string' ? error : 'Failed to load model';
+      setLoadError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -163,6 +175,21 @@ const ModelLoader: React.FC = () => {
           </div>
         )}
       </div>
+
+      {loadError && !isModelLoaded && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error Loading Model</AlertTitle>
+          <AlertDescription>
+            {loadError}
+            {loadError.includes('not found') && (
+              <p className="mt-2">
+                Please make sure model.h5 exists in the project root directory. The app expects to find a file named "model.h5".
+              </p>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Dialog open={showModelHelp} onOpenChange={setShowModelHelp}>
         <DialogContent className="sm:max-w-md">

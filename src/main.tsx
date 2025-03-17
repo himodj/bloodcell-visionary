@@ -24,7 +24,6 @@ const isElectron = typeof window !== 'undefined' && window.electron?.isElectron 
         console.log('Selected model path:', selectedModelPath);
         
         // For H5 files in Electron, we'll use mock analysis directly
-        // This is because TensorFlow.js in the browser cannot load H5 files
         if (selectedModelPath.toLowerCase().endsWith('.h5')) {
           toast.success('H5 model detected. Using dedicated analysis engine.');
           
@@ -34,16 +33,22 @@ const isElectron = typeof window !== 'undefined' && window.electron?.isElectron 
             console.log('H5 Model registered successfully for analysis');
             return true;
           } catch (error) {
-            console.warn('Error registering H5 model:', error);
+            console.error('Error registering H5 model:', error);
             toast.error('Error registering H5 model: ' + (error instanceof Error ? error.message : String(error)));
             return false;
           }
         }
         
-        // For non-H5 models, continue with the normal TensorFlow.js flow
-        await initializeModel(selectedModelPath);
-        console.log('Model initialized successfully');
-        return true;
+        // For non-H5 models - this code path shouldn't be reached with our H5 model
+        try {
+          await initializeModel(selectedModelPath);
+          console.log('Model initialized successfully');
+          return true;
+        } catch (error) {
+          console.error('Failed to load model:', error);
+          toast.error('Failed to load model: ' + (error instanceof Error ? error.message : String(error)));
+          return false;
+        }
       } else {
         console.log('No model selected or found');
         return false;
@@ -51,7 +56,7 @@ const isElectron = typeof window !== 'undefined' && window.electron?.isElectron 
     } catch (error) {
       console.error('Failed to load model:', error);
       toast.error('Failed to load model: ' + (error instanceof Error ? error.message : String(error)));
-      throw error;
+      return false;
     }
   } else {
     console.warn('Model loading is only available in Electron environment');

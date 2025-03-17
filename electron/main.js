@@ -102,37 +102,55 @@ function getModelPath() {
 
 // Handle model loading
 ipcMain.handle('select-model', async () => {
-  const modelPath = getModelPath();
+  try {
+    const modelPath = getModelPath();
   
-  if (modelPath) {
-    console.log('Model found at:', modelPath);
-    return modelPath;
-  } else {
-    console.log('Model not found automatically, letting user know to add model.h5');
-    
-    // Show dialog to inform user
+    if (modelPath) {
+      console.log('Model found at:', modelPath);
+      return modelPath;
+    } else {
+      console.log('Model not found automatically, letting user know to add model.h5');
+      
+      // Show dialog to inform user
+      if (mainWindow) {
+        dialog.showMessageBox(mainWindow, {
+          type: 'warning',
+          title: 'Model Not Found',
+          message: 'model.h5 file is required but not found. Please place the model.h5 file in the application directory and restart the application.',
+          buttons: ['OK']
+        });
+      }
+      
+      return null;
+    }
+  } catch (error) {
+    console.error('Error selecting model:', error);
     if (mainWindow) {
       dialog.showMessageBox(mainWindow, {
-        type: 'warning',
-        title: 'Model Not Found',
-        message: 'model.h5 file is required but not found. Please place the model.h5 file in the application directory and restart the application.',
+        type: 'error',
+        title: 'Error Loading Model',
+        message: `Failed to load model: ${error.message}`,
         buttons: ['OK']
       });
     }
-    
     return null;
   }
 });
 
 // Get default model path without user selection
 ipcMain.handle('get-default-model-path', async () => {
-  const modelPath = getModelPath();
-  
-  if (modelPath) {
-    console.log('Model found at:', modelPath);
-    return modelPath;
-  } else {
-    console.log('Model file not found in any of the expected locations');
+  try {
+    const modelPath = getModelPath();
+    
+    if (modelPath) {
+      console.log('Model found at:', modelPath);
+      return modelPath;
+    } else {
+      console.log('Model file not found in any of the expected locations');
+      return null;
+    }
+  } catch (error) {
+    console.error('Error getting default model path:', error);
     return null;
   }
 });
