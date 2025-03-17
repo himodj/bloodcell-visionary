@@ -17,6 +17,12 @@
       "preload.js",
       "../dist/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "../model.h5",
+        "to": "model.h5"
+      }
+    ],
     "directories": {
       "output": "../electron-dist"
     },

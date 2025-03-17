@@ -1,4 +1,3 @@
-
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -20,7 +19,7 @@ function createWindow() {
 
   // Determine the appropriate URL to load
   const startUrl = isDev
-    ? 'http://localhost:8080' // Vite dev server (updated port to 8080)
+    ? 'http://localhost:8080' // Vite dev server
     : url.format({
         pathname: path.join(__dirname, '../dist/index.html'),
         protocol: 'file:',
@@ -29,6 +28,7 @@ function createWindow() {
 
   console.log('Loading URL:', startUrl);
   console.log('Environment:', process.env.NODE_ENV);
+  console.log('App path:', app.getAppPath());
   
   mainWindow.loadURL(startUrl);
 
@@ -55,31 +55,57 @@ app.on('activate', () => {
   }
 });
 
+// Helper function to determine model path in different environments
+function getModelPath() {
+  // In development, look in the project root
+  if (isDev) {
+    const devModelPath = path.join(process.cwd(), 'model.h5');
+    console.log('Checking development model path:', devModelPath);
+    if (fs.existsSync(devModelPath)) {
+      return devModelPath;
+    }
+  }
+  
+  // In production, look relative to the app's resources directory
+  // This is where the file will be after being included in the electron-builder
+  const prodModelPath = path.join(process.resourcesPath, 'model.h5');
+  console.log('Checking production model path:', prodModelPath);
+  if (fs.existsSync(prodModelPath)) {
+    return prodModelPath;
+  }
+
+  // Fallback to app directory
+  const appModelPath = path.join(app.getAppPath(), 'model.h5');
+  console.log('Checking app model path:', appModelPath);
+  if (fs.existsSync(appModelPath)) {
+    return appModelPath;
+  }
+  
+  return null;
+}
+
 // Handle model loading
 ipcMain.handle('select-model', async () => {
-  // Instead of showing a dialog, use the fixed model path
-  const modelPath = path.join(app.getAppPath(), 'model.h5');
+  const modelPath = getModelPath();
   
-  // Check if the model file exists
-  if (fs.existsSync(modelPath)) {
+  if (modelPath) {
+    console.log('Model found at:', modelPath);
     return modelPath;
   } else {
-    // Log the path being checked for debugging
-    console.error(`Model file not found at: ${modelPath}`);
-    console.log(`Current app path: ${app.getAppPath()}`);
+    console.error('Model file not found in any of the expected locations');
     return null;
   }
 });
 
 // Get default model path without user selection
 ipcMain.handle('get-default-model-path', async () => {
-  const modelPath = path.join(app.getAppPath(), 'model.h5');
+  const modelPath = getModelPath();
   
-  // Check if the model file exists
-  if (fs.existsSync(modelPath)) {
+  if (modelPath) {
+    console.log('Model found at:', modelPath);
     return modelPath;
   } else {
-    console.error(`Model file not found at: ${modelPath}`);
+    console.error('Model file not found in any of the expected locations');
     return null;
   }
 });
