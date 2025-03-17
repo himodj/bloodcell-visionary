@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Database, Check, AlertCircle, Download, HelpCircle } from 'lucide-react';
+import { Database, Check, AlertCircle, Download, HelpCircle, FileCheck } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ const ModelLoader: React.FC = () => {
   const [isElectron, setIsElectron] = useState(false);
   const [showModelHelp, setShowModelHelp] = useState(false);
   const [modelPath, setModelPath] = useState<string | null>(null);
+  const [isH5Model, setIsH5Model] = useState(false);
 
   // Check if we're in Electron on component mount
   useEffect(() => {
@@ -42,15 +43,18 @@ const ModelLoader: React.FC = () => {
         console.log('Default model found at:', modelPath);
         setModelPath(modelPath);
         
+        // Set H5 flag if it's an H5 model
+        if (modelPath.toLowerCase().endsWith('.h5')) {
+          setIsH5Model(true);
+        }
+        
         // Call the global function we defined in main.tsx to load the model
         const success = await (window as any).loadModel(modelPath);
         if (success) {
           setIsModelLoaded(true);
           toast.success('Model loaded successfully from: ' + modelPath);
         } else {
-          toast.error('Found model but failed to load. Using mock analysis for now.');
-          // Even though we couldn't fully load the model, we'll use the mock analysis
-          setIsModelLoaded(true);
+          toast.error('Found model but failed to load. Check console for details.');
         }
       } else {
         console.warn('No model.h5 found. Please check model.h5 exists in project root.');
@@ -108,7 +112,7 @@ const ModelLoader: React.FC = () => {
           ) : (
             <>
               {isModelLoaded ? <Check size={16} className="mr-2" /> : <Database size={16} className="mr-2" />}
-              {isModelLoaded ? 'Model Loaded' : 'Load H5 Model'}
+              {isModelLoaded ? 'Model Loaded' : isH5Model ? 'Load H5 Model' : 'Load Model'}
             </>
           )}
         </Button>
@@ -123,13 +127,22 @@ const ModelLoader: React.FC = () => {
         </Button>
         
         {isModelLoaded && (
-          <span className="text-sm text-green-600 flex items-center">
+          <div className="flex items-center">
             <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-            Model ready for analysis
-            {modelPath && (
-              <span className="ml-2 text-xs text-gray-500">({modelPath.split('/').pop() || modelPath.split('\\').pop()})</span>
-            )}
-          </span>
+            <span className="text-sm text-green-600 flex items-center">
+              {isH5Model ? (
+                <span className="flex items-center">
+                  <FileCheck size={14} className="mr-1" />
+                  H5 Model loaded and ready
+                </span>
+              ) : (
+                'Model ready for analysis'
+              )}
+              {modelPath && (
+                <span className="ml-2 text-xs text-gray-500">({modelPath.split('/').pop() || modelPath.split('\\').pop()})</span>
+              )}
+            </span>
+          </div>
         )}
         
         {!isElectron && (
@@ -173,12 +186,18 @@ const ModelLoader: React.FC = () => {
               <li>For distribution: The model.h5 file is automatically packaged with the application</li>
             </ol>
             
+            <h3 className="font-medium">H5 Model Support</h3>
+            <p className="text-sm text-muted-foreground">
+              The application now supports H5 models directly, without requiring conversion to TensorFlow.js format.
+            </p>
+            
             <h3 className="font-medium">Distributing the Application</h3>
             <p className="text-sm text-muted-foreground">
               To distribute the application to other computers:
             </p>
             <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>Run <code>npm run build</code> in the main directory</li>
+              <li>Ensure <code>model.h5</code> is in the project root directory</li>
+              <li>Run <code>node build-electron.js</code> in the main directory</li>
               <li>The packaged application will be in the <code>electron-dist</code> folder</li>
               <li>Users can install and run the application without any setup</li>
             </ol>

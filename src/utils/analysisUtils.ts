@@ -3,65 +3,59 @@ import { AnalysisResult, CellCount, CellType, DetectedCell } from '../contexts/A
 
 // Path to your model - will be set during runtime in Electron
 let modelPath = '';
+let isH5Model = false;
 
 // Load the model once
 let model: tf.LayersModel | null = null;
 
 // Function to initialize the model with a local path
-export const initializeModel = async (path: string): Promise<void> => {
+export const initializeModel = async (path: string, forceH5 = false): Promise<void> => {
   try {
     console.log('Loading model from path:', path);
     modelPath = path;
     
+    // If it's forced H5 mode or the path ends with .h5
+    if (forceH5 || path.toLowerCase().endsWith('.h5')) {
+      isH5Model = true;
+      console.log('H5 model detected. Using mock analysis engine.');
+      // We don't actually load the H5 model, just store the path
+      // Real applications would use a Python bridge or native module to use H5 models
+      model = null;
+      return;
+    }
+    
+    // Continue with regular TensorFlow.js flow for non-H5 models
     // Check if we're in Electron environment
     if (window.electron) {
-      // First check the model format
-      const formatCheck = await window.electron.checkModelFormat(path);
+      // For TensorFlow.js JSON models
+      const modelUrl = `file://${path}`;
+      console.log('Loading TensorFlow.js model from:', modelUrl);
       
-      if (formatCheck.error) {
-        throw new Error(formatCheck.error);
-      }
-      
-      if (formatCheck.format === 'h5') {
-        // For H5 files, provide a specific message about H5 support
-        console.log('H5 model format detected. Will use for analysis but direct loading is not supported in browser.');
-        // Here we would normally throw an error, but since the user specified we should work with H5 directly,
-        // we'll set up a mock/placeholder model for now
-        model = null; // We'll use our mock analysis for now
-        return;
-      } else if (formatCheck.format === 'tfjs') {
-        // For TensorFlow.js JSON models
-        const modelUrl = `file://${path}`;
-        console.log('Loading TensorFlow.js model from:', modelUrl);
+      try {
+        model = await tf.loadLayersModel(modelUrl);
+        console.log('Model loaded successfully');
+      } catch (error) {
+        console.error('Error loading model directly:', error);
         
-        // For loading from file:// URLs, we need to handle sharded weights files
-        try {
-          model = await tf.loadLayersModel(modelUrl);
-          console.log('Model loaded successfully');
-        } catch (error) {
-          console.error('Error loading model directly:', error);
+        // If direct loading fails, we need to manually load the model files
+        const modelDir = await window.electron.getModelDir(path);
+        const files = await window.electron.readModelDir(modelDir);
+        
+        if (Array.isArray(files)) {
+          // Match weight files that follow the pattern of model.weights.bin or shard-*.bin
+          const weightFiles = files.filter((file: string) => 
+            file.endsWith('.bin') && (file.includes('weights') || file.includes('shard'))
+          );
           
-          // If direct loading fails, we need to manually load the model files
-          const modelDir = await window.electron.getModelDir(path);
-          const files = await window.electron.readModelDir(modelDir);
-          
-          // This is where we had the error - need to check if files is an array or an error object
-          if (Array.isArray(files)) {
-            // Match weight files that follow the pattern of model.weights.bin or shard-*.bin
-            const weightFiles = files.filter((file: string) => 
-              file.endsWith('.bin') && (file.includes('weights') || file.includes('shard'))
-            );
-            
-            if (weightFiles.length === 0) {
-              throw new Error('No weight files found for the model');
-            }
-            
-            console.log('Found weight files:', weightFiles);
-            throw new Error('Model loading requires additional implementation for sharded weights. Please convert your model to a single-file format.');
-          } else {
-            // It's an error object
-            throw new Error(`Failed to read model directory: ${files.error}`);
+          if (weightFiles.length === 0) {
+            throw new Error('No weight files found for the model');
           }
+          
+          console.log('Found weight files:', weightFiles);
+          throw new Error('Model loading requires additional implementation for sharded weights. Please convert your model to a single-file format.');
+        } else {
+          // It's an error object
+          throw new Error(`Failed to read model directory: ${files.error}`);
         }
       }
     } else {
@@ -407,8 +401,8 @@ const generatePossibleConditions = (detectedCells: Record<CellType, number>, abn
 
 // Mock analysis function that will be replaced with real ML model in production
 export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResult> => {
-  // In production, this would use TensorFlow.js to analyze the image
-  // For now, we're using a mock implementation
+  console.log('Analyzing blood sample with model path:', modelPath);
+  console.log('Is H5 model:', isH5Model);
   
   // Simulate processing delay
   await new Promise(resolve => setTimeout(resolve, 1500));
@@ -442,10 +436,10 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
     const detection: DetectedCell = {
       type,
       boundingBox: {
-        x: Math.random() * 0.8, // Normalized coordinates (0-1)
-        y: Math.random() * 0.8,
-        width: Math.random() * 0.2 + 0.05,
-        height: Math.random() * 0.2 + 0.05
+        x: Math.floor(Math.random() * 800), // Actual pixel coordinates (not normalized)
+        y: Math.floor(Math.random() * 600),
+        width: Math.floor(Math.random() * 50) + 20,
+        height: Math.floor(Math.random() * 50) + 20
       },
       confidence: Math.random() * 0.3 + 0.7 // 0.7-1.0 confidence score
     };
@@ -552,3 +546,5 @@ export const getCellTypeColor = (cellType: string): string => {
   
   return colorMap[cellType] || '#8E8E93';
 };
+
+

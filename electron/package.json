@@ -30,7 +30,8 @@
       "category": "public.app-category.medical"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "icon.ico"
     },
     "linux": {
       "target": "AppImage"

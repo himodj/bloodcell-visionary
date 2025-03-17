@@ -1,3 +1,4 @@
+
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -15,6 +16,8 @@ function createWindow() {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
     },
+    title: "BloodCell Analyzer",
+    icon: path.join(__dirname, 'icon.ico')
   });
 
   // Determine the appropriate URL to load
@@ -57,20 +60,23 @@ app.on('activate', () => {
 
 // Helper function to determine model path in different environments
 function getModelPath() {
-  // In development, look in the project root
+  console.log('Looking for model.h5 file in various locations...');
+  
+  // In development, look in the project root (one level up from the electron directory)
   if (isDev) {
-    const devModelPath = path.join(process.cwd(), 'model.h5');
+    const devModelPath = path.join(__dirname, '..', 'model.h5');
     console.log('Checking development model path:', devModelPath);
     if (fs.existsSync(devModelPath)) {
+      console.log('✅ Found model at', devModelPath);
       return devModelPath;
     }
   }
   
   // In production, look relative to the app's resources directory
-  // This is where the file will be after being included in the electron-builder
   const prodModelPath = path.join(process.resourcesPath, 'model.h5');
   console.log('Checking production model path:', prodModelPath);
   if (fs.existsSync(prodModelPath)) {
+    console.log('✅ Found model at', prodModelPath);
     return prodModelPath;
   }
 
@@ -78,9 +84,19 @@ function getModelPath() {
   const appModelPath = path.join(app.getAppPath(), 'model.h5');
   console.log('Checking app model path:', appModelPath);
   if (fs.existsSync(appModelPath)) {
+    console.log('✅ Found model at', appModelPath);
     return appModelPath;
   }
   
+  // One more fallback for packaged apps - look one level up
+  const packagedAppPath = path.join(app.getAppPath(), '..', 'model.h5');
+  console.log('Checking packaged app path:', packagedAppPath);
+  if (fs.existsSync(packagedAppPath)) {
+    console.log('✅ Found model at', packagedAppPath);
+    return packagedAppPath;
+  }
+  
+  console.log('❌ Model not found in any location');
   return null;
 }
 
@@ -92,7 +108,18 @@ ipcMain.handle('select-model', async () => {
     console.log('Model found at:', modelPath);
     return modelPath;
   } else {
-    console.error('Model file not found in any of the expected locations');
+    console.log('Model not found automatically, letting user know to add model.h5');
+    
+    // Show dialog to inform user
+    if (mainWindow) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        title: 'Model Not Found',
+        message: 'model.h5 file is required but not found. Please place the model.h5 file in the application directory and restart the application.',
+        buttons: ['OK']
+      });
+    }
+    
     return null;
   }
 });
@@ -105,7 +132,7 @@ ipcMain.handle('get-default-model-path', async () => {
     console.log('Model found at:', modelPath);
     return modelPath;
   } else {
-    console.error('Model file not found in any of the expected locations');
+    console.log('Model file not found in any of the expected locations');
     return null;
   }
 });
@@ -126,8 +153,8 @@ ipcMain.handle('check-model-format', async (event, modelPath) => {
     
     // Check if it's a model.json file
     if (modelPath.endsWith('.json')) {
-      const content = fs.readFileSync(modelPath, 'utf8');
       try {
+        const content = fs.readFileSync(modelPath, 'utf8');
         const json = JSON.parse(content);
         if (json.format === 'layers-model' || json.modelTopology) {
           // It's a valid TensorFlow.js model JSON
