@@ -608,11 +608,12 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
   
   if (isH5Model && window.electron) {
     try {
-      console.log('Starting H5 model analysis with Python backend');
+      console.log('Starting H5 model analysis with Python backend using model path:', modelPath);
+      console.log('Sending image to Python server for analysis...');
       
       // Request analysis from Python backend through Electron's preload.js
       const result = await window.electron.analyzeWithH5Model(modelPath, resizedImageUrl);
-      console.log('Python backend analysis complete:', result);
+      console.log('Python backend analysis complete. Raw result:', JSON.stringify(result));
       
       if (result.error) {
         console.error('Error during Python backend analysis:', result.error);
@@ -623,7 +624,7 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
       predictedCellType = result.predictedClass as CellType;
       confidence = result.confidence || 0.95;
       
-      console.log(`Model prediction from Python backend: ${predictedCellType} with confidence ${confidence}`);
+      console.log(`Model prediction from Python backend: ${predictedCellType} with confidence ${confidence.toFixed(4)}`);
     } catch (error) {
       console.error('Error during H5 model prediction with Python backend:', error);
       
@@ -657,6 +658,8 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
     },
     confidence: confidence
   }];
+  
+  console.log('Created detection with cell type:', predictedCellType);
   
   // For background counts - using reasonable defaults without too many extras
   const totalNormalRBC = predictedCellType === 'RBC' ? 1 : Math.floor(Math.random() * 5) + 1;

@@ -113,6 +113,13 @@ app.on('will-quit', () => {
 function getModelPath() {
   console.log('Looking for model.h5 file in various locations...');
   
+  const userSpecifiedPath = 'C:\\Users\\H\\Desktop\\app\\model.h5';
+  console.log('Checking user-specified model path:', userSpecifiedPath);
+  if (fs.existsSync(userSpecifiedPath)) {
+    console.log('✅ Found model at user-specified path:', userSpecifiedPath);
+    return userSpecifiedPath;
+  }
+  
   if (isDev) {
     const devModelPath = path.join(__dirname, '..', 'model.h5');
     console.log('Checking development model path:', devModelPath);
@@ -143,8 +150,8 @@ function getModelPath() {
     return packagedAppPath;
   }
   
-  console.log('❌ Model not found in any location');
-  return null;
+  console.log('❌ Model not found in any location, returning user-specified path as fallback');
+  return userSpecifiedPath;
 }
 
 ipcMain.handle('select-model', async () => {

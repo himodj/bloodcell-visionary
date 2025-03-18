@@ -65,16 +65,16 @@ const ModelLoader: React.FC = () => {
         const success = await (window as any).loadModel(modelPath);
         if (success) {
           setIsModelLoaded(true);
-          toast.success(`Model loaded successfully: ${modelPath.split('/').pop() || modelPath.split('\\').pop()}`);
+          toast.success(`Model loaded successfully from: ${modelPath}`);
         } else {
           setLoadError('Found model but failed to load. Check console for details.');
           toast.error('Found model but failed to load. Check console for details.');
         }
       } else {
-        const errorMsg = 'No model.h5 found. Please check model.h5 exists in project root.';
+        const errorMsg = 'No model.h5 found. Check if C:\\Users\\H\\Desktop\\app\\model.h5 exists.';
         console.warn(errorMsg);
         setLoadError(errorMsg);
-        toast.warning('Model not found. Place model.h5 in the root directory of the application.');
+        toast.warning('Model not found. Please check if the specified path is correct: C:\\Users\\H\\Desktop\\app\\model.h5');
       }
     } catch (error) {
       console.error('Error loading default model:', error);
@@ -190,7 +190,9 @@ const ModelLoader: React.FC = () => {
                 'Model ready for analysis'
               )}
               {modelPath && (
-                <span className="ml-2 text-xs text-gray-500">({modelPath.split('/').pop() || modelPath.split('\\').pop()})</span>
+                <span className="text-xs text-gray-500 ml-2 truncate max-w-[200px]" title={modelPath}>
+                  ({modelPath})
+                </span>
               )}
             </span>
           </div>
@@ -223,7 +225,7 @@ const ModelLoader: React.FC = () => {
             {loadError}
             {loadError.includes('not found') && (
               <p className="mt-2">
-                Please make sure model.h5 exists in the project root directory. The app expects to find a file named "model.h5".
+                Please make sure model.h5 exists at C:\Users\H\Desktop\app\model.h5 or in the project root directory.
               </p>
             )}
           </AlertDescription>
