@@ -43,5 +43,8 @@
     "electron": "latest",
     "electron-builder": "latest",
     "concurrently": "latest"
+  },
+  "dependencies": {
+    "axios": "latest"
   }
 }

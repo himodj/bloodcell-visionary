@@ -62,24 +62,66 @@ function startPythonServer() {
   const scriptPath = path.join(app.getAppPath(), 'python', 'model_server.py');
   console.log('Python script path:', scriptPath);
   
+  if (!fs.existsSync(scriptPath)) {
+    console.error(`Python script not found at ${scriptPath}`);
+    
+    if (mainWindow) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'error',
+        title: 'Server Error',
+        message: `Python script not found at ${scriptPath}. The application may not work correctly.`,
+        buttons: ['OK']
+      });
+    }
+    return;
+  }
+  
   console.log('Starting Python model server...');
-  pythonProcess = spawn(pythonCommand, [scriptPath], {
-    env: env,
-    stdio: 'pipe'
-  });
-  
-  pythonProcess.stdout.on('data', (data) => {
-    console.log(`Python server: ${data}`);
-  });
-  
-  pythonProcess.stderr.on('data', (data) => {
-    console.error(`Python server error: ${data}`);
-  });
-  
-  pythonProcess.on('close', (code) => {
-    console.log(`Python server exited with code ${code}`);
-    pythonProcess = null;
-  });
+  try {
+    pythonProcess = spawn(pythonCommand, [scriptPath], {
+      env: env,
+      stdio: 'pipe'
+    });
+    
+    pythonProcess.stdout.on('data', (data) => {
+      console.log(`Python server: ${data}`);
+    });
+    
+    pythonProcess.stderr.on('data', (data) => {
+      console.error(`Python server error: ${data}`);
+    });
+    
+    pythonProcess.on('close', (code) => {
+      console.log(`Python server exited with code ${code}`);
+      pythonProcess = null;
+      
+      if (code !== 0 && mainWindow) {
+        dialog.showMessageBox(mainWindow, {
+          type: 'warning',
+          title: 'Server Error',
+          message: `Python server exited unexpectedly with code ${code}. Image analysis may not work correctly.`,
+          buttons: ['OK']
+        });
+      }
+    });
+    
+    if (pythonProcess.pid) {
+      console.log(`Python server started with PID ${pythonProcess.pid}`);
+    } else {
+      console.error('Failed to start Python server - no PID assigned');
+    }
+  } catch (error) {
+    console.error('Error starting Python server:', error);
+    
+    if (mainWindow) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'error',
+        title: 'Server Error',
+        message: `Failed to start Python server: ${error.message}`,
+        buttons: ['OK']
+      });
+    }
+  }
 }
 
 app.on('ready', () => {

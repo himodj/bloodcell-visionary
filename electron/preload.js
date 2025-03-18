@@ -1,9 +1,8 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
-const axios = require('axios');
 
-// Expose specific Electron APIs to the renderer process
-contextBridge.exposeInMainWorld('electron', {
+// Initialize API object with a default error handler for the analyzeWithH5Model function
+let electronAPI = {
   // Set a flag so the renderer process can check if it's running in Electron
   isElectron: true,
   
@@ -25,8 +24,20 @@ contextBridge.exposeInMainWorld('electron', {
   // Read files in a directory
   readModelDir: (dirPath) => ipcRenderer.invoke('read-model-dir', dirPath),
   
-  // Analyze image with H5 model through Python backend
-  analyzeWithH5Model: async (modelPath, imageDataUrl) => {
+  // Fallback implementation if axios is missing
+  analyzeWithH5Model: async () => ({
+    error: 'Python backend communication is not available. Missing axios dependency.',
+    stack: 'Module not found: axios'
+  })
+};
+
+// Try to load axios and set up the proper analyzeWithH5Model function
+try {
+  const axios = require('axios');
+  console.log('Axios loaded successfully');
+  
+  // Override the default implementation with the actual one
+  electronAPI.analyzeWithH5Model = async (modelPath, imageDataUrl) => {
     try {
       console.log('Sending image to Python backend for analysis');
       
@@ -46,5 +57,11 @@ contextBridge.exposeInMainWorld('electron', {
         stack: error.stack
       };
     }
-  }
-});
+  };
+} catch (error) {
+  console.error('Failed to load axios:', error.message);
+  // We'll use the fallback implementation defined above
+}
+
+// Expose the API to the renderer process
+contextBridge.exposeInMainWorld('electron', electronAPI);
