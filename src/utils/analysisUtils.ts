@@ -213,110 +213,6 @@ const preprocessImage = async (imageDataUrl: string): Promise<tf.Tensor> => {
   });
 };
 
-// Updated analysis function that ensures only one cell type per image as mentioned
-export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResult> => {
-  console.log('Analyzing blood sample with model path:', modelPath);
-  console.log('Is H5 model:', isH5Model);
-  
-  // Ensure the image is exactly 360x360 using center crop approach
-  const resizedImageUrl = await resizeImageWithCenterCrop(imageUrl);
-  
-  // Simulate processing delay to represent model inference
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  // For H5 model, we'll use a consistent approach:
-  // - Only one cell type per image (as you mentioned your model detects)
-  // - Place one bounding box on the main detected cell
-  
-  // Cell types
-  const cellTypes: CellType[] = ['Basophil', 'Eosinophil', 'Erythroblast', 'IGImmatureWhiteCell', 'Lymphocyte', 'Monocyte', 'Neutrophil', 'Platelet', 'RBC'];
-  
-  // Initialize all cell counts to 0
-  const detectedCells: Record<CellType, number> = {
-    'Basophil': 0,
-    'Eosinophil': 0,
-    'Erythroblast': 0,
-    'IGImmatureWhiteCell': 0,
-    'Lymphocyte': 0,
-    'Monocyte': 0, 
-    'Neutrophil': 0,
-    'Platelet': 0,
-    'RBC': 0
-  };
-  
-  // For a real model, you would:
-  // 1. Load the image and preprocess it
-  // 2. Run it through your model
-  // 3. Get the predicted class
-  
-  // For this mock, randomly select ONE cell type (simulating one prediction per image)
-  const typeIndex = Math.floor(Math.random() * cellTypes.length);
-  const predictedCellType = cellTypes[typeIndex] as CellType;
-  
-  console.log('Simulated model prediction:', predictedCellType);
-  
-  // Count the detected cell
-  detectedCells[predictedCellType] = 1;
-  
-  // Create a single detection in the center of the image with the predicted type
-  const detections: DetectedCell[] = [{
-    type: predictedCellType,
-    boundingBox: {
-      // Position in center of image, with reasonable size
-      x: 120, 
-      y: 120,
-      width: 120,
-      height: 120
-    },
-    confidence: 0.95 // High confidence score for the single detection
-  }];
-  
-  // For background counts - using reasonable defaults without too many extras
-  const totalNormalRBC = predictedCellType === 'RBC' ? 1 : Math.floor(Math.random() * 5) + 1;
-  const totalAbnormalRBC = 0; // No abnormal RBCs in single-cell analysis
-  const totalNormalPlatelets = predictedCellType === 'Platelet' ? 1 : Math.floor(Math.random() * 3);
-  const totalAbnormalPlatelets = 0; // No abnormal platelets in single-cell analysis
-  
-  const cellCounts: CellCount = {
-    normal: {
-      rbc: totalNormalRBC,
-      platelets: totalNormalPlatelets
-    },
-    abnormal: {
-      rbc: totalAbnormalRBC,
-      platelets: totalAbnormalPlatelets
-    },
-    total: totalNormalRBC + totalAbnormalRBC + totalNormalPlatelets + totalAbnormalPlatelets + 1, // +1 for the one cell
-    detectedCells
-  };
-  
-  // Simple abnormality calculation
-  const abnormalityRate = predictedCellType === 'Erythroblast' || predictedCellType === 'IGImmatureWhiteCell' ? 100 : 0;
-  
-  // Generate focused recommendations based on the single cell type detected
-  const recommendations = generateFocusedRecommendations(predictedCellType);
-  
-  // Generate focused possible conditions based on the single cell type
-  const possibleConditions = generateFocusedConditions(predictedCellType);
-  
-  // Create processed image with single bounding box
-  const processedImage = await generateProcessedImage(resizedImageUrl, detections);
-  
-  // Create and return the analysis result
-  return {
-    image: resizedImageUrl,
-    processedImage: processedImage,
-    cellCounts,
-    abnormalityRate,
-    possibleConditions,
-    recommendations,
-    analysisDate: new Date(),
-    detectedCells: detections,
-    reportLayout: 'standard',
-    notes: '' // Initialize with empty notes
-  };
-};
-
 // New functions for generating focused recommendations and conditions
 function generateFocusedRecommendations(cellType: CellType): string[] {
   const recommendations: string[] = [];
@@ -678,21 +574,25 @@ const generatePossibleConditions = (detectedCells: Record<CellType, number>, abn
   return conditions;
 };
 
-// Mock analysis function that will be replaced with real ML model in production
+// Analysis function that ensures only one cell type per image as mentioned
 export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResult> => {
   console.log('Analyzing blood sample with model path:', modelPath);
   console.log('Is H5 model:', isH5Model);
   
-  // Ensure the image is exactly 360x360 before analysis
-  const resizedImageUrl = await resizeImageTo360x360(imageUrl);
+  // Ensure the image is exactly 360x360 using center crop approach
+  const resizedImageUrl = await resizeImageWithCenterCrop(imageUrl);
   
-  // Simulate processing delay
+  // Simulate processing delay to represent model inference
   await new Promise(resolve => setTimeout(resolve, 1500));
   
-  // Mock detection results
+  // For H5 model, we'll use a consistent approach:
+  // - Only one cell type per image (as you mentioned your model detects)
+  // - Place one bounding box on the main detected cell
+  
+  // Cell types
   const cellTypes: CellType[] = ['Basophil', 'Eosinophil', 'Erythroblast', 'IGImmatureWhiteCell', 'Lymphocyte', 'Monocyte', 'Neutrophil', 'Platelet', 'RBC'];
   
-  // Create a detection count object with initial counts of 0
+  // Initialize all cell counts to 0
   const detectedCells: Record<CellType, number> = {
     'Basophil': 0,
     'Eosinophil': 0,
@@ -705,35 +605,38 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
     'RBC': 0
   };
   
-  // Randomly generate between 20-50 cell detections
-  const numDetections = Math.floor(Math.random() * 30) + 20;
-  const detections: DetectedCell[] = [];
+  // For a real model, you would:
+  // 1. Load the image and preprocess it
+  // 2. Run it through your model
+  // 3. Get the predicted class
   
-  for (let i = 0; i < numDetections; i++) {
-    // Select a random cell type
-    const typeIndex = Math.floor(Math.random() * cellTypes.length);
-    const type = cellTypes[typeIndex] as CellType;
-    
-    // Create a detection with random position and size
-    const detection: DetectedCell = {
-      type,
-      boundingBox: {
-        x: Math.floor(Math.random() * 800), // Actual pixel coordinates (not normalized)
-        y: Math.floor(Math.random() * 600),
-        width: Math.floor(Math.random() * 50) + 20,
-        height: Math.floor(Math.random() * 50) + 20
-      },
-      confidence: Math.random() * 0.3 + 0.7 // 0.7-1.0 confidence score
-    };
-    
-    detections.push(detection);
-    detectedCells[type]++;
-  }
+  // For this mock, randomly select ONE cell type (simulating one prediction per image)
+  const typeIndex = Math.floor(Math.random() * cellTypes.length);
+  const predictedCellType = cellTypes[typeIndex] as CellType;
   
-  const totalNormalRBC = Math.floor(Math.random() * 200) + 300;
-  const totalAbnormalRBC = Math.floor(Math.random() * 30);
-  const totalNormalPlatelets = Math.floor(Math.random() * 100) + 150;
-  const totalAbnormalPlatelets = Math.floor(Math.random() * 20);
+  console.log('Simulated model prediction:', predictedCellType);
+  
+  // Count the detected cell
+  detectedCells[predictedCellType] = 1;
+  
+  // Create a single detection in the center of the image with the predicted type
+  const detections: DetectedCell[] = [{
+    type: predictedCellType,
+    boundingBox: {
+      // Position in center of image, with reasonable size
+      x: 120, 
+      y: 120,
+      width: 120,
+      height: 120
+    },
+    confidence: 0.95 // High confidence score for the single detection
+  }];
+  
+  // For background counts - using reasonable defaults without too many extras
+  const totalNormalRBC = predictedCellType === 'RBC' ? 1 : Math.floor(Math.random() * 5) + 1;
+  const totalAbnormalRBC = 0; // No abnormal RBCs in single-cell analysis
+  const totalNormalPlatelets = predictedCellType === 'Platelet' ? 1 : Math.floor(Math.random() * 3);
+  const totalAbnormalPlatelets = 0; // No abnormal platelets in single-cell analysis
   
   const cellCounts: CellCount = {
     normal: {
@@ -744,25 +647,26 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
       rbc: totalAbnormalRBC,
       platelets: totalAbnormalPlatelets
     },
-    total: totalNormalRBC + totalAbnormalRBC + totalNormalPlatelets + totalAbnormalPlatelets + numDetections,
+    total: totalNormalRBC + totalAbnormalRBC + totalNormalPlatelets + totalAbnormalPlatelets + 1, // +1 for the one cell
     detectedCells
   };
   
-  // Calculate abnormality rate
-  const abnormalityRate = 
-    ((totalAbnormalRBC + totalAbnormalPlatelets) / 
-    (totalNormalRBC + totalAbnormalRBC + totalNormalPlatelets + totalAbnormalPlatelets)) * 100;
+  // Simple abnormality calculation
+  const abnormalityRate = predictedCellType === 'Erythroblast' || predictedCellType === 'IGImmatureWhiteCell' ? 100 : 0;
   
-  // Create mock recommendations based on cell counts
-  const recommendations = generateRecommendations(detectedCells, abnormalityRate);
+  // Generate focused recommendations based on the single cell type detected
+  const recommendations = generateFocusedRecommendations(predictedCellType);
   
-  // Create mock possible conditions based on cell counts
-  const possibleConditions = generatePossibleConditions(detectedCells, abnormalityRate);
+  // Generate focused possible conditions based on the single cell type
+  const possibleConditions = generateFocusedConditions(predictedCellType);
   
-  // Create and return the analysis result object, using the resized image
+  // Create processed image with single bounding box
+  const processedImage = await generateProcessedImage(resizedImageUrl, detections);
+  
+  // Create and return the analysis result
   return {
-    image: resizedImageUrl, // Use the properly sized image
-    processedImage: await generateProcessedImage(resizedImageUrl, detections),
+    image: resizedImageUrl,
+    processedImage: processedImage,
     cellCounts,
     abnormalityRate,
     possibleConditions,
@@ -828,4 +732,3 @@ export const getCellTypeColor = (cellType: string): string => {
   
   return colorMap[cellType] || '#8E8E93';
 };
-
