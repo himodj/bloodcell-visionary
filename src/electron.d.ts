@@ -7,6 +7,13 @@ interface ElectronAPI {
   readModelFile: (filePath: string) => Promise<{success: boolean, data?: string, error?: string}>;
   readModelDir: (dirPath: string) => Promise<string[] | {error: string}>;
   isElectron: boolean;
+  analyzeWithH5Model: (modelPath: string, imageDataUrl: string) => Promise<{
+    predictedClass?: string;
+    confidence?: number;
+    timestamp?: string;
+    error?: string;
+    stack?: string;
+  }>;
 }
 
 interface Window {

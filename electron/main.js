@@ -2,9 +2,11 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const url = require('url');
+const { spawn } = require('child_process');
 const isDev = process.env.NODE_ENV === 'development';
 
 let mainWindow;
+let pythonProcess = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -51,7 +53,39 @@ function createWindow() {
   });
 }
 
-app.on('ready', createWindow);
+function startPythonServer() {
+  const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
+  
+  const env = Object.assign({}, process.env);
+  env.MODEL_PATH = getModelPath();
+  
+  const scriptPath = path.join(app.getAppPath(), 'python', 'model_server.py');
+  console.log('Python script path:', scriptPath);
+  
+  console.log('Starting Python model server...');
+  pythonProcess = spawn(pythonCommand, [scriptPath], {
+    env: env,
+    stdio: 'pipe'
+  });
+  
+  pythonProcess.stdout.on('data', (data) => {
+    console.log(`Python server: ${data}`);
+  });
+  
+  pythonProcess.stderr.on('data', (data) => {
+    console.error(`Python server error: ${data}`);
+  });
+  
+  pythonProcess.on('close', (code) => {
+    console.log(`Python server exited with code ${code}`);
+    pythonProcess = null;
+  });
+}
+
+app.on('ready', () => {
+  createWindow();
+  startPythonServer();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -62,6 +96,17 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (mainWindow === null) {
     createWindow();
+  }
+});
+
+app.on('will-quit', () => {
+  if (pythonProcess) {
+    console.log('Shutting down Python server...');
+    if (process.platform === 'win32') {
+      spawn('taskkill', ['/pid', pythonProcess.pid, '/f', '/t']);
+    } else {
+      pythonProcess.kill();
+    }
   }
 });
 
@@ -265,46 +310,4 @@ ipcMain.handle('read-model-dir', async (event, dirPath) => {
   }
 });
 
-ipcMain.handle('analyze-with-h5-model', async (event, modelPath, imageDataUrl) => {
-  console.log('Received request to analyze image with H5 model');
-  
-  try {
-    if (!fs.existsSync(modelPath)) {
-      return { error: 'Model file not found' };
-    }
-    
-    console.log('Model file exists at:', modelPath);
-    
-    const isH5 = modelPath.toLowerCase().endsWith('.h5');
-    if (!isH5) {
-      return { error: 'Not an H5 model file' };
-    }
-    
-    console.log('IMPORTANT: This is a placeholder for actual model inference');
-    console.log('In a real implementation, you would call Python or another backend');
-    console.log('to perform the actual H5 model inference on the image');
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const cellTypes = ['Basophil', 'Eosinophil', 'Erythroblast', 'IGImmatureWhiteCell', 
-                      'Lymphocyte', 'Monocyte', 'Neutrophil', 'Platelet', 'RBC'];
-    
-    const mockPrediction = {
-      predictedClass: cellTypes[Math.floor(Math.random() * cellTypes.length)],
-      confidence: 0.85 + (Math.random() * 0.14),
-      timestamp: new Date().toISOString(),
-      modelPath: modelPath
-    };
-    
-    console.log('Mock prediction result:', mockPrediction);
-    console.log('NOTE: Replace this with actual H5 model inference');
-    
-    return mockPrediction;
-  } catch (error) {
-    console.error('Error analyzing image with H5 model:', error);
-    return { 
-      error: `Error during model analysis: ${error.message}`,
-      stack: error.stack 
-    };
-  }
-});
+// Removed analyzeWithH5Model handler as it's now handled in preload.js using HTTP

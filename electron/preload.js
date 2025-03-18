@@ -1,5 +1,6 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
+const axios = require('axios');
 
 // Expose specific Electron APIs to the renderer process
 contextBridge.exposeInMainWorld('electron', {
@@ -24,6 +25,26 @@ contextBridge.exposeInMainWorld('electron', {
   // Read files in a directory
   readModelDir: (dirPath) => ipcRenderer.invoke('read-model-dir', dirPath),
   
-  // NEW: Analyze image with H5 model
-  analyzeWithH5Model: (modelPath, imageDataUrl) => ipcRenderer.invoke('analyze-with-h5-model', modelPath, imageDataUrl),
+  // Analyze image with H5 model through Python backend
+  analyzeWithH5Model: async (modelPath, imageDataUrl) => {
+    try {
+      console.log('Sending image to Python backend for analysis');
+      
+      // Send the image to the Python server
+      const response = await axios.post('http://localhost:5000/predict', {
+        image: imageDataUrl
+      });
+      
+      console.log('Received prediction:', response.data);
+      
+      // Return the prediction result
+      return response.data;
+    } catch (error) {
+      console.error('Error communicating with Python backend:', error);
+      return {
+        error: `Failed to analyze image: ${error.message}`,
+        stack: error.stack
+      };
+    }
+  }
 });

@@ -573,7 +573,7 @@ const generatePossibleConditions = (detectedCells: Record<CellType, number>, abn
   return conditions;
 };
 
-// Analysis function that ensures only one cell type per image as mentioned
+// Updated analysis function that uses Python backend for H5 model inference
 export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResult> => {
   console.log('Analyzing blood sample with model path:', modelPath);
   console.log('Is H5 model:', isH5Model);
@@ -608,17 +608,14 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
   
   if (isH5Model && window.electron) {
     try {
-      console.log('Starting H5 model analysis with Electron backend');
-      // Preprocess image to tensor
-      const tensor = await preprocessImage(resizedImageUrl);
-      console.log('Image preprocessed as tensor for model input');
+      console.log('Starting H5 model analysis with Python backend');
       
-      // Request analysis from Electron backend using your H5 model
+      // Request analysis from Python backend through Electron's preload.js
       const result = await window.electron.analyzeWithH5Model(modelPath, resizedImageUrl);
-      console.log('H5 model analysis complete:', result);
+      console.log('Python backend analysis complete:', result);
       
       if (result.error) {
-        console.error('Error during H5 model analysis:', result.error);
+        console.error('Error during Python backend analysis:', result.error);
         throw new Error(`Model analysis failed: ${result.error}`);
       }
       
@@ -626,19 +623,19 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
       predictedCellType = result.predictedClass as CellType;
       confidence = result.confidence || 0.95;
       
-      console.log(`Model prediction: ${predictedCellType} with confidence ${confidence}`);
+      console.log(`Model prediction from Python backend: ${predictedCellType} with confidence ${confidence}`);
     } catch (error) {
-      console.error('Error during H5 model prediction:', error);
+      console.error('Error during H5 model prediction with Python backend:', error);
       
       // FALLBACK: If model prediction fails, use random selection for demo purposes
       // In a real app, you would want to show an error instead
-      console.warn('FALLBACK: Using random selection since model prediction failed');
+      console.warn('FALLBACK: Using random selection since Python backend prediction failed');
       const typeIndex = Math.floor(Math.random() * cellTypes.length);
       predictedCellType = cellTypes[typeIndex];
       console.log('FALLBACK prediction (random):', predictedCellType);
     }
   } else {
-    console.warn('Using random cell selection because H5 model is not properly configured');
+    console.warn('Using random cell selection because H5 model or Python backend is not properly configured');
     // For demo purposes only - this shouldn't happen in production
     const typeIndex = Math.floor(Math.random() * cellTypes.length);
     predictedCellType = cellTypes[typeIndex];
@@ -760,4 +757,3 @@ export const getCellTypeColor = (cellType: string): string => {
   
   return colorMap[cellType] || '#8E8E93';
 };
-
