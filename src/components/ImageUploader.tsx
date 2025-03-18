@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useAnalysis } from '../contexts/AnalysisContext';
-import { handleImageUpload } from '../utils/analysisUtils';
+import { handleImageUpload, resizeImageWithCenterCrop } from '../utils/analysisUtils';
 import { Button } from '@/components/ui/button';
 import { Upload, ImagePlus, X, Microscope, Camera } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,7 +20,7 @@ const ImageUploader: React.FC = () => {
       try {
         const imageDataUrl = await handleImageUpload(files[0]);
         setOriginalImage(imageDataUrl);
-        toast.success('Image uploaded successfully');
+        toast.success('Image uploaded and resized to 360x360 with center crop');
       } catch (error) {
         if (error instanceof Error) {
           toast.error(error.message);
@@ -79,12 +79,12 @@ const ImageUploader: React.FC = () => {
         const stream = await navigator.mediaDevices.getUserMedia({ 
           video: { 
             facingMode: 'environment', // Prefer rear camera on mobile
-            width: { ideal: 360 },
-            height: { ideal: 360 } 
+            width: { ideal: 1080 },
+            height: { ideal: 1080 } 
           } 
         });
         videoRef.current.srcObject = stream;
-        toast.success('Camera started');
+        toast.success('Camera started - position your sample in the center');
       }
     } catch (error) {
       console.error('Error accessing camera:', error);
@@ -102,34 +102,48 @@ const ImageUploader: React.FC = () => {
     setShowCamera(false);
   };
 
-  const captureImage = () => {
+  const captureImage = async () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       
-      // Set canvas dimensions to 360x360
-      canvas.width = 360;
-      canvas.height = 360;
-      
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        // Capture the center square of the video feed
+      try {
+        // Take a square crop from the center of the video
         const size = Math.min(video.videoWidth, video.videoHeight);
         const startX = (video.videoWidth - size) / 2;
         const startY = (video.videoHeight - size) / 2;
+        
+        // First create a temporary canvas with the cropped image
+        canvas.width = size;
+        canvas.height = size;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          throw new Error('Failed to get canvas context');
+        }
         
         // Draw from the center of the video to create a square image
         ctx.drawImage(
           video, 
           startX, startY, size, size, // Source rectangle
-          0, 0, 360, 360 // Destination rectangle (360x360)
+          0, 0, size, size // Destination rectangle (exact crop size)
         );
         
         // Convert to data URL
-        const imageDataUrl = canvas.toDataURL('image/png');
-        setOriginalImage(imageDataUrl);
+        const croppedImageDataUrl = canvas.toDataURL('image/png');
+        
+        // Now resize to exactly 360x360
+        const resizedImageDataUrl = await resizeImageWithCenterCrop(croppedImageDataUrl);
+        
+        // Set the image and close camera
+        setOriginalImage(resizedImageDataUrl);
         stopCamera();
-        toast.success('Image captured');
+        toast.success('Image captured and resized to 360x360');
+        
+        console.log('Image dimensions: 360x360 (center cropped and resized)');
+      } catch (error) {
+        console.error('Error capturing image:', error);
+        toast.error('Failed to capture image');
       }
     }
   };
@@ -139,7 +153,7 @@ const ImageUploader: React.FC = () => {
       <div className="text-center mb-6">
         <h2 className="text-2xl font-display font-medium mb-2">Blood Cell Analysis</h2>
         <p className="text-medical-dark text-opacity-70 max-w-md mx-auto text-balance">
-          Upload a blood sample image or capture one directly to analyze and identify abnormal cells using our advanced CNN model.
+          Upload a blood sample image or capture one directly. Images will be center-cropped and resized to 360x360 for optimal model performance.
         </p>
       </div>
       

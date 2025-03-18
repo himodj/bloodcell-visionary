@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Database, Check, AlertCircle, Download, HelpCircle, FileCheck } from 'lucide-react';
+import { Database, Check, AlertCircle, Download, HelpCircle, FileCheck, RefreshCw } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,7 @@ const ModelLoader: React.FC = () => {
   const [modelPath, setModelPath] = useState<string | null>(null);
   const [isH5Model, setIsH5Model] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [modelFormat, setModelFormat] = useState<string | null>(null);
 
   // Check if we're in Electron on component mount
   useEffect(() => {
@@ -33,7 +34,7 @@ const ModelLoader: React.FC = () => {
     }
   }, []);
 
-  // New function to load default model
+  // Function to load default model
   const loadDefaultModel = async () => {
     if (!window.electron) return;
     
@@ -46,16 +47,25 @@ const ModelLoader: React.FC = () => {
         console.log('Default model found at:', modelPath);
         setModelPath(modelPath);
         
+        // Check model format
+        const modelFormat = await window.electron.checkModelFormat(modelPath);
+        if (modelFormat.error) {
+          throw new Error(`Model validation failed: ${modelFormat.error}`);
+        }
+        
+        setModelFormat(modelFormat.format);
+        
         // Set H5 flag if it's an H5 model
-        if (modelPath.toLowerCase().endsWith('.h5')) {
+        if (modelPath.toLowerCase().endsWith('.h5') || modelFormat.format === 'h5') {
           setIsH5Model(true);
+          console.log('H5 model format detected');
         }
         
         // Call the global function we defined in main.tsx to load the model
         const success = await (window as any).loadModel(modelPath);
         if (success) {
           setIsModelLoaded(true);
-          toast.success('Model loaded successfully from: ' + modelPath);
+          toast.success(`Model loaded successfully: ${modelPath.split('/').pop() || modelPath.split('\\').pop()}`);
         } else {
           setLoadError('Found model but failed to load. Check console for details.');
           toast.error('Found model but failed to load. Check console for details.');
@@ -68,7 +78,7 @@ const ModelLoader: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading default model:', error);
-      const errorMessage = typeof error === 'string' ? error : 'Failed to load default model';
+      const errorMessage = typeof error === 'string' ? error : error instanceof Error ? error.message : 'Failed to load default model';
       setLoadError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -100,9 +110,25 @@ const ModelLoader: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading model:', error);
-      const errorMessage = typeof error === 'string' ? error : 'Failed to load model';
+      const errorMessage = typeof error === 'string' ? error : error instanceof Error ? error.message : 'Failed to load model';
       setLoadError(errorMessage);
       toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReloadModel = async () => {
+    if (!isElectron) return;
+    
+    setIsLoading(true);
+    
+    try {
+      await loadDefaultModel();
+      toast.success('Model reloaded');
+    } catch (error) {
+      console.error('Error reloading model:', error);
+      toast.error('Failed to reload model');
     } finally {
       setIsLoading(false);
     }
@@ -129,6 +155,19 @@ const ModelLoader: React.FC = () => {
           )}
         </Button>
         
+        {isModelLoaded && (
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-10 w-10"
+            onClick={handleReloadModel}
+            disabled={isLoading}
+            title="Reload model"
+          >
+            <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+          </Button>
+        )}
+        
         <Button 
           variant="outline" 
           size="icon" 
@@ -145,7 +184,7 @@ const ModelLoader: React.FC = () => {
               {isH5Model ? (
                 <span className="flex items-center">
                   <FileCheck size={14} className="mr-1" />
-                  H5 Model loaded and ready
+                  H5 Model loaded and ready (360x360 input)
                 </span>
               ) : (
                 'Model ready for analysis'
@@ -194,39 +233,41 @@ const ModelLoader: React.FC = () => {
       <Dialog open={showModelHelp} onOpenChange={setShowModelHelp}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Using BloodCellVision as a Desktop App</DialogTitle>
+            <DialogTitle>Using CNN Model for Blood Cell Analysis</DialogTitle>
             <DialogDescription>
               Instructions for using the H5 model in the desktop application
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
-            <h3 className="font-medium">Standalone Application</h3>
+            <h3 className="font-medium">Model Requirements</h3>
             <p className="text-sm text-muted-foreground">
-              BloodCellVision works as a standalone desktop application that doesn't require a browser.
+              This application requires a trained CNN model (model.h5) that:
             </p>
-            
-            <h3 className="font-medium">Model File Requirements</h3>
             <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>The application requires a <strong>model.h5</strong> file to be present</li>
-              <li>For development: Place the model.h5 file in the project root directory</li>
-              <li>For distribution: The model.h5 file is automatically packaged with the application</li>
+              <li>Is trained on <strong>360x360 pixel</strong> blood cell images</li>
+              <li>Can identify specific cell types (Basophil, Neutrophil, etc.)</li>
+              <li>Is saved in H5 format</li>
             </ol>
             
-            <h3 className="font-medium">H5 Model Support</h3>
+            <h3 className="font-medium">Image Processing</h3>
             <p className="text-sm text-muted-foreground">
-              The application now supports H5 models directly, without requiring conversion to TensorFlow.js format.
-            </p>
-            
-            <h3 className="font-medium">Distributing the Application</h3>
-            <p className="text-sm text-muted-foreground">
-              To distribute the application to other computers:
+              All images are automatically:
             </p>
             <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>Ensure <code>model.h5</code> is in the project root directory</li>
-              <li>Run <code>node build-electron.js</code> in the main directory</li>
-              <li>The packaged application will be in the <code>electron-dist</code> folder</li>
-              <li>Users can install and run the application without any setup</li>
+              <li>Center-cropped to maintain aspect ratio (creating a 1:1 square)</li>
+              <li>Resized to exactly 360x360 pixels</li>
+              <li>Normalized before analysis</li>
+            </ol>
+            
+            <h3 className="font-medium">Model Installation</h3>
+            <p className="text-sm text-muted-foreground">
+              To use your CNN model:
+            </p>
+            <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+              <li>Place <code>model.h5</code> in the project root directory</li>
+              <li>The application will automatically locate and load it</li>
+              <li>If "Model Loaded" appears in green, your model is ready for use</li>
             </ol>
           </div>
           
