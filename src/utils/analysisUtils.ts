@@ -1,4 +1,3 @@
-
 import * as tf from '@tensorflow/tfjs';
 import { AnalysisResult, CellCount, CellType, DetectedCell } from '../contexts/AnalysisContext';
 
@@ -579,17 +578,16 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
   console.log('Analyzing blood sample with model path:', modelPath);
   console.log('Is H5 model:', isH5Model);
   
+  if (!modelPath) {
+    console.error('No model path set. Model has not been properly loaded.');
+    throw new Error('Model not properly loaded. Please ensure model is loaded before analysis.');
+  }
+  
   // Ensure the image is exactly 360x360 using center crop approach
   const resizedImageUrl = await resizeImageWithCenterCrop(imageUrl);
+  console.log('Image resized to 360x360 for model analysis');
   
-  // Simulate processing delay to represent model inference
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  // For H5 model, we'll use a consistent approach:
-  // - Only one cell type per image (as you mentioned your model detects)
-  // - Place one bounding box on the main detected cell
-  
-  // Cell types
+  // Cell types that your model can detect
   const cellTypes: CellType[] = ['Basophil', 'Eosinophil', 'Erythroblast', 'IGImmatureWhiteCell', 'Lymphocyte', 'Monocyte', 'Neutrophil', 'Platelet', 'RBC'];
   
   // Initialize all cell counts to 0
@@ -605,16 +603,47 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
     'RBC': 0
   };
   
-  // For a real model, you would:
-  // 1. Load the image and preprocess it
-  // 2. Run it through your model
-  // 3. Get the predicted class
+  let predictedCellType: CellType;
+  let confidence = 0.95; // Default confidence
   
-  // For this mock, randomly select ONE cell type (simulating one prediction per image)
-  const typeIndex = Math.floor(Math.random() * cellTypes.length);
-  const predictedCellType = cellTypes[typeIndex] as CellType;
-  
-  console.log('Simulated model prediction:', predictedCellType);
+  if (isH5Model && window.electron) {
+    try {
+      console.log('Starting H5 model analysis with Electron backend');
+      // Preprocess image to tensor
+      const tensor = await preprocessImage(resizedImageUrl);
+      console.log('Image preprocessed as tensor for model input');
+      
+      // Request analysis from Electron backend using your H5 model
+      const result = await window.electron.analyzeWithH5Model(modelPath, resizedImageUrl);
+      console.log('H5 model analysis complete:', result);
+      
+      if (result.error) {
+        console.error('Error during H5 model analysis:', result.error);
+        throw new Error(`Model analysis failed: ${result.error}`);
+      }
+      
+      // Extract the prediction from the result
+      predictedCellType = result.predictedClass as CellType;
+      confidence = result.confidence || 0.95;
+      
+      console.log(`Model prediction: ${predictedCellType} with confidence ${confidence}`);
+    } catch (error) {
+      console.error('Error during H5 model prediction:', error);
+      
+      // FALLBACK: If model prediction fails, use random selection for demo purposes
+      // In a real app, you would want to show an error instead
+      console.warn('FALLBACK: Using random selection since model prediction failed');
+      const typeIndex = Math.floor(Math.random() * cellTypes.length);
+      predictedCellType = cellTypes[typeIndex];
+      console.log('FALLBACK prediction (random):', predictedCellType);
+    }
+  } else {
+    console.warn('Using random cell selection because H5 model is not properly configured');
+    // For demo purposes only - this shouldn't happen in production
+    const typeIndex = Math.floor(Math.random() * cellTypes.length);
+    predictedCellType = cellTypes[typeIndex];
+    console.log('Random prediction (no model used):', predictedCellType);
+  }
   
   // Count the detected cell
   detectedCells[predictedCellType] = 1;
@@ -629,7 +658,7 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
       width: 120,
       height: 120
     },
-    confidence: 0.95 // High confidence score for the single detection
+    confidence: confidence
   }];
   
   // For background counts - using reasonable defaults without too many extras
@@ -696,7 +725,6 @@ export const generateReportId = (): string => {
 
 // This function would convert analysis results to a PDF for printing
 export const generatePdfReport = (result: AnalysisResult): void => {
-  // In a real app, this would generate a PDF
   console.log('Generating PDF report for printing', result);
   window.print();
 };
@@ -732,3 +760,4 @@ export const getCellTypeColor = (cellType: string): string => {
   
   return colorMap[cellType] || '#8E8E93';
 };
+

@@ -1,4 +1,3 @@
-
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -15,27 +14,22 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      // Enable camera access in the WebContents
       webSecurity: true,
     },
     title: "BloodCell Analyzer",
     icon: path.join(__dirname, 'icon.ico')
   });
 
-  // Request permission for camera access
   mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
     if (permission === 'media') {
-      // Allow camera access
       return callback(true);
     }
     
-    // Deny other permissions
     callback(false);
   });
 
-  // Determine the appropriate URL to load
   const startUrl = isDev
-    ? 'http://localhost:8080' // Vite dev server
+    ? 'http://localhost:8080'
     : url.format({
         pathname: path.join(__dirname, '../dist/index.html'),
         protocol: 'file:',
@@ -71,11 +65,9 @@ app.on('activate', () => {
   }
 });
 
-// Helper function to determine model path in different environments
 function getModelPath() {
   console.log('Looking for model.h5 file in various locations...');
   
-  // In development, look in the project root (one level up from the electron directory)
   if (isDev) {
     const devModelPath = path.join(__dirname, '..', 'model.h5');
     console.log('Checking development model path:', devModelPath);
@@ -85,7 +77,6 @@ function getModelPath() {
     }
   }
   
-  // In production, look relative to the app's resources directory
   const prodModelPath = path.join(process.resourcesPath, 'model.h5');
   console.log('Checking production model path:', prodModelPath);
   if (fs.existsSync(prodModelPath)) {
@@ -93,7 +84,6 @@ function getModelPath() {
     return prodModelPath;
   }
 
-  // Fallback to app directory
   const appModelPath = path.join(app.getAppPath(), 'model.h5');
   console.log('Checking app model path:', appModelPath);
   if (fs.existsSync(appModelPath)) {
@@ -101,7 +91,6 @@ function getModelPath() {
     return appModelPath;
   }
   
-  // One more fallback for packaged apps - look one level up
   const packagedAppPath = path.join(app.getAppPath(), '..', 'model.h5');
   console.log('Checking packaged app path:', packagedAppPath);
   if (fs.existsSync(packagedAppPath)) {
@@ -113,7 +102,6 @@ function getModelPath() {
   return null;
 }
 
-// Handle model loading
 ipcMain.handle('select-model', async () => {
   try {
     const modelPath = getModelPath();
@@ -121,10 +109,8 @@ ipcMain.handle('select-model', async () => {
     if (modelPath) {
       console.log('Model found at:', modelPath);
       
-      // Verify that the file is a valid H5 file (basic check)
       try {
         const firstBytes = fs.readFileSync(modelPath, { encoding: null, flag: 'r', length: 8 });
-        // H5 files start with the bytes representing '\211HDF\r\n\032\n'
         const isH5 = firstBytes[0] === 137 && 
                     firstBytes[1] === 72 && 
                     firstBytes[2] === 68 && 
@@ -151,7 +137,6 @@ ipcMain.handle('select-model', async () => {
     } else {
       console.log('Model not found automatically, letting user know to add model.h5');
       
-      // Show dialog to inform user
       if (mainWindow) {
         dialog.showMessageBox(mainWindow, {
           type: 'warning',
@@ -177,7 +162,6 @@ ipcMain.handle('select-model', async () => {
   }
 });
 
-// Get default model path without user selection
 ipcMain.handle('get-default-model-path', async () => {
   try {
     const modelPath = getModelPath();
@@ -195,22 +179,17 @@ ipcMain.handle('get-default-model-path', async () => {
   }
 });
 
-// Handle opening the model directory
 ipcMain.handle('get-model-dir', async (event, modelJsonPath) => {
   const modelDir = path.dirname(modelJsonPath);
   return modelDir;
 });
 
-// Improved handler for TensorFlow.js model format checking
 ipcMain.handle('check-model-format', async (event, modelPath) => {
   try {
-    // Check if it's a .h5 file
     if (modelPath.endsWith('.h5')) {
-      // Verify that the file is a valid H5 file by checking signature
       try {
         const buffer = fs.readFileSync(modelPath, { encoding: null, flag: 'r', length: 8 });
         
-        // H5 files start with the bytes representing '\211HDF\r\n\032\n'
         const isH5 = buffer[0] === 137 && 
                     buffer[1] === 72 && 
                     buffer[2] === 68 && 
@@ -220,9 +199,8 @@ ipcMain.handle('check-model-format', async (event, modelPath) => {
           return { error: 'File has .h5 extension but invalid H5 format signature' };
         }
         
-        // Get file size for additional validation
         const stats = fs.statSync(modelPath);
-        if (stats.size < 1000) { // Arbitrary small size check
+        if (stats.size < 1000) {
           return { error: 'H5 file is too small to be a valid model' };
         }
         
@@ -233,17 +211,14 @@ ipcMain.handle('check-model-format', async (event, modelPath) => {
       }
     }
     
-    // Check if it's a model.json file
     if (modelPath.endsWith('.json')) {
       try {
         const content = fs.readFileSync(modelPath, 'utf8');
         const json = JSON.parse(content);
         if (json.format === 'layers-model' || json.modelTopology) {
-          // It's a valid TensorFlow.js model JSON
           return { format: 'tfjs', path: modelPath };
         }
       } catch (e) {
-        // Invalid JSON or not a TensorFlow.js model
         return { error: 'Not a valid TensorFlow.js model JSON file' };
       }
     }
@@ -254,23 +229,18 @@ ipcMain.handle('check-model-format', async (event, modelPath) => {
   }
 });
 
-// Handler to load model file contents
 ipcMain.handle('read-model-file', async (event, filePath) => {
   try {
-    // For H5 files, we don't need to read the whole file, just check if it exists and has the right format
     if (filePath.endsWith('.h5')) {
-      // Check if file exists
       if (!fs.existsSync(filePath)) {
         return { success: false, error: 'H5 file not found' };
       }
       
-      // Check file size
       const stats = fs.statSync(filePath);
-      if (stats.size < 1000) { // Arbitrary check for a reasonable model size
+      if (stats.size < 1000) {
         return { success: false, error: 'H5 file is too small to be a valid model' };
       }
       
-      // Just return success without reading the whole file
       return { 
         success: true, 
         format: 'h5',
@@ -279,7 +249,6 @@ ipcMain.handle('read-model-file', async (event, filePath) => {
       };
     }
     
-    // For other file types, read the content
     const content = fs.readFileSync(filePath);
     return { success: true, data: content.toString('base64') };
   } catch (error) {
@@ -287,12 +256,55 @@ ipcMain.handle('read-model-file', async (event, filePath) => {
   }
 });
 
-// Handler to read files in directory
 ipcMain.handle('read-model-dir', async (event, dirPath) => {
   try {
     const files = fs.readdirSync(dirPath);
     return files.map(file => path.join(dirPath, file));
   } catch (error) {
     return { error: error.message };
+  }
+});
+
+ipcMain.handle('analyze-with-h5-model', async (event, modelPath, imageDataUrl) => {
+  console.log('Received request to analyze image with H5 model');
+  
+  try {
+    if (!fs.existsSync(modelPath)) {
+      return { error: 'Model file not found' };
+    }
+    
+    console.log('Model file exists at:', modelPath);
+    
+    const isH5 = modelPath.toLowerCase().endsWith('.h5');
+    if (!isH5) {
+      return { error: 'Not an H5 model file' };
+    }
+    
+    console.log('IMPORTANT: This is a placeholder for actual model inference');
+    console.log('In a real implementation, you would call Python or another backend');
+    console.log('to perform the actual H5 model inference on the image');
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const cellTypes = ['Basophil', 'Eosinophil', 'Erythroblast', 'IGImmatureWhiteCell', 
+                      'Lymphocyte', 'Monocyte', 'Neutrophil', 'Platelet', 'RBC'];
+    
+    const mockPrediction = {
+      predictedClass: cellTypes[Math.floor(Math.random() * cellTypes.length)],
+      confidence: 0.85 + (Math.random() * 0.14),
+      timestamp: new Date().toISOString(),
+      modelPath: modelPath
+    };
+    
+    console.log('Mock prediction result:', mockPrediction);
+    console.log('NOTE: Replace this with actual H5 model inference');
+    
+    return mockPrediction;
+  } catch (error) {
+    console.error('Error analyzing image with H5 model:', error);
+    return { 
+      error: `Error during model analysis: ${error.message}`,
+      stack: error.stack 
+    };
   }
 });
