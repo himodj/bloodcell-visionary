@@ -42,6 +42,18 @@ function createWindow() {
   console.log('Environment:', process.env.NODE_ENV);
   console.log('App path:', app.getAppPath());
   
+  if (isDev) {
+    try {
+      console.log('Installing DevTools in development mode');
+      const { default: installExtension, REACT_DEVELOPER_TOOLS } = require('electron-devtools-installer');
+      installExtension(REACT_DEVELOPER_TOOLS)
+        .then((name) => console.log(`Added Extension: ${name}`))
+        .catch((err) => console.log('An error occurred: ', err));
+    } catch (e) {
+      console.error('Failed to install developer tools:', e);
+    }
+  }
+  
   mainWindow.loadURL(startUrl);
 
   if (isDev) {
@@ -359,4 +371,11 @@ ipcMain.handle('read-model-dir', async (event, dirPath) => {
   }
 });
 
-// Removed analyzeWithH5Model handler as it's now handled in preload.js using HTTP
+ipcMain.handle('test-axios', async () => {
+  try {
+    const axios = require('axios');
+    return { available: true, message: 'Axios is available in the main process' };
+  } catch (error) {
+    return { available: false, error: error.message };
+  }
+});

@@ -45,6 +45,6 @@
     "concurrently": "latest"
   },
   "dependencies": {
-    "axios": "latest"
+    "axios": "^1.8.3"
   }
 }
