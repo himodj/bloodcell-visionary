@@ -1,13 +1,26 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 // Log the current directory and NODE_PATH to help debug module resolution
 console.log('Current directory:', process.cwd());
 console.log('NODE_PATH:', process.env.NODE_PATH);
 console.log('Attempting to load axios...');
 
-// Initialize API object with a default error handler for the analyzeWithH5Model function
+// Check if a module exists at a specific path
+function checkModuleExists(modulePath) {
+  try {
+    return fs.existsSync(modulePath) || 
+           fs.existsSync(modulePath + '.js') || 
+           fs.existsSync(path.join(modulePath, 'index.js')) ||
+           fs.existsSync(modulePath + '.node');
+  } catch (e) {
+    return false;
+  }
+}
+
+// Initialize API object
 let electronAPI = {
   // Set a flag so the renderer process can check if it's running in Electron
   isElectron: true,
@@ -30,51 +43,57 @@ let electronAPI = {
   // Read files in a directory
   readModelDir: (dirPath) => ipcRenderer.invoke('read-model-dir', dirPath),
   
-  // Fallback implementation if axios is missing
-  analyzeWithH5Model: async () => {
-    console.log('Using fallback analyzeWithH5Model implementation because axios is unavailable');
+  // Default implementation that will be replaced if axios loads
+  analyzeWithH5Model: async (modelPath, imageDataUrl) => {
+    console.log('Using fallback analyzeWithH5Model implementation');
     return {
-      error: 'Python backend communication is not available. Missing axios dependency.',
+      error: 'Python backend communication is not available. Could not load axios module.',
       stack: 'Module not found: axios'
     };
   }
 };
 
-// Try to load axios in multiple ways to handle different Electron environments
-try {
-  // First, try to require axios directly
-  let axios;
-  try {
-    axios = require('axios');
-    console.log('Axios loaded successfully via direct require');
-  } catch (directError) {
-    console.error('Failed to load axios directly:', directError.message);
-    
-    // Try to load from node_modules in the electron directory
-    try {
-      const electronDirPath = process.cwd();
-      const axiosPath = path.join(electronDirPath, 'node_modules', 'axios');
-      console.log('Trying to load axios from:', axiosPath);
-      axios = require(axiosPath);
-      console.log('Axios loaded successfully from electron/node_modules');
-    } catch (localError) {
-      console.error('Failed to load axios from local node_modules:', localError.message);
-      
-      // Try to load from parent directory's node_modules
-      try {
-        const parentDirPath = path.join(process.cwd(), '..');
-        const axiosPath = path.join(parentDirPath, 'node_modules', 'axios');
-        console.log('Trying to load axios from parent:', axiosPath);
-        axios = require(axiosPath);
-        console.log('Axios loaded successfully from parent node_modules');
-      } catch (parentError) {
-        console.error('Failed to load axios from parent node_modules:', parentError.message);
-        throw new Error('Could not load axios from any location');
-      }
-    }
+// Try to load axios with multiple strategies
+let axios = null;
+const possiblePaths = [
+  // Direct require
+  { 
+    path: 'axios', 
+    description: 'direct require' 
+  },
+  // From electron directory node_modules
+  { 
+    path: path.join(process.cwd(), 'node_modules', 'axios'), 
+    description: 'electron/node_modules' 
+  },
+  // From parent directory node_modules
+  { 
+    path: path.join(process.cwd(), '..', 'node_modules', 'axios'), 
+    description: 'parent node_modules' 
   }
+];
+
+// Try each path in order
+for (const pathObj of possiblePaths) {
+  console.log(`Attempting to load axios from: ${pathObj.description} (${pathObj.path})`);
   
-  // If we got here, we have a valid axios instance
+  if (checkModuleExists(pathObj.path)) {
+    console.log(`Found axios module at: ${pathObj.path}`);
+    
+    try {
+      axios = require(pathObj.path);
+      console.log(`Successfully loaded axios from ${pathObj.description}`);
+      break;
+    } catch (err) {
+      console.error(`Error requiring axios from ${pathObj.description}:`, err.message);
+    }
+  } else {
+    console.log(`Axios not found at: ${pathObj.path}`);
+  }
+}
+
+// Check if we successfully loaded axios
+if (axios) {
   console.log('Axios is available, setting up analyzeWithH5Model with actual implementation');
   
   // Override the default implementation with the actual one
@@ -99,9 +118,8 @@ try {
       };
     }
   };
-} catch (error) {
-  console.error('All attempts to load axios failed:', error.message);
-  console.error('The application will use the fallback implementation');
+} else {
+  console.error('All attempts to load axios failed. The application will use the fallback implementation');
 }
 
 // Expose the API to the renderer process
