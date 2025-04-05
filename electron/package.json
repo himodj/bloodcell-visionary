@@ -21,6 +21,10 @@
       {
         "from": "../model.h5",
         "to": "model.h5"
+      },
+      {
+        "from": "../python",
+        "to": "python"
       }
     ],
     "directories": {

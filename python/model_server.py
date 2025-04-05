@@ -7,6 +7,12 @@ import io
 import base64
 import os
 import datetime
+import traceback
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -14,10 +20,12 @@ app = Flask(__name__)
 model = None
 try:
     model_path = os.environ.get('MODEL_PATH', 'model.h5')
+    logger.info(f"Loading model from {model_path}")
     model = tf.keras.models.load_model(model_path)
-    print(f"Model loaded successfully from {model_path}")
+    logger.info(f"Model loaded successfully from {model_path}")
 except Exception as e:
-    print(f"Error loading model: {e}")
+    logger.error(f"Error loading model: {e}")
+    logger.error(traceback.format_exc())
 
 # Class labels (update with your actual classes)
 class_labels = [
@@ -33,30 +41,35 @@ def preprocess_image(image_data):
     3. Resize to 360x360
     4. Normalize pixel values
     """
-    # Decode base64 image
-    img = Image.open(io.BytesIO(base64.b64decode(image_data.split(',')[1])))
-    
-    # Get dimensions for center crop
-    width, height = img.size
-    new_dim = min(width, height)
-    
-    # Calculate crop coordinates
-    left = (width - new_dim) // 2
-    top = (height - new_dim) // 2
-    right = left + new_dim
-    bottom = top + new_dim
-    
-    # Crop and resize
-    img = img.crop((left, top, right, bottom))
-    img = img.resize((360, 360), Image.LANCZOS)
-    
-    # Convert to numpy array and normalize
-    img_array = np.array(img) / 255.0
-    
-    # Add batch dimension
-    img_array = np.expand_dims(img_array, axis=0)
-    
-    return img_array
+    try:
+        # Decode base64 image
+        img = Image.open(io.BytesIO(base64.b64decode(image_data.split(',')[1])))
+        
+        # Get dimensions for center crop
+        width, height = img.size
+        new_dim = min(width, height)
+        
+        # Calculate crop coordinates
+        left = (width - new_dim) // 2
+        top = (height - new_dim) // 2
+        right = left + new_dim
+        bottom = top + new_dim
+        
+        # Crop and resize
+        img = img.crop((left, top, right, bottom))
+        img = img.resize((360, 360), Image.LANCZOS)
+        
+        # Convert to numpy array and normalize
+        img_array = np.array(img) / 255.0
+        
+        # Add batch dimension
+        img_array = np.expand_dims(img_array, axis=0)
+        
+        return img_array
+    except Exception as e:
+        logger.error(f"Error preprocessing image: {e}")
+        logger.error(traceback.format_exc())
+        raise
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -80,6 +93,8 @@ def predict():
         predicted_class_idx = np.argmax(prediction[0])
         confidence = float(prediction[0][predicted_class_idx])
         predicted_class = class_labels[predicted_class_idx]
+        
+        logger.info(f"Predicted class: {predicted_class} with confidence {confidence:.4f}")
         
         # Create single detected cell
         cell = {
@@ -109,10 +124,18 @@ def predict():
         return jsonify(result)
         
     except Exception as e:
-        print(f"Error processing request: {e}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error processing request: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({'error': str(e), 'stack': traceback.format_exc()}), 500
 
 if __name__ == '__main__':
-    # Run on port 5000 by default
+    # Get port from environment or use default
     port = int(os.environ.get('PORT', 5000))
+    
+    # Log server startup
+    logger.info(f"Starting Flask server on port {port}")
+    logger.info(f"Model loaded: {model is not None}")
+    logger.info(f"Current working directory: {os.getcwd()}")
+    
+    # Run on port 5000 by default, make it accessible from outside
     app.run(host='0.0.0.0', port=port, debug=False)

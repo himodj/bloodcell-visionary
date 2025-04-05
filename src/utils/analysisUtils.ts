@@ -328,14 +328,19 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
       
       // Extract detected cell from the Python backend response
       if (result.detectedCells && Array.isArray(result.detectedCells) && result.detectedCells.length > 0) {
-        // Take only the first detected cell
-        detectedCells = [result.detectedCells[0]];
+        // Take only the first detected cell and ensure it has the correct type
+        const detectedCell = result.detectedCells[0];
+        detectedCells = [{
+          type: detectedCell.type as CellType, // Cast to CellType to satisfy the type system
+          confidence: detectedCell.confidence,
+          boundingBox: detectedCell.boundingBox
+        }];
         console.log(`Received cell detection from Python backend: ${detectedCells[0].type}`);
       }
       
       // Extract cell counts if available
       if (result.cellCounts) {
-        cellCountsMap = result.cellCounts;
+        cellCountsMap = result.cellCounts as Record<CellType, number>;
         console.log('Received cell counts from Python backend:', cellCountsMap);
       }
     } catch (error) {

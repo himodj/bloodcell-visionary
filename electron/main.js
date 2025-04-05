@@ -71,21 +71,71 @@ function startPythonServer() {
   const env = Object.assign({}, process.env);
   env.MODEL_PATH = getModelPath();
   
-  const scriptPath = path.join(app.getAppPath(), 'python', 'model_server.py');
+  let scriptPath;
+  if (isDev) {
+    scriptPath = path.join(__dirname, '..', 'python', 'model_server.py');
+  } else {
+    scriptPath = path.join(process.resourcesPath, 'python', 'model_server.py');
+  }
+  
   console.log('Python script path:', scriptPath);
   
-  if (!fs.existsSync(scriptPath)) {
-    console.error(`Python script not found at ${scriptPath}`);
-    
-    if (mainWindow) {
-      dialog.showMessageBox(mainWindow, {
-        type: 'error',
-        title: 'Server Error',
-        message: `Python script not found at ${scriptPath}. The application may not work correctly.`,
-        buttons: ['OK']
-      });
+  const pythonDir = path.dirname(scriptPath);
+  if (!fs.existsSync(pythonDir)) {
+    try {
+      fs.mkdirSync(pythonDir, { recursive: true });
+    } catch (err) {
+      console.error(`Could not create python directory: ${err.message}`);
     }
-    return;
+  }
+  
+  if (!fs.existsSync(scriptPath)) {
+    try {
+      const possibleSourcePaths = [
+        path.join(app.getAppPath(), 'python', 'model_server.py'),
+        path.join(__dirname, '..', 'python', 'model_server.py'),
+        path.join(process.resourcesPath, 'app.asar', 'python', 'model_server.py')
+      ];
+      
+      let sourceFile = null;
+      for (const sourcePath of possibleSourcePaths) {
+        if (fs.existsSync(sourcePath)) {
+          sourceFile = sourcePath;
+          console.log(`Found source Python script at: ${sourcePath}`);
+          break;
+        }
+      }
+      
+      if (sourceFile) {
+        fs.mkdirSync(path.dirname(scriptPath), { recursive: true });
+        fs.copyFileSync(sourceFile, scriptPath);
+        console.log(`Copied Python script from ${sourceFile} to ${scriptPath}`);
+      } else {
+        console.error(`Python script not found at any of the expected locations`);
+        
+        if (mainWindow) {
+          dialog.showMessageBox(mainWindow, {
+            type: 'error',
+            title: 'Server Error',
+            message: `Python script not found. The application may not work correctly.`,
+            buttons: ['OK']
+          });
+        }
+        return;
+      }
+    } catch (error) {
+      console.error(`Error copying Python script: ${error.message}`);
+      
+      if (mainWindow) {
+        dialog.showMessageBox(mainWindow, {
+          type: 'error',
+          title: 'Server Error',
+          message: `Failed to copy Python script: ${error.message}. The application may not work correctly.`,
+          buttons: ['OK']
+        });
+      }
+      return;
+    }
   }
   
   console.log('Starting Python model server...');
