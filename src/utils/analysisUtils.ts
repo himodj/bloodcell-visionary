@@ -134,7 +134,7 @@ export const resizeImageWithCenterCrop = (imageDataUrl: string): Promise<string>
   });
 };
 
-// Modified to create proper bounding boxes for all detected cells
+// Modified to create a bounding box for the detected cell
 const generateProcessedImage = (imageDataUrl: string, detectedCells: DetectedCell[]): Promise<string> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -152,8 +152,9 @@ const generateProcessedImage = (imageDataUrl: string, detectedCells: DetectedCel
       // Draw the original image
       ctx.drawImage(img, 0, 0);
       
-      // Draw bounding boxes and labels for all detected cells
-      detectedCells.forEach(cell => {
+      // Draw bounding box and label for the cell if there is one
+      if (detectedCells.length > 0) {
+        const cell = detectedCells[0];
         const { x, y, width, height } = cell.boundingBox;
         const confidencePercentage = (cell.confidence * 100).toFixed(1);
         
@@ -177,7 +178,7 @@ const generateProcessedImage = (imageDataUrl: string, detectedCells: DetectedCel
         ctx.fillStyle = '#FFFFFF';
         ctx.font = '12px Arial';
         ctx.fillText(labelText, x + 5, textY);
-      });
+      }
       
       // Get the processed image as data URL
       resolve(canvas.toDataURL('image/png'));
@@ -188,147 +189,96 @@ const generateProcessedImage = (imageDataUrl: string, detectedCells: DetectedCel
   });
 };
 
-// Generate conditions based on specific cell types and their counts
-const generateConditionsByCell = (cellCounts: Record<CellType, number>, abnormalityRate: number): string[] => {
+// Generate conditions based on the identified cell type
+const generateConditionsByCell = (cellType: CellType | null): string[] => {
   const conditions: string[] = [];
   
-  // High eosinophil count
-  if (cellCounts['Eosinophil'] > 2) {
-    conditions.push('Possible eosinophilia - may indicate allergic reaction or parasitic infection');
+  if (!cellType) {
+    return ['No significant cell detected'];
   }
   
-  // High basophil count
-  if (cellCounts['Basophil'] > 1) {
-    conditions.push('Elevated basophil count - may indicate inflammatory reaction or myeloproliferative disorder');
-  }
-  
-  // Presence of erythroblasts (immature RBCs)
-  if (cellCounts['Erythroblast'] > 0) {
-    conditions.push('Erythroblasts present in peripheral blood - may indicate severe anemia or bone marrow stress');
-  }
-  
-  // Immature white cells
-  if (cellCounts['IGImmatureWhiteCell'] > 0) {
-    conditions.push('Immature granulocytes detected - possible infection, inflammation, or myeloid malignancy');
-  }
-  
-  // Abnormal lymphocyte count
-  if (cellCounts['Lymphocyte'] > 4) {
-    conditions.push('Lymphocytosis - may indicate viral infection or lymphoproliferative disorder');
-  } else if (cellCounts['Lymphocyte'] < 1 && cellCounts['Lymphocyte'] > 0) {
-    conditions.push('Lymphopenia - possible immunosuppression or severe infection');
-  }
-  
-  // Neutrophil evaluation
-  if (cellCounts['Neutrophil'] > 5) {
-    conditions.push('Neutrophilia - indicates acute bacterial infection or inflammation');
-  } else if (cellCounts['Neutrophil'] < 1 && cellCounts['Neutrophil'] > 0) {
-    conditions.push('Neutropenia - risk of infection, may indicate bone marrow suppression');
-  }
-  
-  // Monocyte evaluation
-  if (cellCounts['Monocyte'] > 2) {
-    conditions.push('Monocytosis - may indicate chronic infection or inflammatory disease');
-  }
-  
-  // General abnormality rate-based conditions
-  if (abnormalityRate > 15) {
-    conditions.push('High rate of abnormal cells - comprehensive hematological evaluation recommended');
-  } else if (abnormalityRate > 10) {
-    conditions.push('Moderate cell abnormalities detected');
-  } else if (abnormalityRate > 5) {
-    conditions.push('Mild cell abnormalities detected');
-  } else if (conditions.length === 0) {
-    conditions.push('No significant abnormalities detected');
+  switch(cellType) {
+    case 'Eosinophil':
+      conditions.push('Possible eosinophilia - may indicate allergic reaction or parasitic infection');
+      break;
+    case 'Basophil':
+      conditions.push('Elevated basophil count - may indicate inflammatory reaction or myeloproliferative disorder');
+      break;
+    case 'Erythroblast':
+      conditions.push('Erythroblasts present in peripheral blood - may indicate severe anemia or bone marrow stress');
+      break;
+    case 'IGImmatureWhiteCell':
+      conditions.push('Immature granulocytes detected - possible infection, inflammation, or myeloid malignancy');
+      break;
+    case 'Lymphocyte':
+      conditions.push('Lymphocyte detected - part of normal immune response or possible viral infection');
+      break;
+    case 'Monocyte':
+      conditions.push('Monocyte detected - part of normal immune response or possible chronic infection');
+      break;
+    case 'Neutrophil':
+      conditions.push('Neutrophil detected - part of normal immune response or possible bacterial infection');
+      break;
+    case 'Platelet':
+      conditions.push('Platelet detected - important for blood clotting');
+      break;
+    case 'RBC':
+      conditions.push('Red blood cell detected - normal oxygen-carrying cell');
+      break;
+    default:
+      conditions.push('Unknown cell type detected');
   }
   
   return conditions;
 };
 
-// Generate recommendations based on cell findings
-const generateRecommendations = (detectedCells: Record<CellType, number>, abnormalityRate: number): string[] => {
+// Generate recommendations based on the identified cell type
+const generateRecommendations = (cellType: CellType | null): string[] => {
   const recommendations: string[] = [];
   
-  // Eosinophil-specific recommendations
-  if (detectedCells['Eosinophil'] > 0) {
-    recommendations.push(`Eosinophil detected [${detectedCells['Eosinophil']} cells]: Check for allergies or parasitic infections`);
-    if (detectedCells['Eosinophil'] > 2) {
-      recommendations.push(`Elevated Eosinophil count [${detectedCells['Eosinophil']} cells]: Consider stool examination for ova and parasites`);
-    }
+  if (!cellType) {
+    return ['Repeat the analysis with a clearer sample'];
   }
   
-  // Basophil-specific recommendations
-  if (detectedCells['Basophil'] > 0) {
-    recommendations.push(`Basophil detected [${detectedCells['Basophil']} cells]: Monitor for hypersensitivity reactions`);
-    if (detectedCells['Basophil'] > 1) {
-      recommendations.push(`Elevated Basophil count [${detectedCells['Basophil']} cells]: Consider bone marrow examination if persistently elevated`);
-    }
-  }
-  
-  // Erythroblast-specific recommendations
-  if (detectedCells['Erythroblast'] > 0) {
-    recommendations.push(`Erythroblast detected [${detectedCells['Erythroblast']} cells]: Assess for hemolytic anemia or severe blood loss`);
-    recommendations.push(`Erythroblast present [${detectedCells['Erythroblast']} cells]: Bone marrow biopsy should be considered`);
-  }
-  
-  // Immature granulocyte recommendations
-  if (detectedCells['IGImmatureWhiteCell'] > 0) {
-    recommendations.push(`Immature Granulocytes [${detectedCells['IGImmatureWhiteCell']} cells]: Repeat complete blood count in 2-3 days`);
-    recommendations.push(`Immature Granulocytes [${detectedCells['IGImmatureWhiteCell']} cells]: Monitor for signs of infection or myeloproliferative disorders`);
-  }
-  
-  // Lymphocyte-specific recommendations
-  if (detectedCells['Lymphocyte'] > 0) {
-    if (detectedCells['Lymphocyte'] > 4) {
-      recommendations.push(`Elevated Lymphocyte count [${detectedCells['Lymphocyte']} cells]: Evaluate for viral infections, particularly EBV or CMV`);
-      recommendations.push(`Lymphocytosis [${detectedCells['Lymphocyte']} cells]: Flow cytometry if lymphocytosis persists to rule out lymphoproliferative disorder`);
-    } else if (detectedCells['Lymphocyte'] < 1) {
-      recommendations.push(`Low Lymphocyte count [${detectedCells['Lymphocyte']} cells]: Assess immune status and risk of opportunistic infections`);
-    }
-  }
-  
-  // Neutrophil-specific recommendations
-  if (detectedCells['Neutrophil'] > 0) {
-    if (detectedCells['Neutrophil'] > 5) {
-      recommendations.push(`Elevated Neutrophil count [${detectedCells['Neutrophil']} cells]: Search for source of infection or inflammation`);
-      recommendations.push(`Neutrophilia [${detectedCells['Neutrophil']} cells]: Blood cultures if fever present`);
-    } else if (detectedCells['Neutrophil'] < 1) {
-      recommendations.push(`Low Neutrophil count [${detectedCells['Neutrophil']} cells]: Neutropenic precautions and monitoring`);
-      recommendations.push(`Neutropenia [${detectedCells['Neutrophil']} cells]: Evaluate medication history for potential causes`);
-    }
-  }
-  
-  // Monocyte-specific recommendations
-  if (detectedCells['Monocyte'] > 0) {
-    if (detectedCells['Monocyte'] > 2) {
-      recommendations.push(`Elevated Monocyte count [${detectedCells['Monocyte']} cells]: Evaluate for chronic infections such as TB or endocarditis`);
-      recommendations.push(`Monocytosis [${detectedCells['Monocyte']} cells]: Consider autoimmune disorder workup`);
-    }
-  }
-  
-  // Red blood cell specific recommendations
-  if (detectedCells['RBC'] > 0) {
-    recommendations.push(`Red Blood Cells detected [${detectedCells['RBC']} cells]: Evaluate for morphological abnormalities`);
-  }
-  
-  // Platelet specific recommendations
-  if (detectedCells['Platelet'] > 0) {
-    recommendations.push(`Platelets detected [${detectedCells['Platelet']} cells]: Assess for clumping or abnormal morphology`);
-  }
-  
-  // General recommendations based on abnormality rate
-  if (abnormalityRate > 15) {
-    recommendations.push(`High abnormality rate [${abnormalityRate.toFixed(1)}%]: Urgent hematology consultation recommended`);
-    recommendations.push(`Severe abnormalities [${abnormalityRate.toFixed(1)}%]: Additional blood tests including flow cytometry`);
-  } else if (abnormalityRate > 10) {
-    recommendations.push(`Moderate abnormality rate [${abnormalityRate.toFixed(1)}%]: Follow-up with hematology within 2 weeks`);
-    recommendations.push(`Moderate abnormalities [${abnormalityRate.toFixed(1)}%]: Complete blood count with differential`);
-  } else if (abnormalityRate > 5) {
-    recommendations.push(`Mild abnormality rate [${abnormalityRate.toFixed(1)}%]: Repeat blood test in 1 month`);
-    recommendations.push(`Mild abnormalities [${abnormalityRate.toFixed(1)}%]: Clinical correlation with patient symptoms`);
-  } else if (recommendations.length === 0) {
-    recommendations.push(`No significant abnormality [${abnormalityRate.toFixed(1)}%]: Routine follow-up as clinically indicated`);
-    recommendations.push(`Normal findings [${abnormalityRate.toFixed(1)}%]: No immediate hematological intervention required`);
+  switch(cellType) {
+    case 'Eosinophil':
+      recommendations.push('Check for allergies or parasitic infections');
+      recommendations.push('Consider stool examination for ova and parasites');
+      break;
+    case 'Basophil':
+      recommendations.push('Monitor for hypersensitivity reactions');
+      recommendations.push('Consider bone marrow examination if persistently elevated');
+      break;
+    case 'Erythroblast':
+      recommendations.push('Assess for hemolytic anemia or severe blood loss');
+      recommendations.push('Bone marrow biopsy should be considered');
+      break;
+    case 'IGImmatureWhiteCell':
+      recommendations.push('Repeat complete blood count in 2-3 days');
+      recommendations.push('Monitor for signs of infection or myeloproliferative disorders');
+      break;
+    case 'Lymphocyte':
+      recommendations.push('Evaluate for viral infections, particularly EBV or CMV');
+      recommendations.push('Monitor lymphocyte count in follow-up CBC');
+      break;
+    case 'Monocyte':
+      recommendations.push('Evaluate for chronic infections such as TB or endocarditis');
+      recommendations.push('Consider autoimmune disorder workup');
+      break;
+    case 'Neutrophil':
+      recommendations.push('Search for source of infection or inflammation');
+      recommendations.push('Consider blood cultures if fever present');
+      break;
+    case 'Platelet':
+      recommendations.push('Assess for clumping or abnormal morphology');
+      recommendations.push('Check platelet count in CBC');
+      break;
+    case 'RBC':
+      recommendations.push('Evaluate for morphological abnormalities');
+      recommendations.push('Check hemoglobin and hematocrit levels');
+      break;
+    default:
+      recommendations.push('Further detailed examination recommended');
   }
   
   return recommendations;
@@ -376,10 +326,11 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
         throw new Error(`Model analysis failed: ${result.error}`);
       }
       
-      // Extract detected cells from the Python backend response
-      if (result.detectedCells && Array.isArray(result.detectedCells)) {
-        detectedCells = result.detectedCells;
-        console.log(`Received ${detectedCells.length} detected cells from Python backend`);
+      // Extract detected cell from the Python backend response
+      if (result.detectedCells && Array.isArray(result.detectedCells) && result.detectedCells.length > 0) {
+        // Take only the first detected cell
+        detectedCells = [result.detectedCells[0]];
+        console.log(`Received cell detection from Python backend: ${detectedCells[0].type}`);
       }
       
       // Extract cell counts if available
@@ -393,50 +344,53 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
       // FALLBACK: If model prediction fails, generate random detection data
       console.warn('FALLBACK: Using random detection data since Python backend prediction failed');
       const randomData = generateRandomDetectionData();
-      detectedCells = randomData.detectedCells;
+      detectedCells = [randomData.detectedCells[0]]; // Only take the first cell
       cellCountsMap = randomData.cellCounts;
     }
   } else {
     console.warn('Using random cell detection data because H5 model or Python backend is not properly configured');
     // For demo purposes only - this shouldn't happen in production
     const randomData = generateRandomDetectionData();
-    detectedCells = randomData.detectedCells;
+    detectedCells = [randomData.detectedCells[0]]; // Only take the first cell
     cellCountsMap = randomData.cellCounts;
   }
   
-  // Calculate total count and background cells
-  const totalCellCount = Object.values(cellCountsMap).reduce((sum, count) => sum + count, 0);
-  
-  // Calculate normal and abnormal counts for RBC and platelets
-  const totalNormalRBC = cellCountsMap['RBC'] || 0;
-  const totalAbnormalRBC = 0;
-  const totalNormalPlatelets = cellCountsMap['Platelet'] || 0;
-  const totalAbnormalPlatelets = 0;
-  
+  // Create cell counts object
   const cellCounts: CellCount = {
     normal: {
-      rbc: totalNormalRBC,
-      platelets: totalNormalPlatelets
+      rbc: cellCountsMap['RBC'] || 0,
+      platelets: cellCountsMap['Platelet'] || 0
     },
     abnormal: {
-      rbc: totalAbnormalRBC,
-      platelets: totalAbnormalPlatelets
+      rbc: 0,
+      platelets: 0
     },
-    total: totalCellCount,
+    total: 1, // Since we're only detecting one cell
     detectedCells: cellCountsMap
   };
   
-  // Calculate abnormality rate based on cell types
-  const abnormalCells = cellCountsMap['Erythroblast'] + cellCountsMap['IGImmatureWhiteCell'];
-  const abnormalityRate = totalCellCount > 0 ? (abnormalCells / totalCellCount) * 100 : 0;
+  // Set abnormality rate based on cell type
+  let abnormalityRate = 0;
+  if (detectedCells.length > 0) {
+    const cellType = detectedCells[0].type;
+    // Consider certain cell types as abnormal
+    if (cellType === 'Erythroblast' || cellType === 'IGImmatureWhiteCell') {
+      abnormalityRate = 100;
+    } else if (cellType === 'Basophil' || cellType === 'Eosinophil') {
+      abnormalityRate = 50;
+    }
+  }
   
-  // Generate recommendations based on detected cells
-  const recommendations = generateRecommendations(cellCountsMap, abnormalityRate);
+  // Get the detected cell type or null if none detected
+  const detectedCellType = detectedCells.length > 0 ? detectedCells[0].type as CellType : null;
+  
+  // Generate recommendations based on detected cell
+  const recommendations = generateRecommendations(detectedCellType);
   
   // Generate possible conditions
-  const possibleConditions = generateConditionsByCell(cellCountsMap, abnormalityRate);
+  const possibleConditions = generateConditionsByCell(detectedCellType);
   
-  // Create processed image with bounding boxes
+  // Create processed image with bounding box
   const processedImage = await generateProcessedImage(resizedImageUrl, detectedCells);
   
   // Create and return the analysis result
@@ -458,7 +412,7 @@ export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResu
 function generateRandomDetectionData() {
   const cellTypes: CellType[] = ['Basophil', 'Eosinophil', 'Erythroblast', 'IGImmatureWhiteCell', 'Lymphocyte', 'Monocyte', 'Neutrophil', 'Platelet', 'RBC'];
   
-  // Initialize cell counts
+  // Initialize cell counts to all zeros
   const cellCounts: Record<CellType, number> = {
     'Basophil': 0,
     'Eosinophil': 0,
@@ -471,69 +425,23 @@ function generateRandomDetectionData() {
     'RBC': 0
   };
   
-  // Generate random number of cells (5-15)
-  const numCells = Math.floor(Math.random() * 10) + 5;
-  const detectedCells: DetectedCell[] = [];
+  // Pick a random cell type
+  const cellType = cellTypes[Math.floor(Math.random() * cellTypes.length)];
   
-  // Used positions to avoid overlap
-  const usedPositions: {x: number, y: number, width: number, height: number}[] = [];
+  // Set count to 1 for the selected cell type
+  cellCounts[cellType] = 1;
   
-  for (let i = 0; i < numCells; i++) {
-    // Pick a random cell type
-    const cellType = cellTypes[Math.floor(Math.random() * cellTypes.length)];
-    
-    // Generate random position that doesn't overlap too much with existing cells
-    let x, y, width, height;
-    let overlapFound = true;
-    let attempts = 0;
-    
-    while (overlapFound && attempts < 10) {
-      width = Math.floor(Math.random() * 60) + 60; // 60-120
-      height = width; // Keep it square
-      x = Math.floor(Math.random() * (360 - width));
-      y = Math.floor(Math.random() * (360 - height));
-      
-      // Check for overlap
-      overlapFound = false;
-      for (const pos of usedPositions) {
-        // Simple overlap check
-        if (!(x > pos.x + pos.width || x + width < pos.x || y > pos.y + pos.height || y + height < pos.y)) {
-          overlapFound = true;
-          break;
-        }
-      }
-      
-      attempts++;
+  // Create a single detected cell
+  const detectedCells: DetectedCell[] = [{
+    type: cellType,
+    confidence: 0.7 + Math.random() * 0.29, // Random confidence between 0.7 and 0.99
+    boundingBox: {
+      x: 120, // Center position
+      y: 120,
+      width: 120,
+      height: 120
     }
-    
-    // If we couldn't find a non-overlapping position, just place it somewhere
-    if (overlapFound) {
-      x = Math.floor(Math.random() * (360 - 80));
-      y = Math.floor(Math.random() * (360 - 80));
-      width = 80;
-      height = 80;
-    }
-    
-    // Add position to used positions
-    usedPositions.push({x, y, width, height});
-    
-    // Create cell with random confidence (0.7-0.99)
-    const confidence = 0.7 + Math.random() * 0.29;
-    
-    detectedCells.push({
-      type: cellType,
-      confidence,
-      boundingBox: {
-        x,
-        y,
-        width,
-        height
-      }
-    });
-    
-    // Increment cell count
-    cellCounts[cellType]++;
-  }
+  }];
   
   return {
     detectedCells,

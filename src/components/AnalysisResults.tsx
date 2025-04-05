@@ -96,44 +96,22 @@ const AnalysisResults: React.FC = () => {
           <CardContent className="p-4">
             <div className="flex flex-col divide-y">
               <div className="py-3 flex justify-between items-center">
-                <span className="text-sm text-medical-dark text-opacity-70">Total cells analyzed:</span>
-                <span className="font-medium text-medical-dark">{formatNumber(cellCounts.total)}</span>
-              </div>
-              
-              {/* Display all detected cell types */}
-              {Object.entries(cellCounts.detectedCells)
-                .filter(([_, count]) => count > 0)
-                .sort(([_, countA], [__, countB]) => countB - countA)
-                .map(([cellType, count], index) => (
-                  <div key={index} className="py-3 flex justify-between items-center">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: getCellTypeColor(cellType) }}></div>
-                      <span className="text-sm text-medical-dark text-opacity-70">{cellType}:</span>
-                    </div>
-                    <span className="font-medium text-medical-dark">{formatNumber(count)}</span>
-                  </div>
-                ))
-              }
-              
-              <div className="py-3 flex justify-between items-center">
-                <span className="text-sm text-medical-dark text-opacity-70">Analysis Confidence:</span>
-                <span className="font-medium text-medical-dark">{avgConfidence}%</span>
+                <span className="text-sm text-medical-dark text-opacity-70">Cell detected:</span>
+                <span className="font-medium text-medical-dark">{detectedCells.length > 0 ? detectedCells[0].type : "None"}</span>
               </div>
               
               <div className="py-3 flex justify-between items-center">
-                <span className="text-sm text-medical-dark text-opacity-70">Abnormality rate:</span>
-                <div className="flex items-center">
-                  <div 
-                    className="w-3 h-3 rounded-full mr-2"
-                    style={{ backgroundColor: getSeverityColor(severity) }} 
-                  ></div>
-                  <span 
-                    className="font-medium"
-                    style={{ color: getSeverityColor(severity) }}
-                  >
-                    {abnormalityRate.toFixed(1)}%
-                  </span>
-                </div>
+                <span className="text-sm text-medical-dark text-opacity-70">Confidence:</span>
+                <span className="font-medium text-medical-dark">
+                  {detectedCells.length > 0 ? `${(detectedCells[0].confidence * 100).toFixed(1)}%` : "N/A"}
+                </span>
+              </div>
+              
+              <div className="py-3 flex justify-between items-center">
+                <span className="text-sm text-medical-dark text-opacity-70">Analysis Date:</span>
+                <span className="font-medium text-medical-dark">
+                  {analysisResult.analysisDate.toLocaleString()}
+                </span>
               </div>
             </div>
           </CardContent>
@@ -143,81 +121,33 @@ const AnalysisResults: React.FC = () => {
           <div className="p-4 bg-medical-blue bg-opacity-5 border-b border-medical-blue border-opacity-10">
             <h3 className="font-display font-medium flex items-center text-medical-dark">
               <Circle size={16} className="text-medical-blue mr-2" />
-              Cell Distribution
+              Cell Classification
             </h3>
           </div>
           <CardContent className="p-4 h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={90}
-                  paddingAngle={1}
-                  dataKey="value"
+            {detectedCells.length > 0 ? (
+              <div className="flex flex-col h-full justify-center items-center">
+                <div 
+                  className="w-24 h-24 rounded-full mb-4 flex items-center justify-center text-white text-lg font-bold"
+                  style={{ backgroundColor: getCellTypeColor(detectedCells[0].type) }}
                 >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  formatter={(value: number) => [formatNumber(value), 'Count']}
-                  contentStyle={{ 
-                    borderRadius: '8px', 
-                    border: 'none', 
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                    backgroundColor: 'white',
-                    padding: '8px 12px'
-                  }}
-                />
-                <Legend 
-                  verticalAlign="bottom" 
-                  align="center" 
-                  layout="horizontal"
-                  iconType="circle"
-                  iconSize={8}
-                  wrapperStyle={{ paddingTop: '20px' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+                  {detectedCells[0].type.charAt(0)}
+                </div>
+                <h3 className="text-xl font-medium mb-2">{detectedCells[0].type}</h3>
+                <p className="text-medical-dark text-opacity-70">
+                  Confidence: {(detectedCells[0].confidence * 100).toFixed(1)}%
+                </p>
+              </div>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <p className="text-medical-dark text-opacity-70">No cell detected</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
       
-      <Card className="medical-card overflow-hidden mb-6 border-l-4" style={{ borderLeftColor: getSeverityColor(severity) }}>
-        <div className="p-4 bg-opacity-5 flex items-center justify-between" style={{ backgroundColor: `${getSeverityColor(severity)}20` }}>
-          <div className="flex items-center">
-            <AlertTriangle size={18} style={{ color: getSeverityColor(severity) }} className="mr-2" />
-            <h3 className="font-display font-medium text-medical-dark">Detected Cell Types</h3>
-          </div>
-        </div>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {detectedCells.length > 0 ? (
-              detectedCells
-                .sort((a, b) => b.confidence - a.confidence)
-                .slice(0, 10)
-                .map((cell, index) => (
-                  <div key={index} className="flex items-center">
-                    <div 
-                      className="w-3 h-3 rounded-full mr-2" 
-                      style={{ backgroundColor: getCellTypeColor(cell.type) }}
-                    ></div>
-                    <span className="text-medical-dark">
-                      {cell.type} - {(cell.confidence * 100).toFixed(1)}% confidence
-                    </span>
-                  </div>
-                ))
-            ) : (
-              <p className="text-medical-dark text-opacity-70">No specific cells detected</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-      
-      {abnormalityRate > 0 && (
+      {detectedCells.length > 0 && (
         <Card className="medical-card overflow-hidden mb-6 border-l-4" style={{ borderLeftColor: getSeverityColor(severity) }}>
           <div className="p-4 bg-opacity-5 flex items-center justify-between" style={{ backgroundColor: `${getSeverityColor(severity)}20` }}>
             <div className="flex items-center">
@@ -246,32 +176,34 @@ const AnalysisResults: React.FC = () => {
         </Card>
       )}
       
-      <Card className="medical-card overflow-hidden mb-6">
-        <div className="p-4 bg-medical-blue bg-opacity-5 border-b border-medical-blue border-opacity-10 flex items-center justify-between">
-          <h3 className="font-display font-medium flex items-center text-medical-dark">
-            <Circle size={16} className="text-medical-blue mr-2" />
-            Cell-Specific Recommendations
-          </h3>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={handleEditRecommendations}
-            className="text-xs"
-          >
-            <Edit3 size={14} className="mr-1" />
-            Edit
-          </Button>
-        </div>
-        <CardContent className="p-4">
-          <ul className="list-disc pl-6 space-y-2">
-            {analysisResult.recommendations.map((recommendation, index) => (
-              <li key={index} className="text-medical-dark">
-                {recommendation}
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
+      {detectedCells.length > 0 && (
+        <Card className="medical-card overflow-hidden mb-6">
+          <div className="p-4 bg-medical-blue bg-opacity-5 border-b border-medical-blue border-opacity-10 flex items-center justify-between">
+            <h3 className="font-display font-medium flex items-center text-medical-dark">
+              <Circle size={16} className="text-medical-blue mr-2" />
+              Recommendations
+            </h3>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleEditRecommendations}
+              className="text-xs"
+            >
+              <Edit3 size={14} className="mr-1" />
+              Edit
+            </Button>
+          </div>
+          <CardContent className="p-4">
+            <ul className="list-disc pl-6 space-y-2">
+              {analysisResult.recommendations.map((recommendation, index) => (
+                <li key={index} className="text-medical-dark">
+                  {recommendation}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

@@ -47,7 +47,7 @@ export interface AnalysisResult {
   analysisDate: Date;
   detectedCells: DetectedCell[];
   reportLayout: 'standard' | 'compact' | 'detailed';
-  notes: string; // Added notes field
+  notes: string;
 }
 
 interface AnalysisContextType {
@@ -63,7 +63,7 @@ interface AnalysisContextType {
   updateReportLayout: (layout: 'standard' | 'compact' | 'detailed') => void;
   updateRecommendations: (recommendations: string[]) => void;
   updatePossibleConditions: (conditions: string[]) => void;
-  updateNotes: (notes: string) => void; // Added function to update notes
+  updateNotes: (notes: string) => void;
 }
 
 const AnalysisContext = createContext<AnalysisContextType | undefined>(undefined);
