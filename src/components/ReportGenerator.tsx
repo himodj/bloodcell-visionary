@@ -29,7 +29,7 @@ const ReportGenerator: React.FC = () => {
   
   if (!analysisResult) return null;
   
-  const { abnormalityRate, recommendations, analysisDate, reportLayout, cellCounts, possibleConditions, processedImage, notes, detectedCells } = analysisResult;
+  const { abnormalityRate, recommendations, analysisDate, reportLayout, cellCounts, possibleConditions, processedImage, notes, detectedCells, image } = analysisResult;
   const severity = determineSeverity(abnormalityRate);
   const reportId = generateReportId();
   
@@ -53,8 +53,12 @@ const ReportGenerator: React.FC = () => {
   const mostFrequentCellTypes = getCellTypeCounts();
   
   const handlePrintReport = () => {
-    window.print();
+    // Show a message before printing
     toast.success('Preparing report for printing');
+    // Give a small delay to ensure all elements are rendered
+    setTimeout(() => {
+      window.print();
+    }, 300);
   };
   
   const handleSaveReport = () => {
@@ -157,47 +161,133 @@ const ReportGenerator: React.FC = () => {
     </div>
   );
 
-  // Lab report specific print styles
+  // Enhanced print styles for improved report printing layout
   const printStyles = `
     @media print {
       @page {
         size: A4;
         margin: 15mm;
       }
+      
       body {
         margin: 0;
         padding: 0;
         background: white;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
+        color-adjust: exact !important;
       }
+      
+      /* Hide non-printable elements */
       .no-print, .no-print * {
         display: none !important;
       }
+      
+      /* Show print-only elements */
       .print-only {
         display: block !important;
       }
+      
+      /* Hide app UI elements */
       #root > div > header,
-      #root > div > main > div.animate-fade-in,
-      #root > div > main > div.grid,
+      #root > div > main > div:not(#print-content),
       #root > div > footer,
-      button, 
+      button:not(.print-button), 
+      select,
       .select,
       .controls-container {
         display: none !important;
       }
+      
+      /* Format the print content */
       #print-content {
         display: block !important;
-        width: 100%;
-        height: auto;
-        overflow: visible;
-        box-shadow: none;
-        border: none;
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        page-break-inside: avoid;
+        box-shadow: none !important;
+        border: 1px solid #e2e8f0 !important;
       }
+      
       #print-content * {
         color-adjust: exact !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
+      }
+      
+      /* Ensure images print properly */
+      #print-content img {
+        max-width: 100% !important;
+        height: auto !important;
+        page-break-inside: avoid;
+        display: block !important;
+      }
+      
+      /* Format text elements for print */
+      #print-content h1, 
+      #print-content h2, 
+      #print-content h3, 
+      #print-content h4 {
+        page-break-after: avoid;
+      }
+      
+      #print-content p, 
+      #print-content li {
+        orphans: 3;
+        widows: 3;
+      }
+      
+      /* Format grid layout for print */
+      #print-content .grid {
+        display: block !important;
+      }
+      
+      /* Make sure form inputs look good in print */
+      #print-content input,
+      #print-content textarea,
+      #print-content select {
+        border: 1px solid #ddd !important;
+        background: white !important;
+      }
+      
+      /* Format container elements for print */
+      .print-container {
+        page-break-inside: avoid;
+        margin-bottom: 15mm;
+      }
+      
+      /* Report specific styles */
+      .report-header {
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 10mm;
+        margin-bottom: 10mm;
+      }
+      
+      .report-section {
+        margin-bottom: 8mm;
+      }
+      
+      .report-footer {
+        margin-top: 15mm;
+        padding-top: 5mm;
+        border-top: 1px solid #e2e8f0;
+        font-size: 9pt;
+      }
+      
+      /* Cell Image display */
+      .cell-image-container {
+        max-width: 100%;
+        text-align: center;
+        margin: 0 auto;
+        page-break-inside: avoid;
+      }
+      
+      .cell-image {
+        max-width: 90%;
+        height: auto;
+        border: 1px solid #ddd;
+        margin: 0 auto;
       }
     }
   `;
@@ -246,8 +336,8 @@ const ReportGenerator: React.FC = () => {
       
       {/* Standard Layout */}
       {reportLayout === 'standard' && (
-        <Card className="medical-card overflow-hidden" id="print-content">
-          <div className="p-4 border-b">
+        <Card className="medical-card overflow-hidden print-container" id="print-content">
+          <div className="p-4 border-b report-header">
             <div className="flex flex-col md:flex-row justify-between">
               <div>
                 <h3 className="font-display font-bold text-xl">Blood Cell Analysis Report</h3>
@@ -268,12 +358,29 @@ const ReportGenerator: React.FC = () => {
           </div>
           
           <CardContent className="p-4">
+            {/* Cell image display - Added for better report printing */}
+            <div className="cell-image-container mb-6">
+              {processedImage && (
+                <div className="flex flex-col items-center">
+                  <h4 className="font-medium mb-2 text-medical-dark">Blood Cell Sample</h4>
+                  <img 
+                    src={processedImage} 
+                    alt="Processed Blood Sample" 
+                    className="cell-image" 
+                  />
+                  <p className="text-xs text-center mt-2 text-medical-dark text-opacity-70">
+                    Blood sample image with detected cell type highlighted
+                  </p>
+                </div>
+              )}
+            </div>
+            
             {/* Patient Information */}
             <PatientInfoSection />
             
             <Separator className="my-4" />
             
-            <div className="mb-6">
+            <div className="mb-6 report-section">
               <h4 className="font-medium mb-2 text-medical-dark">Sample Information</h4>
               <div className="text-sm space-y-2">
                 <div className="flex justify-between">
@@ -315,7 +422,7 @@ const ReportGenerator: React.FC = () => {
             <Separator className="my-4" />
             
             {/* Detected cell types section */}
-            <div className="mb-6">
+            <div className="mb-6 report-section">
               <h4 className="font-medium mb-2 text-medical-dark">Detected Cell Types</h4>
               <div className="text-sm space-y-2">
                 {mostFrequentCellTypes.length > 0 ? (
@@ -332,7 +439,7 @@ const ReportGenerator: React.FC = () => {
             
             <Separator className="my-4" />
             
-            <div className="mb-6">
+            <div className="mb-6 report-section">
               <h4 className="font-medium mb-3 text-medical-dark">Findings</h4>
               <div className="text-sm space-y-2">
                 {possibleConditions.map((condition, index) => (
@@ -343,7 +450,7 @@ const ReportGenerator: React.FC = () => {
               </div>
             </div>
             
-            <div className="mb-6">
+            <div className="mb-6 report-section">
               <h4 className="font-medium mb-3 text-medical-dark flex items-center justify-between">
                 <span>Cell-Specific Recommendations</span>
                 <Button 
@@ -369,7 +476,7 @@ const ReportGenerator: React.FC = () => {
             
             <NotesSection />
             
-            <div className="text-xs text-medical-dark text-opacity-50 mt-6">
+            <div className="text-xs text-medical-dark text-opacity-50 mt-6 report-footer">
               <p>
                 This report was generated using BloodCellVision CNN analysis system. Results should be
                 correlated with clinical findings and confirmed by a qualified healthcare professional.
@@ -381,8 +488,8 @@ const ReportGenerator: React.FC = () => {
       
       {/* Compact Layout */}
       {reportLayout === 'compact' && (
-        <Card className="medical-card overflow-hidden" id="print-content">
-          <div className="p-3 border-b bg-gray-50">
+        <Card className="medical-card overflow-hidden print-container" id="print-content">
+          <div className="p-3 border-b bg-gray-50 report-header">
             <div className="flex justify-between items-center">
               <h3 className="font-display font-bold text-base">Blood Cell Analysis Summary</h3>
               <p className="text-xs text-medical-dark text-opacity-70">ID: {reportId}</p>
@@ -390,6 +497,19 @@ const ReportGenerator: React.FC = () => {
           </div>
           
           <CardContent className="p-3">
+            {/* Cell image display - Added for better report printing */}
+            <div className="cell-image-container mb-3">
+              {processedImage && (
+                <div className="flex flex-col items-center">
+                  <img 
+                    src={processedImage} 
+                    alt="Processed Blood Sample" 
+                    className="cell-image max-h-[300px]" 
+                  />
+                </div>
+              )}
+            </div>
+            
             <div className="flex flex-col space-y-3">
               {/* Patient Information - Compact */}
               <div className="grid grid-cols-3 gap-2 text-xs">
@@ -522,7 +642,7 @@ const ReportGenerator: React.FC = () => {
                 />
               </div>
               
-              <div className="text-xxs text-medical-dark text-opacity-50 mt-2 text-center">
+              <div className="text-xxs text-medical-dark text-opacity-50 mt-2 text-center report-footer">
                 BloodCellVision AI-assisted analysis. Findings should be confirmed by a healthcare professional.
               </div>
             </div>
@@ -532,8 +652,8 @@ const ReportGenerator: React.FC = () => {
       
       {/* Detailed Layout */}
       {reportLayout === 'detailed' && (
-        <Card className="medical-card overflow-hidden" id="print-content">
-          <div className="p-4 border-b bg-blue-50">
+        <Card className="medical-card overflow-hidden print-container" id="print-content">
+          <div className="p-4 border-b bg-blue-50 report-header">
             <div className="flex flex-col md:flex-row justify-between">
               <div>
                 <h3 className="font-display font-bold text-xl">Comprehensive Hematology Analysis</h3>
@@ -593,12 +713,18 @@ const ReportGenerator: React.FC = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               <div className="md:col-span-1">
+                {/* Show the processed image (with cell detection) in the report */}
                 {processedImage && (
-                  <img 
-                    src={processedImage} 
-                    alt="Processed Blood Sample" 
-                    className="w-full h-auto object-contain border border-gray-200 rounded mb-4"
-                  />
+                  <div className="cell-image-container mb-4">
+                    <img 
+                      src={processedImage} 
+                      alt="Processed Blood Sample" 
+                      className="cell-image border border-gray-200 rounded" 
+                    />
+                    <p className="text-xs text-center mt-1 text-medical-dark text-opacity-70">
+                      Cell detection with AI classification
+                    </p>
+                  </div>
                 )}
                 
                 <div className="bg-gray-50 p-3 rounded border">
@@ -643,6 +769,20 @@ const ReportGenerator: React.FC = () => {
               
               <div className="md:col-span-2">
                 <h4 className="font-medium mb-3 text-medical-dark border-b pb-2">Clinical Interpretation</h4>
+                
+                {/* Original image for comparison if available */}
+                {image && image !== processedImage && (
+                  <div className="cell-image-container mb-4">
+                    <img 
+                      src={image} 
+                      alt="Original Blood Sample" 
+                      className="cell-image border border-gray-200 rounded" 
+                    />
+                    <p className="text-xs text-center mt-1 text-medical-dark text-opacity-70">
+                      Original blood sample image
+                    </p>
+                  </div>
+                )}
                 
                 {/* Detected cell types */}
                 <div className="mb-4">
@@ -699,7 +839,7 @@ const ReportGenerator: React.FC = () => {
             
             <Separator className="my-4" />
             
-            <div className="bg-gray-50 p-3 rounded text-xs text-medical-dark text-opacity-70 mt-6">
+            <div className="bg-gray-50 p-3 rounded text-xs text-medical-dark text-opacity-70 mt-6 report-footer">
               <p className="font-medium mb-1">Methodology:</p>
               <p>
                 Analysis performed using BloodCellVision deep learning convolutional neural network with cell detection and classification.

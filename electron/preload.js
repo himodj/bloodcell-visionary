@@ -55,40 +55,42 @@ let electronAPI = {
 
 // Try to load axios with multiple strategies
 let axios = null;
-const possiblePaths = [
-  // Direct require
-  { 
-    path: 'axios', 
-    description: 'direct require' 
-  },
-  // From electron directory node_modules
-  { 
-    path: path.join(process.cwd(), 'node_modules', 'axios'), 
-    description: 'electron/node_modules' 
-  },
-  // From parent directory node_modules
-  { 
-    path: path.join(process.cwd(), '..', 'node_modules', 'axios'), 
-    description: 'parent node_modules' 
-  }
-];
-
-// Try each path in order
-for (const pathObj of possiblePaths) {
-  console.log(`Attempting to load axios from: ${pathObj.description} (${pathObj.path})`);
+try {
+  // Try direct require first
+  console.log('Attempting to load axios directly...');
+  axios = require('axios');
+  console.log('Successfully loaded axios directly');
+} catch (err) {
+  console.error('Error loading axios directly:', err.message);
   
-  if (checkModuleExists(pathObj.path)) {
-    console.log(`Found axios module at: ${pathObj.path}`);
-    
-    try {
-      axios = require(pathObj.path);
-      console.log(`Successfully loaded axios from ${pathObj.description}`);
-      break;
-    } catch (err) {
-      console.error(`Error requiring axios from ${pathObj.description}:`, err.message);
+  // Try from node_modules in the electron directory
+  try {
+    const electronDirAxiosPath = path.join(process.cwd(), 'node_modules', 'axios');
+    console.log('Attempting to load axios from:', electronDirAxiosPath);
+    if (checkModuleExists(electronDirAxiosPath)) {
+      axios = require(electronDirAxiosPath);
+      console.log('Successfully loaded axios from electron/node_modules');
+    } else {
+      console.log('Axios not found in electron/node_modules');
     }
-  } else {
-    console.log(`Axios not found at: ${pathObj.path}`);
+  } catch (err) {
+    console.error('Error loading axios from electron/node_modules:', err.message);
+  }
+  
+  // Try from parent directory's node_modules as a last resort
+  if (!axios) {
+    try {
+      const parentDirAxiosPath = path.join(process.cwd(), '..', 'node_modules', 'axios');
+      console.log('Attempting to load axios from:', parentDirAxiosPath);
+      if (checkModuleExists(parentDirAxiosPath)) {
+        axios = require(parentDirAxiosPath);
+        console.log('Successfully loaded axios from parent directory node_modules');
+      } else {
+        console.log('Axios not found in parent directory node_modules');
+      }
+    } catch (err) {
+      console.error('Error loading axios from parent directory node_modules:', err.message);
+    }
   }
 }
 
@@ -119,7 +121,7 @@ if (axios) {
     }
   };
 } else {
-  console.error('All attempts to load axios failed. The application will use the fallback implementation');
+  console.error('Failed to load axios. The application will use the fallback implementation');
 }
 
 // Expose the API to the renderer process
