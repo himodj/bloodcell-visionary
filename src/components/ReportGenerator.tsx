@@ -5,8 +5,7 @@ import { formatReportDate, generateReportId, getCellTypeColor, determineSeverity
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
-import { FileText, Printer, Download, FileCheck, AlertTriangle, Circle } from 'lucide-react';
+import { Printer } from 'lucide-react';
 
 const ReportGenerator: React.FC = () => {
   const { analysisResult } = useAnalysis();
@@ -20,15 +19,6 @@ const ReportGenerator: React.FC = () => {
   const reportId = generateReportId();
   const reportDate = formatReportDate(analysisResult.analysisDate);
   const severity = determineSeverity(analysisResult.abnormalityRate);
-  
-  // Prepare data for pie chart - using detected cell types
-  const pieData = Object.entries(analysisResult.cellCounts.detectedCells)
-    .filter(([_, count]) => count > 0)
-    .map(([type, count]) => ({
-      name: type,
-      value: count,
-      color: getCellTypeColor(type)
-    }));
   
   const getSeverityColor = (severity: string) => {
     const colors: Record<string, string> = {
@@ -273,3 +263,4 @@ const ReportGenerator: React.FC = () => {
 };
 
 export default ReportGenerator;
+

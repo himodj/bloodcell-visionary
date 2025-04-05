@@ -8,8 +8,17 @@ interface ElectronAPI {
   readModelDir: (dirPath: string) => Promise<string[] | {error: string}>;
   isElectron: boolean;
   analyzeWithH5Model: (modelPath: string, imageDataUrl: string) => Promise<{
-    predictedClass?: string;
-    confidence?: number;
+    detectedCells?: Array<{
+      type: string;
+      confidence: number;
+      boundingBox: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      };
+    }>;
+    cellCounts?: Record<string, number>;
     timestamp?: string;
     error?: string;
     stack?: string;
