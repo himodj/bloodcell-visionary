@@ -46,33 +46,44 @@ function backupPackageJson() {
   }
 }
 
+// Check if axios is properly installed in the electron/node_modules directory
+function isAxiosInstalled() {
+  const axiosPath = path.join(process.cwd(), 'node_modules', 'axios');
+  return fs.existsSync(axiosPath);
+}
+
 // Main function
 async function main() {
   try {
     // Create backup
     backupPackageJson();
     
-    // First, ensure axios is installed with the exact version
-    console.log('Installing axios@1.8.3...');
-    await runCommand('npm install axios@1.8.3 --save');
-    console.log('Axios installed successfully.');
-    
-    // Check if axios is actually in node_modules
-    const axiosPath = path.join(process.cwd(), 'node_modules', 'axios');
-    if (fs.existsSync(axiosPath)) {
-      console.log('Verified axios is installed in:', axiosPath);
-    } else {
-      console.error('WARNING: axios not found in node_modules after installation!');
-      // Try installing with force
-      await runCommand('npm install axios@1.8.3 --save --force');
+    // Check if axios is already installed
+    if (!isAxiosInstalled()) {
+      // First, ensure axios is installed with the exact version
+      console.log('Installing axios@1.8.3...');
+      await runCommand('npm install axios@1.8.3 --save');
+      console.log('Axios installed successfully.');
+      
+      // Check if axios is actually in node_modules
+      const axiosPath = path.join(process.cwd(), 'node_modules', 'axios');
       if (fs.existsSync(axiosPath)) {
-        console.log('Forced installation successful, axios is now present');
+        console.log('Verified axios is installed in:', axiosPath);
       } else {
-        console.error('ERROR: axios installation failed even with --force');
+        console.error('WARNING: axios not found in node_modules after installation!');
+        // Try installing with force
+        await runCommand('npm install axios@1.8.3 --save --force');
+        if (fs.existsSync(axiosPath)) {
+          console.log('Forced installation successful, axios is now present');
+        } else {
+          console.error('ERROR: axios installation failed even with --force');
+        }
       }
+    } else {
+      console.log('Axios is already installed in electron/node_modules');
     }
     
-    // Install other dependencies
+    // Install other dependencies if needed
     console.log('Installing other dependencies...');
     await runCommand('npm install');
     

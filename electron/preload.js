@@ -3,12 +3,10 @@ const { contextBridge, ipcRenderer } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-// Log the current directory and NODE_PATH to help debug module resolution
+// Log the current directory
 console.log('Current directory:', process.cwd());
-console.log('NODE_PATH:', process.env.NODE_PATH);
-console.log('Attempting to load axios...');
 
-// Check if a module exists at a specific path
+// Function to check if a module exists at a specific path
 function checkModuleExists(modulePath) {
   try {
     return fs.existsSync(modulePath) || 
@@ -45,7 +43,7 @@ let electronAPI = {
   
   // Default implementation that will be replaced if axios loads
   analyzeWithH5Model: async (modelPath, imageDataUrl) => {
-    console.log('Using fallback analyzeWithH5Model implementation');
+    console.log('Using fallback analyzeWithH5Model implementation - axios not loaded');
     return {
       error: 'Python backend communication is not available. Could not load axios module.',
       stack: 'Module not found: axios'
@@ -55,42 +53,31 @@ let electronAPI = {
 
 // Try to load axios with multiple strategies
 let axios = null;
-try {
-  // Try direct require first
-  console.log('Attempting to load axios directly...');
-  axios = require('axios');
-  console.log('Successfully loaded axios directly');
-} catch (err) {
-  console.error('Error loading axios directly:', err.message);
-  
-  // Try from node_modules in the electron directory
+
+// Paths to check for axios
+const possiblePaths = [
+  // Direct require
+  'axios',
+  // From electron directory node_modules
+  path.join(process.cwd(), 'node_modules', 'axios'),
+  // From parent directory node_modules
+  path.join(process.cwd(), '..', 'node_modules', 'axios')
+];
+
+// Try each path
+for (const axiosPath of possiblePaths) {
   try {
-    const electronDirAxiosPath = path.join(process.cwd(), 'node_modules', 'axios');
-    console.log('Attempting to load axios from:', electronDirAxiosPath);
-    if (checkModuleExists(electronDirAxiosPath)) {
-      axios = require(electronDirAxiosPath);
-      console.log('Successfully loaded axios from electron/node_modules');
+    console.log(`Attempting to load axios from: ${axiosPath}`);
+    
+    if (axiosPath === 'axios' || checkModuleExists(axiosPath)) {
+      axios = require(axiosPath);
+      console.log(`Successfully loaded axios from ${axiosPath}`);
+      break; // Exit the loop if successful
     } else {
-      console.log('Axios not found in electron/node_modules');
+      console.log(`Axios not found at ${axiosPath}`);
     }
   } catch (err) {
-    console.error('Error loading axios from electron/node_modules:', err.message);
-  }
-  
-  // Try from parent directory's node_modules as a last resort
-  if (!axios) {
-    try {
-      const parentDirAxiosPath = path.join(process.cwd(), '..', 'node_modules', 'axios');
-      console.log('Attempting to load axios from:', parentDirAxiosPath);
-      if (checkModuleExists(parentDirAxiosPath)) {
-        axios = require(parentDirAxiosPath);
-        console.log('Successfully loaded axios from parent directory node_modules');
-      } else {
-        console.log('Axios not found in parent directory node_modules');
-      }
-    } catch (err) {
-      console.error('Error loading axios from parent directory node_modules:', err.message);
-    }
+    console.error(`Error loading axios from ${axiosPath}:`, err.message);
   }
 }
 
@@ -108,7 +95,7 @@ if (axios) {
         image: imageDataUrl
       });
       
-      console.log('Received prediction:', response.data);
+      console.log('Received prediction from Python backend');
       
       // Return the prediction result
       return response.data;

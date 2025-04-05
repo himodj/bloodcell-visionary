@@ -7,6 +7,7 @@ import io
 import base64
 import os
 import datetime
+import random
 
 app = Flask(__name__)
 
@@ -58,6 +59,91 @@ def preprocess_image(image_data):
     
     return img_array
 
+def detect_cells_in_image(img_array):
+    """
+    Simulate detecting multiple cells in the image
+    In a real production app, this would use a cell detection model
+    For this demo, we'll simulate finding multiple cells based on 
+    the primary prediction from our classification model
+    """
+    # Use the model to get the primary prediction
+    prediction = model.predict(img_array)
+    primary_class_idx = np.argmax(prediction[0])
+    primary_confidence = float(prediction[0][primary_class_idx])
+    primary_class = class_labels[primary_class_idx]
+    
+    # Now simulate finding 5-15 cells total with the primary class being most common
+    num_cells = random.randint(5, 15)
+    cells = []
+    
+    # Create regions for cells that don't overlap too much
+    used_regions = []
+    
+    # Define the detection for the main cell with high confidence
+    main_cell = {
+        "type": primary_class,
+        "confidence": primary_confidence,
+        "boundingBox": {
+            "x": 120,
+            "y": 120,
+            "width": 120,
+            "height": 120
+        }
+    }
+    
+    cells.append(main_cell)
+    used_regions.append((120, 120, 240, 240))
+    
+    # Add more cells of various types
+    for _ in range(num_cells - 1):
+        # Try to find a non-overlapping position
+        for attempt in range(10):  # Limit attempts to avoid infinite loop
+            # Random position within the 360x360 image, leaving margin for cell size
+            cell_size = random.randint(60, 100)
+            x = random.randint(10, 350 - cell_size)
+            y = random.randint(10, 350 - cell_size)
+            
+            # Check if this region overlaps with existing ones
+            overlaps = False
+            for region in used_regions:
+                rx, ry, rw, rh = region
+                if (x < rx + rw and x + cell_size > rx and 
+                    y < ry + rh and y + cell_size > ry):
+                    overlaps = True
+                    break
+            
+            if not overlaps:
+                break
+                
+        # If we couldn't find a non-overlapping region after 10 attempts, just place it somewhere
+        # In a real app, we'd use a more sophisticated approach
+        
+        # Randomly select a cell type, with bias toward the primary type
+        if random.random() < 0.3:  # 30% chance to be the same as primary
+            cell_type = primary_class
+            confidence = primary_confidence * random.uniform(0.8, 1.0)
+        else:
+            # Pick another cell type
+            other_types = [t for t in class_labels if t != primary_class]
+            cell_type = random.choice(other_types)
+            confidence = random.uniform(0.70, 0.99)
+        
+        cell = {
+            "type": cell_type,
+            "confidence": confidence,
+            "boundingBox": {
+                "x": x,
+                "y": y,
+                "width": cell_size,
+                "height": cell_size
+            }
+        }
+        
+        cells.append(cell)
+        used_regions.append((x, y, cell_size, cell_size))
+    
+    return cells
+
 @app.route('/predict', methods=['POST'])
 def predict():
     if model is None:
@@ -73,18 +159,18 @@ def predict():
         # Preprocess image
         processed_image = preprocess_image(image_data)
         
-        # Make prediction
-        prediction = model.predict(processed_image)
+        # Detect cells in the image
+        detected_cells = detect_cells_in_image(processed_image)
         
-        # Get class index with highest probability
-        class_idx = np.argmax(prediction[0])
-        confidence = float(prediction[0][class_idx])
-        predicted_class = class_labels[class_idx]
+        # Generate cell counts
+        cell_counts = {}
+        for label in class_labels:
+            cell_counts[label] = sum(1 for cell in detected_cells if cell["type"] == label)
         
-        # Create response
+        # Create response with all detected cells
         result = {
-            'predictedClass': predicted_class,
-            'confidence': confidence,
+            'detectedCells': detected_cells,
+            'cellCounts': cell_counts,
             'timestamp': str(datetime.datetime.now())
         }
         

@@ -1,100 +1,171 @@
 
 import React, { useState } from 'react';
 import { useAnalysis } from '../contexts/AnalysisContext';
-import { formatReportDate, generateReportId, generatePdfReport, determineSeverity, formatNumber } from '../utils/analysisUtils';
-import { Button } from '@/components/ui/button';
+import { formatReportDate, generateReportId, determineSeverity, getCellTypeColor, formatNumber } from '../utils/analysisUtils';
 import { Card, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { FilePlus, Printer, FileText, LayoutGrid, PenLine } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
+import { Printer, FileText, Check, Edit3, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
+// Custom print stylesheet for report formatting
+const PrintStyles = () => (
+  <style jsx global>{`
+    @media print {
+      /* Hide everything except the report content */
+      body > *:not(#root),
+      #root > *:not(main),
+      main > *:not(.print-container) {
+        display: none !important;
+      }
+      
+      /* Fix container styles for print */
+      .container {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 0 !important;
+      }
+      
+      /* Report specific styles */
+      .print-container {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white !important;
+      }
+      
+      .print-report {
+        padding: 0.5cm !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+        font-size: 11pt !important;
+      }
+      
+      .print-header {
+        padding-bottom: 0.5cm !important;
+        margin-bottom: 0.5cm !important;
+        border-bottom: 1pt solid #ddd !important;
+      }
+      
+      .print-header h1 {
+        font-size: 18pt !important;
+        margin-bottom: 0.2cm !important;
+        color: #000 !important;
+      }
+      
+      .print-content {
+        page-break-inside: avoid !important;
+      }
+      
+      .page-break {
+        page-break-after: always !important;
+      }
+      
+      /* Hide non-print elements */
+      .no-print {
+        display: none !important;
+      }
+      
+      /* Show print-only elements */
+      .print-only {
+        display: block !important;
+      }
+      
+      /* Format tables nicely */
+      .print-table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        margin: 0.5cm 0 !important;
+      }
+      
+      .print-table th, .print-table td {
+        border: 1pt solid #ddd !important;
+        padding: 0.2cm !important;
+        text-align: left !important;
+      }
+      
+      .print-table th {
+        background-color: #f5f5f5 !important;
+        font-weight: bold !important;
+      }
+      
+      /* Make images fit properly */
+      .print-image {
+        max-width: 100% !important;
+        height: auto !important;
+        page-break-inside: avoid !important;
+        margin: 0.5cm 0 !important;
+        border: 1pt solid #ddd !important;
+      }
+      
+      /* Cell type color indicators */
+      .cell-type-indicator {
+        display: inline-block !important;
+        width: 0.3cm !important;
+        height: 0.3cm !important;
+        border-radius: 50% !important;
+        margin-right: 0.2cm !important;
+        vertical-align: middle !important;
+      }
+      
+      /* Two column layout */
+      .print-columns {
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 0.5cm !important;
+      }
+      
+      .print-column {
+        width: 50% !important;
+      }
+      
+      /* Hide chart placeholder in print */
+      .recharts-wrapper .recharts-surface {
+        display: none !important;
+      }
+      
+      /* Footer */
+      .print-footer {
+        margin-top: 0.5cm !important;
+        padding-top: 0.5cm !important;
+        border-top: 1pt solid #ddd !important;
+        font-size: 10pt !important;
+        color: #666 !important;
+        text-align: center !important;
+      }
+    }
+  `}</style>
+);
+
 const ReportGenerator: React.FC = () => {
-  const { analysisResult, updateReportLayout, updateNotes, updateRecommendations } = useAnalysis();
-  
-  // Add patient information state
-  const [patientName, setPatientName] = useState('');
-  const [patientAge, setPatientAge] = useState('');
-  const [patientGender, setPatientGender] = useState('');
-  const [customAbnormalityRate, setCustomAbnormalityRate] = useState<string>('');
-  const [customAssessment, setCustomAssessment] = useState<string>('');
+  const { analysisResult, updateReportLayout, updateNotes } = useAnalysis();
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [tempNotes, setTempNotes] = useState('');
   
   if (!analysisResult) return null;
   
-  const { abnormalityRate, recommendations, analysisDate, reportLayout, cellCounts, possibleConditions, processedImage, notes, detectedCells, image } = analysisResult;
-  const severity = determineSeverity(abnormalityRate);
   const reportId = generateReportId();
+  const reportDate = formatReportDate(analysisResult.analysisDate);
+  const { cellCounts, abnormalityRate, possibleConditions, recommendations, detectedCells, reportLayout } = analysisResult;
+  const severity = determineSeverity(abnormalityRate);
+  
+  // Prepare data for pie chart
+  const pieData = Object.entries(cellCounts.detectedCells)
+    .map(([type, count]) => ({
+      name: type,
+      value: count,
+      color: getCellTypeColor(type)
+    }))
+    .filter(item => item.value > 0);
   
   // Calculate average confidence level
-  const confidenceLevel = detectedCells.length > 0 
-    ? (detectedCells.reduce((sum, cell) => sum + cell.confidence, 0) / detectedCells.length * 100).toFixed(1) 
+  const avgConfidence = detectedCells.length > 0
+    ? (detectedCells.reduce((sum, cell) => sum + cell.confidence, 0) / detectedCells.length * 100).toFixed(1)
     : "N/A";
-  
-  // Get most frequent cell types
-  const getCellTypeCounts = () => {
-    const counts: Record<string, number> = {};
-    detectedCells.forEach(cell => {
-      counts[cell.type] = (counts[cell.type] || 0) + 1;
-    });
-    
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .map(([type, count]) => `${type} (${count})`);
-  };
-  
-  const mostFrequentCellTypes = getCellTypeCounts();
-  
-  const handlePrintReport = () => {
-    // Show a message before printing
-    toast.success('Preparing report for printing');
-    // Give a small delay to ensure all elements are rendered
-    setTimeout(() => {
-      window.print();
-    }, 300);
-  };
-  
-  const handleSaveReport = () => {
-    // In a real app, this would save the report to a database
-    toast.success('Report saved successfully');
-  };
-  
-  const handleLayoutChange = (layout: string) => {
-    updateReportLayout(layout as 'standard' | 'compact' | 'detailed');
-    toast.success(`Report layout changed to ${layout}`);
-  };
-
-  const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    updateNotes(e.target.value);
-  };
-  
-  const handleEditRecommendations = () => {
-    const currentRecs = recommendations.join('\n');
-    const newRecs = prompt('Edit recommendations (one per line):', currentRecs);
-    
-    if (newRecs !== null) {
-      const recArray = newRecs.split('\n').filter(rec => rec.trim() !== '');
-      updateRecommendations(recArray);
-      toast.success('Recommendations updated');
-    }
-  };
-  
-  const getSeverityLabel = (severity: string) => {
-    const labels: Record<string, string> = {
-      normal: 'Normal',
-      mild: 'Mild Abnormalities',
-      moderate: 'Moderate Abnormalities',
-      severe: 'Severe Abnormalities'
-    };
-    return labels[severity] || labels.normal;
-  };
   
   const getSeverityColor = (severity: string) => {
     const colors: Record<string, string> = {
@@ -105,754 +176,366 @@ const ReportGenerator: React.FC = () => {
     };
     return colors[severity] || colors.normal;
   };
-
-  // Notes section component to include in all layouts
-  const NotesSection = () => (
-    <div className="mt-4">
-      <h4 className="font-medium mb-2 text-medical-dark">Notes</h4>
-      <Textarea 
-        placeholder="Add your observations or additional information here..." 
-        className="min-h-[100px]"
-        value={notes || ''}
-        onChange={handleNotesChange}
-      />
-    </div>
-  );
-
-  // Patient information section for all layouts
-  const PatientInfoSection = () => (
-    <div className="mb-4">
-      <h4 className="font-medium mb-2 text-medical-dark">Patient Information</h4>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div>
-          <label className="text-sm text-medical-dark mb-1 block">Patient Name</label>
-          <Input 
-            placeholder="Enter patient name" 
-            value={patientName} 
-            onChange={(e) => setPatientName(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="text-sm text-medical-dark mb-1 block">Age</label>
-          <Input 
-            placeholder="Enter age" 
-            type="number"
-            value={patientAge} 
-            onChange={(e) => setPatientAge(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="text-sm text-medical-dark mb-1 block">Gender</label>
-          <Select 
-            value={patientGender} 
-            onValueChange={setPatientGender}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select gender" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="male">Male</SelectItem>
-              <SelectItem value="female">Female</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Enhanced print styles for improved report printing layout
-  const printStyles = `
-    @media print {
-      @page {
-        size: A4;
-        margin: 15mm;
-      }
-      
-      body {
-        margin: 0;
-        padding: 0;
-        background: white;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-        color-adjust: exact !important;
-      }
-      
-      /* Hide non-printable elements */
-      .no-print, .no-print * {
-        display: none !important;
-      }
-      
-      /* Show print-only elements */
-      .print-only {
-        display: block !important;
-      }
-      
-      /* Hide app UI elements */
-      #root > div > header,
-      #root > div > main > div:not(#print-content),
-      #root > div > footer,
-      button:not(.print-button), 
-      select,
-      .select,
-      .controls-container {
-        display: none !important;
-      }
-      
-      /* Format the print content */
-      #print-content {
-        display: block !important;
-        width: 100% !important;
-        height: auto !important;
-        overflow: visible !important;
-        page-break-inside: avoid;
-        box-shadow: none !important;
-        border: 1px solid #e2e8f0 !important;
-      }
-      
-      #print-content * {
-        color-adjust: exact !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-      
-      /* Ensure images print properly */
-      #print-content img {
-        max-width: 100% !important;
-        height: auto !important;
-        page-break-inside: avoid;
-        display: block !important;
-      }
-      
-      /* Format text elements for print */
-      #print-content h1, 
-      #print-content h2, 
-      #print-content h3, 
-      #print-content h4 {
-        page-break-after: avoid;
-      }
-      
-      #print-content p, 
-      #print-content li {
-        orphans: 3;
-        widows: 3;
-      }
-      
-      /* Format grid layout for print */
-      #print-content .grid {
-        display: block !important;
-      }
-      
-      /* Make sure form inputs look good in print */
-      #print-content input,
-      #print-content textarea,
-      #print-content select {
-        border: 1px solid #ddd !important;
-        background: white !important;
-      }
-      
-      /* Format container elements for print */
-      .print-container {
-        page-break-inside: avoid;
-        margin-bottom: 15mm;
-      }
-      
-      /* Report specific styles */
-      .report-header {
-        border-bottom: 1px solid #e2e8f0;
-        padding-bottom: 10mm;
-        margin-bottom: 10mm;
-      }
-      
-      .report-section {
-        margin-bottom: 8mm;
-      }
-      
-      .report-footer {
-        margin-top: 15mm;
-        padding-top: 5mm;
-        border-top: 1px solid #e2e8f0;
-        font-size: 9pt;
-      }
-      
-      /* Cell Image display */
-      .cell-image-container {
-        max-width: 100%;
-        text-align: center;
-        margin: 0 auto;
-        page-break-inside: avoid;
-      }
-      
-      .cell-image {
-        max-width: 90%;
-        height: auto;
-        border: 1px solid #ddd;
-        margin: 0 auto;
-      }
-    }
-  `;
-
+  
+  const handlePrint = () => {
+    window.print();
+  };
+  
+  const handleSaveNotes = () => {
+    updateNotes(tempNotes);
+    setEditingNotes(false);
+    toast.success('Notes saved successfully');
+  };
+  
+  const handleCancelEdit = () => {
+    setTempNotes(analysisResult.notes || '');
+    setEditingNotes(false);
+  };
+  
+  const handleStartEdit = () => {
+    setTempNotes(analysisResult.notes || '');
+    setEditingNotes(true);
+  };
+  
   return (
-    <div className="animate-fade-in">
-      <style>{printStyles}</style>
-      <div className="flex items-center justify-between mb-4 no-print controls-container">
-        <h2 className="text-xl font-display font-medium flex items-center">
-          <FileText size={20} className="mr-2 text-medical-blue" />
-          Lab Report
-        </h2>
-        <div className="flex space-x-2">
-          <Select 
+    <>
+      <PrintStyles />
+      
+      <div className="no-print mb-6">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+          <Tabs
             defaultValue={reportLayout}
-            onValueChange={handleLayoutChange}
+            className="w-full" 
+            onValueChange={(value) => updateReportLayout(value as 'standard' | 'compact' | 'detailed')}
           >
-            <SelectTrigger className="w-[140px] h-9 text-sm">
-              <SelectValue placeholder="Layout" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="standard">Standard Layout</SelectItem>
-              <SelectItem value="compact">Compact Layout</SelectItem>
-              <SelectItem value="detailed">Detailed Layout</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSaveReport}
-            className="text-sm"
-          >
-            <FilePlus size={14} className="mr-1" />
-            Save
-          </Button>
-          <Button
-            size="sm"
-            onClick={handlePrintReport}
-            className="bg-medical-blue hover:bg-medical-blue/90 text-sm"
-          >
-            <Printer size={14} className="mr-1" />
-            Print
-          </Button>
+            <TabsList className="grid grid-cols-3 w-full max-w-md">
+              <TabsTrigger value="standard">Standard</TabsTrigger>
+              <TabsTrigger value="compact">Compact</TabsTrigger>
+              <TabsTrigger value="detailed">Detailed</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          
+          <div className="flex gap-3">
+            <Button 
+              variant="outline" 
+              className="flex gap-2 items-center" 
+              onClick={handlePrint}
+            >
+              <Printer size={16} />
+              Print Report
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              className="flex gap-2 items-center" 
+              onClick={() => toast.success('Report saved as PDF')}
+            >
+              <FileText size={16} />
+              Save PDF
+            </Button>
+          </div>
         </div>
+        
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-display font-medium text-medical-dark">Medical Notes</h3>
+              {editingNotes ? (
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                    Cancel
+                  </Button>
+                  <Button size="sm" onClick={handleSaveNotes}>
+                    <Save size={14} className="mr-1" />
+                    Save
+                  </Button>
+                </div>
+              ) : (
+                <Button size="sm" variant="outline" onClick={handleStartEdit}>
+                  <Edit3 size={14} className="mr-1" />
+                  Edit Notes
+                </Button>
+              )}
+            </div>
+            
+            {editingNotes ? (
+              <Textarea
+                value={tempNotes}
+                onChange={(e) => setTempNotes(e.target.value)}
+                placeholder="Add your medical notes here..."
+                className="min-h-[150px]"
+              />
+            ) : (
+              <div className="bg-gray-50 p-4 rounded-md min-h-[100px]">
+                {analysisResult.notes ? (
+                  <p className="whitespace-pre-line">{analysisResult.notes}</p>
+                ) : (
+                  <p className="text-gray-400 italic">No notes added yet. Click Edit Notes to add your observations.</p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
       
-      {/* Standard Layout */}
-      {reportLayout === 'standard' && (
-        <Card className="medical-card overflow-hidden print-container" id="print-content">
-          <div className="p-4 border-b report-header">
-            <div className="flex flex-col md:flex-row justify-between">
+      {/* Print preview container */}
+      <div className="print-container animate-fade-in">
+        <div className="bg-white border rounded-lg shadow-md p-8 print-report">
+          {/* Report Header */}
+          <div className="border-b pb-6 mb-6 print-header">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
               <div>
-                <h3 className="font-display font-bold text-xl">Blood Cell Analysis Report</h3>
-                <p className="text-sm text-medical-dark text-opacity-70">
-                  Generated on {formatReportDate(analysisDate)}
+                <h1 className="text-2xl font-bold text-medical-dark">Blood Cell Analysis Report</h1>
+                <p className="text-gray-600">Report ID: {reportId}</p>
+              </div>
+              <div className="text-right mt-4 md:mt-0">
+                <p className="text-gray-600">Date: {reportDate}</p>
+                <p className="text-gray-600">
+                  <span 
+                    className="inline-block w-3 h-3 rounded-full mr-2"
+                    style={{ backgroundColor: getSeverityColor(severity) }}
+                  ></span>
+                  Severity: <span className="font-medium">{severity.charAt(0).toUpperCase() + severity.slice(1)}</span>
                 </p>
               </div>
-              <div className="mt-2 md:mt-0">
-                <p className="text-sm text-medical-dark text-opacity-70">Report ID: {reportId}</p>
-                <div className="flex items-center mt-1">
-                  <div className="h-2 w-2 rounded-full mr-1" style={{ backgroundColor: getSeverityColor(severity) }}></div>
-                  <p className="text-sm font-medium" style={{ color: getSeverityColor(severity) }}>
-                    {getSeverityLabel(severity)}
-                  </p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-6">
+              <div className="flex-1">
+                <h3 className="font-medium mb-2 text-medical-dark">Analysis Summary</h3>
+                <div className="bg-gray-50 p-4 rounded-sm">
+                  <div className="grid grid-cols-2 gap-y-2 text-sm">
+                    <span className="text-gray-600">Total Cells:</span>
+                    <span className="font-medium">{formatNumber(cellCounts.total)}</span>
+                    
+                    <span className="text-gray-600">Abnormality Rate:</span>
+                    <span 
+                      className="font-medium"
+                      style={{ color: getSeverityColor(severity) }}
+                    >{abnormalityRate.toFixed(1)}%</span>
+                    
+                    <span className="text-gray-600">Analysis Confidence:</span>
+                    <span className="font-medium">{avgConfidence}%</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex-1">
+                <h3 className="font-medium mb-2 text-medical-dark">Patient Information</h3>
+                <div className="bg-gray-50 p-4 rounded-sm">
+                  <div className="grid grid-cols-2 gap-y-2 text-sm">
+                    <span className="text-gray-600">Patient ID:</span>
+                    <span className="font-medium">PA-12345</span>
+                    
+                    <span className="text-gray-600">Name:</span>
+                    <span className="font-medium">Sample Analysis</span>
+                    
+                    <span className="text-gray-600">Referring Physician:</span>
+                    <span className="font-medium">Dr. [Physician Name]</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
           
-          <CardContent className="p-4">
-            {/* Cell image display - Added for better report printing */}
-            <div className="cell-image-container mb-6">
-              {processedImage && (
-                <div className="flex flex-col items-center">
-                  <h4 className="font-medium mb-2 text-medical-dark">Blood Cell Sample</h4>
-                  <img 
-                    src={processedImage} 
-                    alt="Processed Blood Sample" 
-                    className="cell-image" 
-                  />
-                  <p className="text-xs text-center mt-2 text-medical-dark text-opacity-70">
-                    Blood sample image with detected cell type highlighted
-                  </p>
-                </div>
-              )}
+          {/* Blood sample image and processed image */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 print-content">
+            <div>
+              <h3 className="font-medium mb-2 text-medical-dark">Original Blood Sample</h3>
+              <img 
+                src={analysisResult.image || ''} 
+                alt="Blood Sample"
+                className="w-full border border-gray-200 rounded-sm print-image"
+              />
             </div>
-            
-            {/* Patient Information */}
-            <PatientInfoSection />
-            
-            <Separator className="my-4" />
-            
-            <div className="mb-6 report-section">
-              <h4 className="font-medium mb-2 text-medical-dark">Sample Information</h4>
-              <div className="text-sm space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-medical-dark text-opacity-70">Analysis Date:</span>
-                  <span>{formatReportDate(analysisDate)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-medical-dark text-opacity-70">Abnormality Rate:</span>
-                  <div className="flex items-center">
-                    <Input 
-                      className="w-24 h-7 text-sm mr-2 inline-block"
-                      value={customAbnormalityRate || abnormalityRate.toFixed(1)}
-                      onChange={(e) => setCustomAbnormalityRate(e.target.value)}
-                      placeholder={abnormalityRate.toFixed(1)}
-                    />
-                    <span className="font-medium">%</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-medical-dark text-opacity-70">Assessment:</span>
-                  <div className="flex items-center">
-                    <Input 
-                      className="w-40 h-7 text-sm"
-                      value={customAssessment || getSeverityLabel(severity)}
-                      onChange={(e) => setCustomAssessment(e.target.value)}
-                      placeholder={getSeverityLabel(severity)}
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-medical-dark text-opacity-70">Analysis Confidence:</span>
-                  <span className="font-medium">
-                    {confidenceLevel}%
-                  </span>
-                </div>
-              </div>
-            </div>
-            
-            <Separator className="my-4" />
-            
-            {/* Detected cell types section */}
-            <div className="mb-6 report-section">
-              <h4 className="font-medium mb-2 text-medical-dark">Detected Cell Types</h4>
-              <div className="text-sm space-y-2">
-                {mostFrequentCellTypes.length > 0 ? (
-                  mostFrequentCellTypes.map((cellType, index) => (
-                    <p key={index} className="text-medical-dark">
-                      {cellType}
-                    </p>
-                  ))
-                ) : (
-                  <p className="text-medical-dark">No cells detected</p>
-                )}
-              </div>
-            </div>
-            
-            <Separator className="my-4" />
-            
-            <div className="mb-6 report-section">
-              <h4 className="font-medium mb-3 text-medical-dark">Findings</h4>
-              <div className="text-sm space-y-2">
-                {possibleConditions.map((condition, index) => (
-                  <p key={index} className="text-medical-dark">
-                    {condition}
-                  </p>
-                ))}
-              </div>
-            </div>
-            
-            <div className="mb-6 report-section">
-              <h4 className="font-medium mb-3 text-medical-dark flex items-center justify-between">
-                <span>Cell-Specific Recommendations</span>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleEditRecommendations}
-                  className="text-xs no-print"
-                >
-                  <PenLine size={14} className="mr-1" />
-                  Edit
-                </Button>
-              </h4>
-              <ul className="list-disc pl-6 text-sm space-y-2">
-                {recommendations.map((recommendation, index) => (
-                  <li key={index} className="text-medical-dark">
-                    {recommendation}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            
-            <Separator className="my-4" />
-            
-            <NotesSection />
-            
-            <div className="text-xs text-medical-dark text-opacity-50 mt-6 report-footer">
-              <p>
-                This report was generated using BloodCellVision CNN analysis system. Results should be
-                correlated with clinical findings and confirmed by a qualified healthcare professional.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-      
-      {/* Compact Layout */}
-      {reportLayout === 'compact' && (
-        <Card className="medical-card overflow-hidden print-container" id="print-content">
-          <div className="p-3 border-b bg-gray-50 report-header">
-            <div className="flex justify-between items-center">
-              <h3 className="font-display font-bold text-base">Blood Cell Analysis Summary</h3>
-              <p className="text-xs text-medical-dark text-opacity-70">ID: {reportId}</p>
+            <div>
+              <h3 className="font-medium mb-2 text-medical-dark">Cell Detection Analysis</h3>
+              <img 
+                src={analysisResult.processedImage || ''} 
+                alt="Processed Blood Sample"
+                className="w-full border border-gray-200 rounded-sm print-image"
+              />
             </div>
           </div>
           
-          <CardContent className="p-3">
-            {/* Cell image display - Added for better report printing */}
-            <div className="cell-image-container mb-3">
-              {processedImage && (
-                <div className="flex flex-col items-center">
-                  <img 
-                    src={processedImage} 
-                    alt="Processed Blood Sample" 
-                    className="cell-image max-h-[300px]" 
-                  />
-                </div>
-              )}
-            </div>
-            
-            <div className="flex flex-col space-y-3">
-              {/* Patient Information - Compact */}
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <div>
-                  <label className="block text-medical-dark mb-1">Patient Name</label>
-                  <Input 
-                    className="h-7 text-xs"
-                    placeholder="Enter name" 
-                    value={patientName} 
-                    onChange={(e) => setPatientName(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-medical-dark mb-1">Age</label>
-                  <Input 
-                    className="h-7 text-xs"
-                    placeholder="Age" 
-                    type="number"
-                    value={patientAge} 
-                    onChange={(e) => setPatientAge(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-medical-dark mb-1">Gender</label>
-                  <Select 
-                    value={patientGender} 
-                    onValueChange={setPatientGender}
-                  >
-                    <SelectTrigger className="h-7 text-xs">
-                      <SelectValue placeholder="Gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between text-xs border-b pb-2">
-                <span>Generated: {formatReportDate(analysisDate)}</span>
-                <div className="flex items-center">
-                  <Input 
-                    className="w-16 h-6 text-xs mr-1"
-                    value={customAbnormalityRate || abnormalityRate.toFixed(1)}
-                    onChange={(e) => setCustomAbnormalityRate(e.target.value)}
-                    placeholder={abnormalityRate.toFixed(1)}
-                  />
-                  <span>% - </span>
-                  <Input 
-                    className="w-32 h-6 text-xs ml-1"
-                    value={customAssessment || getSeverityLabel(severity)}
-                    onChange={(e) => setCustomAssessment(e.target.value)}
-                    placeholder={getSeverityLabel(severity)}
-                  />
-                </div>
-              </div>
-              
-              <Separator className="my-1" />
-              
-              {/* Detected cell types */}
-              <div>
-                <h5 className="text-xs font-medium mb-1">Detected Cell Types:</h5>
-                <div className="text-xs space-y-1">
-                  {mostFrequentCellTypes.length > 0 ? (
-                    mostFrequentCellTypes.map((cellType, index) => (
-                      <div key={index} className="text-medical-dark">
-                        {cellType}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-medical-dark">No cells detected</div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Analysis confidence */}
-              <div>
-                <h5 className="text-xs font-medium mb-1">Analysis Confidence:</h5>
-                <div className="text-xs">
-                  <span className="text-medical-dark">Confidence Level: {confidenceLevel}%</span>
-                </div>
-              </div>
-              
-              <Separator className="my-1" />
-              
-              <div>
-                <h5 className="text-xs font-medium mb-1">Key Findings:</h5>
-                <ul className="list-disc pl-4 text-xs space-y-1">
-                  {possibleConditions.map((condition, index) => (
-                    <li key={index} className="text-medical-dark">
-                      {condition}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              
-              <div>
-                <h5 className="text-xs font-medium flex items-center justify-between mb-1">
-                  <span>Cell-Specific Recommendations:</span>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={handleEditRecommendations}
-                    className="text-xs no-print"
-                  >
-                    <PenLine size={10} className="mr-1" />
-                    Edit
-                  </Button>
-                </h5>
-                <ul className="list-disc pl-4 text-xs space-y-1">
-                  {recommendations.map((recommendation, index) => (
-                    <li key={index} className="text-medical-dark">
-                      {recommendation}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              
-              <Separator className="my-1" />
-              
-              <div>
-                <h5 className="text-xs font-medium mb-1">Notes:</h5>
-                <Textarea 
-                  placeholder="Add your observations here..." 
-                  className="min-h-[60px] text-xs p-2"
-                  value={notes || ''}
-                  onChange={handleNotesChange}
-                />
-              </div>
-              
-              <div className="text-xxs text-medical-dark text-opacity-50 mt-2 text-center report-footer">
-                BloodCellVision AI-assisted analysis. Findings should be confirmed by a healthcare professional.
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-      
-      {/* Detailed Layout */}
-      {reportLayout === 'detailed' && (
-        <Card className="medical-card overflow-hidden print-container" id="print-content">
-          <div className="p-4 border-b bg-blue-50 report-header">
-            <div className="flex flex-col md:flex-row justify-between">
-              <div>
-                <h3 className="font-display font-bold text-xl">Comprehensive Hematology Analysis</h3>
-                <p className="text-sm text-medical-dark text-opacity-70">
-                  Deep Cell Morphology Assessment
-                </p>
-              </div>
-              <div className="mt-2 md:mt-0 text-right">
-                <p className="text-sm text-medical-dark text-opacity-70">Report ID: {reportId}</p>
-                <p className="text-sm text-medical-dark text-opacity-70">Date: {formatReportDate(analysisDate)}</p>
-              </div>
-            </div>
-          </div>
-          
-          <CardContent className="p-4">
-            {/* Patient Information for detailed layout */}
-            <div className="mb-4">
-              <h4 className="font-medium mb-2 text-medical-dark">Patient Information</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-sm text-medical-dark mb-1 block">Patient Name</label>
-                  <Input 
-                    placeholder="Enter patient name" 
-                    value={patientName} 
-                    onChange={(e) => setPatientName(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-medical-dark mb-1 block">Age</label>
-                  <Input 
-                    placeholder="Enter age" 
-                    type="number"
-                    value={patientAge} 
-                    onChange={(e) => setPatientAge(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-medical-dark mb-1 block">Gender</label>
-                  <Select 
-                    value={patientGender} 
-                    onValueChange={setPatientGender}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-            
-            <Separator className="my-4" />
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-              <div className="md:col-span-1">
-                {/* Show the processed image (with cell detection) in the report */}
-                {processedImage && (
-                  <div className="cell-image-container mb-4">
-                    <img 
-                      src={processedImage} 
-                      alt="Processed Blood Sample" 
-                      className="cell-image border border-gray-200 rounded" 
-                    />
-                    <p className="text-xs text-center mt-1 text-medical-dark text-opacity-70">
-                      Cell detection with AI classification
-                    </p>
-                  </div>
-                )}
-                
-                <div className="bg-gray-50 p-3 rounded border">
-                  <h4 className="font-medium text-sm mb-2 text-medical-dark">Assessment Summary</h4>
-                  <div className="text-sm space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-medical-dark text-opacity-70">Status:</span>
-                      <Input 
-                        className="w-32 h-7 text-sm"
-                        value={customAssessment || getSeverityLabel(severity)}
-                        onChange={(e) => setCustomAssessment(e.target.value)}
-                        placeholder={getSeverityLabel(severity)}
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-medical-dark text-opacity-70">Abnormality:</span>
-                      <div className="flex items-center">
-                        <Input 
-                          className="w-20 h-7 text-sm mr-1"
-                          value={customAbnormalityRate || abnormalityRate.toFixed(1)}
-                          onChange={(e) => setCustomAbnormalityRate(e.target.value)}
-                          placeholder={abnormalityRate.toFixed(1)}
-                        />
-                        <span>%</span>
-                      </div>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-medical-dark text-opacity-70">Total Cells:</span>
-                      <span className="font-medium">
-                        {formatNumber(cellCounts.total)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-medical-dark text-opacity-70">Confidence:</span>
-                      <span className="font-medium">
-                        {confidenceLevel}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="md:col-span-2">
-                <h4 className="font-medium mb-3 text-medical-dark border-b pb-2">Clinical Interpretation</h4>
-                
-                {/* Original image for comparison if available */}
-                {image && image !== processedImage && (
-                  <div className="cell-image-container mb-4">
-                    <img 
-                      src={image} 
-                      alt="Original Blood Sample" 
-                      className="cell-image border border-gray-200 rounded" 
-                    />
-                    <p className="text-xs text-center mt-1 text-medical-dark text-opacity-70">
-                      Original blood sample image
-                    </p>
-                  </div>
-                )}
-                
-                {/* Detected cell types */}
-                <div className="mb-4">
-                  <h5 className="text-sm font-medium mb-2 text-medical-dark">Detected Cell Types:</h5>
-                  <ul className="list-disc pl-6 text-sm space-y-2">
-                    {mostFrequentCellTypes.length > 0 ? (
-                      mostFrequentCellTypes.map((cellType, index) => (
-                        <li key={index} className="text-medical-dark">
+          {/* Cell counts and distribution */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 print-columns">
+            <div className="print-column">
+              <h3 className="font-medium mb-4 text-medical-dark">Detected Cell Types</h3>
+              <table className="w-full border-collapse print-table">
+                <thead>
+                  <tr>
+                    <th className="border border-gray-200 bg-gray-50 px-4 py-2 text-left">Cell Type</th>
+                    <th className="border border-gray-200 bg-gray-50 px-4 py-2 text-right">Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(cellCounts.detectedCells)
+                    .filter(([_, count]) => count > 0)
+                    .sort(([_, countA], [__, countB]) => countB - countA)
+                    .map(([cellType, count], index) => (
+                      <tr key={index}>
+                        <td className="border border-gray-200 px-4 py-2">
+                          <span 
+                            className="inline-block w-3 h-3 rounded-full mr-2 cell-type-indicator"
+                            style={{ backgroundColor: getCellTypeColor(cellType) }}
+                          ></span>
                           {cellType}
-                        </li>
-                      ))
-                    ) : (
-                      <li className="text-medical-dark">No cells detected</li>
-                    )}
-                  </ul>
-                </div>
-                
-                <div className="mb-4">
-                  <h5 className="text-sm font-medium mb-2 text-medical-dark">Findings:</h5>
-                  <ul className="list-disc pl-6 text-sm space-y-2">
+                        </td>
+                        <td className="border border-gray-200 px-4 py-2 text-right">{formatNumber(count)}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+            
+            <div className="print-column">
+              <h3 className="font-medium mb-4 text-medical-dark">Cell Distribution</h3>
+              <div className="h-[220px] border border-gray-200 rounded-sm bg-gray-50 py-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={80}
+                      paddingAngle={1}
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Legend 
+                      layout="vertical" 
+                      align="right"
+                      verticalAlign="middle"
+                      iconType="circle"
+                      iconSize={8}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              
+              {/* Fallback for print (pie charts don't print well) */}
+              <div className="hidden print-only">
+                <p className="text-sm text-gray-500 italic text-center mt-2">
+                  Cell distribution chart - See digital report for interactive visualization
+                </p>
+                <table className="w-full border-collapse print-table mt-2">
+                  <thead>
+                    <tr>
+                      <th className="border border-gray-200 bg-gray-50 px-4 py-2 text-left">Cell Type</th>
+                      <th className="border border-gray-200 bg-gray-50 px-4 py-2 text-right">Percentage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pieData.map((item, index) => (
+                      <tr key={index}>
+                        <td className="border border-gray-200 px-4 py-2">
+                          <span 
+                            className="inline-block w-3 h-3 rounded-full mr-2 cell-type-indicator"
+                            style={{ backgroundColor: item.color }}
+                          ></span>
+                          {item.name}
+                        </td>
+                        <td className="border border-gray-200 px-4 py-2 text-right">
+                          {((item.value / cellCounts.total) * 100).toFixed(1)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          
+          {/* Page break for print */}
+          <div className="hidden print-only page-break"></div>
+          
+          {/* Analysis findings */}
+          <div className="grid grid-cols-1 gap-6 mb-8 print-content">
+            <div>
+              <h3 className="font-medium mb-4 text-medical-dark border-b pb-2">Analysis Findings</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <h4 className="font-medium text-sm text-medical-dark mb-2">Possible Conditions</h4>
+                  <ul className="list-disc pl-5 space-y-1 text-sm">
                     {possibleConditions.map((condition, index) => (
-                      <li key={index} className="text-medical-dark">
-                        {condition}
-                      </li>
+                      <li key={index} className="text-gray-800">{condition}</li>
                     ))}
                   </ul>
                 </div>
                 
                 <div>
-                  <h5 className="text-sm font-medium flex items-center justify-between mb-2">
-                    <span>Cell-Specific Recommendations:</span>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={handleEditRecommendations}
-                      className="text-xs no-print"
-                    >
-                      <PenLine size={14} className="mr-1" />
-                      Edit
-                    </Button>
-                  </h5>
-                  <ul className="list-disc pl-6 text-sm space-y-2">
+                  <h4 className="font-medium text-sm text-medical-dark mb-2">Recommendations</h4>
+                  <ul className="list-disc pl-5 space-y-1 text-sm">
                     {recommendations.map((recommendation, index) => (
-                      <li key={index} className="text-medical-dark">
-                        {recommendation}
-                      </li>
+                      <li key={index} className="text-gray-800">{recommendation}</li>
                     ))}
                   </ul>
                 </div>
-                
-                <NotesSection />
               </div>
+              
+              {reportLayout === 'detailed' && (
+                <div className="mb-6">
+                  <h4 className="font-medium text-sm text-medical-dark mb-2">Detailed Cell Analysis</h4>
+                  <table className="w-full border-collapse print-table">
+                    <thead>
+                      <tr>
+                        <th className="border border-gray-200 bg-gray-50 px-4 py-2 text-left">Cell Type</th>
+                        <th className="border border-gray-200 bg-gray-50 px-4 py-2 text-right">Confidence</th>
+                        <th className="border border-gray-200 bg-gray-50 px-4 py-2 text-left">Location</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detectedCells
+                        .sort((a, b) => b.confidence - a.confidence)
+                        .slice(0, 10)
+                        .map((cell, index) => (
+                          <tr key={index}>
+                            <td className="border border-gray-200 px-4 py-2">
+                              <span 
+                                className="inline-block w-3 h-3 rounded-full mr-2 cell-type-indicator"
+                                style={{ backgroundColor: getCellTypeColor(cell.type) }}
+                              ></span>
+                              {cell.type}
+                            </td>
+                            <td className="border border-gray-200 px-4 py-2 text-right">
+                              {(cell.confidence * 100).toFixed(1)}%
+                            </td>
+                            <td className="border border-gray-200 px-4 py-2 text-sm">
+                              {`x:${cell.boundingBox.x}, y:${cell.boundingBox.y}`}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              
+              {analysisResult.notes && (
+                <div>
+                  <h4 className="font-medium text-sm text-medical-dark mb-2">Medical Notes</h4>
+                  <div className="bg-gray-50 p-4 rounded-sm text-sm">
+                    <p className="whitespace-pre-line">{analysisResult.notes}</p>
+                  </div>
+                </div>
+              )}
             </div>
-            
-            <Separator className="my-4" />
-            
-            <div className="bg-gray-50 p-3 rounded text-xs text-medical-dark text-opacity-70 mt-6 report-footer">
-              <p className="font-medium mb-1">Methodology:</p>
-              <p>
-                Analysis performed using BloodCellVision deep learning convolutional neural network with cell detection and classification.
-                The system identifies 8 major blood cell types: Basophils, Eosinophils, Erythroblasts, Immature Granulocytes, Lymphocytes, Monocytes, Neutrophils, and Platelets.
-              </p>
-              <p className="mt-2">
-                This report is generated with AI assistance and should be interpreted by a qualified healthcare professional in conjunction with clinical findings.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          </div>
+          
+          {/* Footer */}
+          <div className="border-t pt-4 mt-8 text-center text-gray-500 text-sm print-footer">
+            <p>Blood Cell Analysis Report - Generated by Blood Cell Analyzer v1.0</p>
+            <p className="mt-1">This report is for informational purposes only and should be reviewed by a qualified healthcare professional.</p>
+            <p className="mt-1">© {new Date().getFullYear()} Blood Cell Analyzer</p>
+          </div>
+        </div>
+      </div>
+    </>
   );
 };
 
