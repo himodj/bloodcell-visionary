@@ -1,4 +1,5 @@
 
+// Import required Node.js modules
 const { contextBridge, ipcRenderer } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -14,6 +15,7 @@ function checkModuleExists(modulePath) {
            fs.existsSync(path.join(modulePath, 'index.js')) ||
            fs.existsSync(modulePath + '.node');
   } catch (e) {
+    console.error('Error checking if module exists:', e);
     return false;
   }
 }
@@ -51,33 +53,33 @@ let electronAPI = {
   }
 };
 
-// Try to load axios with multiple strategies
-let axios = null;
-
-// Paths to check for axios
-const possiblePaths = [
-  // Direct require
-  'axios',
-  // From electron directory node_modules
-  path.join(process.cwd(), 'node_modules', 'axios'),
-  // From parent directory node_modules
-  path.join(process.cwd(), '..', 'node_modules', 'axios')
-];
-
-// Try each path
-for (const axiosPath of possiblePaths) {
-  try {
-    console.log(`Attempting to load axios from: ${axiosPath}`);
-    
-    if (axiosPath === 'axios' || checkModuleExists(axiosPath)) {
-      axios = require(axiosPath);
-      console.log(`Successfully loaded axios from ${axiosPath}`);
-      break; // Exit the loop if successful
-    } else {
-      console.log(`Axios not found at ${axiosPath}`);
+// Try to load axios
+let axios;
+try {
+  axios = require('axios');
+  console.log('Successfully loaded axios directly');
+} catch (err) {
+  console.error('Error loading axios directly:', err.message);
+  
+  // Try alternative paths
+  const possiblePaths = [
+    path.join(process.cwd(), 'node_modules', 'axios'),
+    path.join(process.cwd(), '..', 'node_modules', 'axios')
+  ];
+  
+  for (const axiosPath of possiblePaths) {
+    try {
+      console.log(`Attempting to load axios from: ${axiosPath}`);
+      if (checkModuleExists(axiosPath)) {
+        axios = require(axiosPath);
+        console.log(`Successfully loaded axios from ${axiosPath}`);
+        break;
+      } else {
+        console.log(`Axios not found at ${axiosPath}`);
+      }
+    } catch (err) {
+      console.error(`Error loading axios from ${axiosPath}:`, err.message);
     }
-  } catch (err) {
-    console.error(`Error loading axios from ${axiosPath}:`, err.message);
   }
 }
 

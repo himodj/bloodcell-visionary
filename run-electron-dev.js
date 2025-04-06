@@ -31,61 +31,22 @@ function runCommand(command) {
   });
 }
 
-// Create a package.json backup
-function backupPackageJson() {
-  const packageJsonPath = path.join(process.cwd(), 'package.json');
-  const backupPath = path.join(process.cwd(), 'package.json.backup');
-  
-  try {
-    if (fs.existsSync(packageJsonPath)) {
-      fs.copyFileSync(packageJsonPath, backupPath);
-      console.log('Created package.json backup');
-    }
-  } catch (err) {
-    console.error('Error creating package.json backup:', err);
-  }
-}
-
-// Check if axios is properly installed in the electron/node_modules directory
-function isAxiosInstalled() {
-  const axiosPath = path.join(process.cwd(), 'node_modules', 'axios');
-  return fs.existsSync(axiosPath);
-}
-
 // Main function
 async function main() {
   try {
-    // Create backup
-    backupPackageJson();
-    
-    // Check if axios is already installed
-    if (!isAxiosInstalled()) {
-      // First, ensure axios is installed with the exact version
-      console.log('Installing axios@1.8.3...');
-      await runCommand('npm install axios@1.8.3 --save');
-      console.log('Axios installed successfully.');
-      
-      // Check if axios is actually in node_modules
-      const axiosPath = path.join(process.cwd(), 'node_modules', 'axios');
-      if (fs.existsSync(axiosPath)) {
-        console.log('Verified axios is installed in:', axiosPath);
-      } else {
-        console.error('WARNING: axios not found in node_modules after installation!');
-        // Try installing with force
-        await runCommand('npm install axios@1.8.3 --save --force');
-        if (fs.existsSync(axiosPath)) {
-          console.log('Forced installation successful, axios is now present');
-        } else {
-          console.error('ERROR: axios installation failed even with --force');
-        }
-      }
-    } else {
-      console.log('Axios is already installed in electron/node_modules');
-    }
-    
-    // Install other dependencies if needed
-    console.log('Installing other dependencies...');
+    // First, ensure all dependencies are installed in the root directory
+    console.log('Installing root dependencies...');
+    process.chdir(path.join(__dirname));
     await runCommand('npm install');
+    
+    // Now return to electron directory and install its dependencies
+    process.chdir(electronDir);
+    console.log('Installing electron dependencies...');
+    await runCommand('npm install');
+    
+    // Specifically ensure axios is installed
+    console.log('Installing axios@1.8.3...');
+    await runCommand('npm install axios@1.8.3 --save');
     
     console.log('Starting Electron app in development mode...');
     
