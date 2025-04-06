@@ -34,9 +34,9 @@ async function main() {
     console.log('Installing root dependencies...');
     await runCommand('npm install', __dirname);
     
-    // Install vite globally if needed
-    console.log('Installing vite globally...');
-    await runCommand('npm install -g vite');
+    // Install vite locally to ensure it's available
+    console.log('Installing vite locally...');
+    await runCommand('npm install vite --save-dev', __dirname);
     
     // Now handle electron directory dependencies
     const electronDir = path.join(__dirname, 'electron');
@@ -57,6 +57,25 @@ async function main() {
     
     console.log('Starting Electron app in development mode...');
     
+    // Start Vite development server directly using npx to ensure it's found
+    console.log('Starting Vite development server...');
+    const viteProcess = exec('npx vite', { 
+      cwd: __dirname,
+      env: process.env
+    });
+    
+    // Forward stdout and stderr to console
+    viteProcess.stdout.on('data', (data) => {
+      console.log(`[Vite] ${data}`);
+    });
+    
+    viteProcess.stderr.on('data', (data) => {
+      console.error(`[Vite Error] ${data}`);
+    });
+    
+    // Wait a bit for Vite to start
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
     // Start the Electron app in development mode
     const env = Object.assign({}, process.env);
     env.NODE_ENV = 'development';
@@ -65,20 +84,15 @@ async function main() {
     const electronProcess = exec('npm run dev', { 
       cwd: electronDir,
       env 
-    }, (error, stdout, stderr) => {
-      if (error) {
-        console.error(`Error starting Electron app: ${error}`);
-        return;
-      }
     });
 
     // Forward stdout and stderr to console
     electronProcess.stdout.on('data', (data) => {
-      console.log(data);
+      console.log(`[Electron] ${data}`);
     });
 
     electronProcess.stderr.on('data', (data) => {
-      console.error(data);
+      console.error(`[Electron Error] ${data}`);
     });
   } catch (error) {
     console.error('Error in development setup:', error);
