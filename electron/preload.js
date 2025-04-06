@@ -53,7 +53,7 @@ let electronAPI = {
   }
 };
 
-// Try to load axios
+// Try to load axios directly with require
 let axios;
 try {
   axios = require('axios');
@@ -61,24 +61,19 @@ try {
 } catch (err) {
   console.error('Error loading axios directly:', err.message);
   
-  // Try alternative paths
-  const possiblePaths = [
-    path.join(process.cwd(), 'node_modules', 'axios'),
-    path.join(process.cwd(), '..', 'node_modules', 'axios')
-  ];
-  
-  for (const axiosPath of possiblePaths) {
+  // Try requiring from node_modules with a specific relative path
+  try {
+    axios = require('./node_modules/axios');
+    console.log('Successfully loaded axios from ./node_modules/axios');
+  } catch (err2) {
+    console.error('Error loading axios from ./node_modules/axios:', err2.message);
+    
+    // Try loading from parent directory
     try {
-      console.log(`Attempting to load axios from: ${axiosPath}`);
-      if (checkModuleExists(axiosPath)) {
-        axios = require(axiosPath);
-        console.log(`Successfully loaded axios from ${axiosPath}`);
-        break;
-      } else {
-        console.log(`Axios not found at ${axiosPath}`);
-      }
-    } catch (err) {
-      console.error(`Error loading axios from ${axiosPath}:`, err.message);
+      axios = require('../node_modules/axios');
+      console.log('Successfully loaded axios from ../node_modules/axios');
+    } catch (err3) {
+      console.error('Error loading axios from ../node_modules/axios:', err3.message);
     }
   }
 }
