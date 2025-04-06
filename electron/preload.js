@@ -56,10 +56,19 @@ let electronAPI = {
 // Try to load axios directly with require
 let axios;
 try {
-  axios = require('axios');
-  console.log('Successfully loaded axios directly');
+  // Look for axios in the node_modules directory within the electron folder first
+  const axiosPath = path.join(__dirname, 'node_modules', 'axios');
+  console.log('Trying to load axios from:', axiosPath);
+  if (fs.existsSync(axiosPath)) {
+    axios = require(axiosPath);
+    console.log('Successfully loaded axios from local node_modules');
+  } else {
+    // Fall back to the normal require mechanism
+    axios = require('axios');
+    console.log('Successfully loaded axios with normal require');
+  }
 } catch (err) {
-  console.error('Error loading axios directly:', err.message);
+  console.error('Error loading axios:', err.message);
   
   // Try requiring from node_modules with a specific relative path
   try {

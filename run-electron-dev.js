@@ -34,9 +34,19 @@ async function main() {
     console.log('Installing root dependencies...');
     await runCommand('npm install', __dirname);
     
-    // Install vite locally to ensure it's available
-    console.log('Installing vite locally...');
-    await runCommand('npm install vite --save-dev', __dirname);
+    // Install vite locally and explicitly
+    console.log('Installing vite explicitly...');
+    await runCommand('npm install vite@latest --save-dev', __dirname);
+    
+    // Verify vite is installed by checking the binary path
+    const viteBinPath = path.join(__dirname, 'node_modules', '.bin', 'vite');
+    if (!fs.existsSync(viteBinPath)) {
+      console.error(`Vite binary not found at expected path: ${viteBinPath}`);
+      console.log('Trying alternative installation method...');
+      await runCommand('npm install vite@latest --location=project', __dirname);
+    } else {
+      console.log(`Found vite binary at: ${viteBinPath}`);
+    }
     
     // Now handle electron directory dependencies
     const electronDir = path.join(__dirname, 'electron');
@@ -53,13 +63,13 @@ async function main() {
     
     // Specifically ensure axios is installed in electron directory
     console.log('Installing axios@1.8.3 in electron directory...');
-    await runCommand('npm install axios@1.8.3 --save', electronDir);
+    await runCommand('npm install axios@1.8.3 path fs --save', electronDir);
     
     console.log('Starting Electron app in development mode...');
     
-    // Start Vite development server directly using npx to ensure it's found
+    // Start Vite development server using the local installation
     console.log('Starting Vite development server...');
-    const viteProcess = exec('npx vite', { 
+    const viteProcess = exec(`"${viteBinPath}"`, { 
       cwd: __dirname,
       env: process.env
     });
@@ -74,7 +84,7 @@ async function main() {
     });
     
     // Wait a bit for Vite to start
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await new Promise(resolve => setTimeout(resolve, 5000));
     
     // Start the Electron app in development mode
     const env = Object.assign({}, process.env);
