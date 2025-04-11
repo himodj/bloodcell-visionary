@@ -42,9 +42,9 @@ async function main() {
     
     console.log('Starting Electron app in development mode...');
     
-    // Use npx to run vite - this is critical to make it work even if vite is not globally installed
+    // Use npx vite with the full path to node_modules/.bin/vite to avoid "not found" errors
     console.log('Starting Vite development server...');
-    const viteProcess = exec('npx vite', { 
+    const viteProcess = exec('node ./node_modules/vite/bin/vite.js', { 
       cwd: __dirname,
       env: process.env
     });
