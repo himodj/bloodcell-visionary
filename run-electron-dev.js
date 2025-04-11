@@ -30,30 +30,15 @@ function runCommand(command, cwd = null) {
 // Main function
 async function main() {
   try {
-    // First, ensure all dependencies are installed in the root directory
-    console.log('Installing root dependencies...');
-    await runCommand('npm install', __dirname);
-    
-    // Explicitly install vite
-    console.log('Installing vite explicitly...');
-    await runCommand('npm install vite@latest --save-dev', __dirname);
-    
     // Now handle electron directory dependencies
     const electronDir = path.join(__dirname, 'electron');
-    console.log('Installing electron dependencies...');
+    console.log('Checking electron directory...');
     
     // Ensure electron directory exists
     if (!fs.existsSync(electronDir)) {
       console.log('Creating electron directory...');
       fs.mkdirSync(electronDir, { recursive: true });
     }
-    
-    // Change to electron directory and install dependencies
-    await runCommand('npm install', electronDir);
-    
-    // Specifically ensure axios is installed in electron directory
-    console.log('Installing axios@1.8.3 in electron directory...');
-    await runCommand('npm install axios@1.8.3 path fs --save', electronDir);
     
     console.log('Starting Electron app in development mode...');
     
