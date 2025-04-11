@@ -30,13 +30,19 @@ const ModelLoader: React.FC = () => {
     
     // Try to auto-load the model if we're in Electron
     if (isElectronEnv) {
-      loadDefaultModel();
+      console.log('Electron environment detected, auto-loading model...');
+      setTimeout(() => {
+        loadDefaultModel();
+      }, 1000);
     }
   }, []);
 
   // Function to load default model
   const loadDefaultModel = async () => {
-    if (!window.electron) return;
+    if (!window.electron) {
+      console.error('Electron API not available');
+      return;
+    }
     
     try {
       setIsLoading(true);

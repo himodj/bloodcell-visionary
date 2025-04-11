@@ -50,8 +50,6 @@
     "concurrently": "^9.1.2"
   },
   "dependencies": {
-    "axios": "^1.8.3",
-    "path": "^0.12.7",
-    "fs": "0.0.1-security"
+    "axios": "^1.8.3"
   }
 }

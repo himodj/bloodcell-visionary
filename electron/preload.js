@@ -1,24 +1,11 @@
 
 // Import required Node.js modules
 const { contextBridge, ipcRenderer } = require('electron');
-const path = require('path');
+const os = require('os');
 const fs = require('fs');
 
 // Log the current directory
 console.log('Current directory:', process.cwd());
-
-// Function to check if a module exists at a specific path
-function checkModuleExists(modulePath) {
-  try {
-    return fs.existsSync(modulePath) || 
-           fs.existsSync(modulePath + '.js') || 
-           fs.existsSync(path.join(modulePath, 'index.js')) ||
-           fs.existsSync(modulePath + '.node');
-  } catch (e) {
-    console.error('Error checking if module exists:', e);
-    return false;
-  }
-}
 
 // Initialize API object
 let electronAPI = {
@@ -56,34 +43,16 @@ let electronAPI = {
 // Try to load axios directly with require
 let axios;
 try {
-  // Look for axios in the node_modules directory within the electron folder first
-  const axiosPath = path.join(__dirname, 'node_modules', 'axios');
-  console.log('Trying to load axios from:', axiosPath);
-  if (fs.existsSync(axiosPath)) {
-    axios = require(axiosPath);
-    console.log('Successfully loaded axios from local node_modules');
-  } else {
-    // Fall back to the normal require mechanism
-    axios = require('axios');
-    console.log('Successfully loaded axios with normal require');
-  }
+  // Look for axios in the electron directory node_modules first
+  axios = require('axios');
+  console.log('Successfully loaded axios with normal require');
 } catch (err) {
   console.error('Error loading axios:', err.message);
-  
-  // Try requiring from node_modules with a specific relative path
   try {
     axios = require('./node_modules/axios');
     console.log('Successfully loaded axios from ./node_modules/axios');
   } catch (err2) {
     console.error('Error loading axios from ./node_modules/axios:', err2.message);
-    
-    // Try loading from parent directory
-    try {
-      axios = require('../node_modules/axios');
-      console.log('Successfully loaded axios from ../node_modules/axios');
-    } catch (err3) {
-      console.error('Error loading axios from ../node_modules/axios:', err3.message);
-    }
   }
 }
 
