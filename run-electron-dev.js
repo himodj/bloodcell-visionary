@@ -34,19 +34,9 @@ async function main() {
     console.log('Installing root dependencies...');
     await runCommand('npm install', __dirname);
     
-    // Install vite locally and explicitly
+    // Explicitly install vite
     console.log('Installing vite explicitly...');
     await runCommand('npm install vite@latest --save-dev', __dirname);
-    
-    // Verify vite is installed by checking the binary path
-    const viteBinPath = path.join(__dirname, 'node_modules', '.bin', 'vite');
-    if (!fs.existsSync(viteBinPath)) {
-      console.error(`Vite binary not found at expected path: ${viteBinPath}`);
-      console.log('Trying alternative installation method...');
-      await runCommand('npm install vite@latest --location=project', __dirname);
-    } else {
-      console.log(`Found vite binary at: ${viteBinPath}`);
-    }
     
     // Now handle electron directory dependencies
     const electronDir = path.join(__dirname, 'electron');
@@ -67,9 +57,9 @@ async function main() {
     
     console.log('Starting Electron app in development mode...');
     
-    // Start Vite development server using the local installation
+    // Use npx to run vite regardless of where it's installed
     console.log('Starting Vite development server...');
-    const viteProcess = exec(`"${viteBinPath}"`, { 
+    const viteProcess = exec('npx vite', { 
       cwd: __dirname,
       env: process.env
     });
