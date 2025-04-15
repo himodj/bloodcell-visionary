@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
@@ -8,6 +7,14 @@ import { toast } from 'sonner';
 
 // Check if we're running in Electron - make sure this works correctly
 const isElectron = typeof window !== 'undefined' && window.electron?.isElectron === true;
+
+// Keep track of loaded model state globally
+let globalModelLoaded = false;
+
+// Define a global function to check if model is loaded
+(window as any).isModelLoaded = () => {
+  return globalModelLoaded;
+};
 
 // Define a global function to load model that can be called from UI
 (window as any).loadModel = async (modelPath?: string) => {
@@ -23,6 +30,7 @@ const isElectron = typeof window !== 'undefined' && window.electron?.isElectron 
       if (!selectedModelPath) {
         console.error('No model path selected or found');
         toast.error('No model selected or found. Please ensure model.h5 is in the project directory.');
+        globalModelLoaded = false;
         return false;
       }
       
@@ -40,6 +48,7 @@ const isElectron = typeof window !== 'undefined' && window.electron?.isElectron 
           if (modelCheck.error) {
             console.error('Model format check failed:', modelCheck.error);
             toast.error(`Model validation failed: ${modelCheck.error}`);
+            globalModelLoaded = false;
             return false;
           }
           
@@ -47,10 +56,12 @@ const isElectron = typeof window !== 'undefined' && window.electron?.isElectron 
           await initializeModel(selectedModelPath, true); // Using the forceH5 flag
           console.log('H5 Model registered successfully for analysis');
           toast.success('Model loaded successfully and ready for analysis');
+          globalModelLoaded = true;
           return true;
         } catch (error) {
           console.error('Error registering H5 model:', error);
           toast.error('Error loading H5 model: ' + (error instanceof Error ? error.message : String(error)));
+          globalModelLoaded = false;
           return false;
         }
       }
@@ -59,20 +70,24 @@ const isElectron = typeof window !== 'undefined' && window.electron?.isElectron 
       try {
         await initializeModel(selectedModelPath);
         console.log('Model initialized successfully');
+        globalModelLoaded = true;
         return true;
       } catch (error) {
         console.error('Failed to load model:', error);
         toast.error('Failed to load model: ' + (error instanceof Error ? error.message : String(error)));
+        globalModelLoaded = false;
         return false;
       }
     } catch (error) {
       console.error('Failed to load model:', error);
       toast.error('Failed to load model: ' + (error instanceof Error ? error.message : String(error)));
+      globalModelLoaded = false;
       return false;
     }
   } else {
     console.warn('Model loading is only available in Electron environment');
     toast.error('Model loading is only available in desktop application');
+    globalModelLoaded = false;
     return false;
   }
 };

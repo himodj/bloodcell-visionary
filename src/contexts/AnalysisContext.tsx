@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { analyzeBloodSample } from '../utils/analysisUtils';
+import { analyzeBloodSample, isModelInitialized } from '../utils/analysisUtils';
+import { toast } from 'sonner';
 
 export type CellType = 
   | 'RBC' 
@@ -75,7 +76,17 @@ export const AnalysisProvider: React.FC<{children: ReactNode}> = ({ children }) 
   const [error, setError] = useState<string | null>(null);
 
   const startAnalysis = async () => {
-    if (!originalImage) return;
+    if (!originalImage) {
+      toast.error("Please upload an image first");
+      return;
+    }
+    
+    // Check if model is loaded before proceeding
+    if (!isModelInitialized()) {
+      toast.error("Please load a model first. Click the 'Load Model' or 'Browse for Model' button.");
+      setError("Model not loaded. Please load a model first.");
+      return;
+    }
     
     setIsAnalyzing(true);
     setError(null);
@@ -91,6 +102,7 @@ export const AnalysisProvider: React.FC<{children: ReactNode}> = ({ children }) 
       } else {
         setError('An unknown error occurred during analysis');
       }
+      toast.error(error instanceof Error ? error.message : 'Analysis failed');
     } finally {
       setIsAnalyzing(false);
     }

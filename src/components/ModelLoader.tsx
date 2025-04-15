@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Database, Check, AlertCircle, Download, HelpCircle, FileCheck, RefreshCw, FolderOpen } from 'lucide-react';
+import { Database, Check, AlertCircle, Download, HelpCircle, FileCheck, RefreshCw, FolderOpen, ShieldAlert } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
+import { isModelInitialized } from "../utils/analysisUtils";
 
 const ModelLoader: React.FC = () => {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
@@ -25,8 +26,9 @@ const ModelLoader: React.FC = () => {
   const [modelFormat, setModelFormat] = useState<string | null>(null);
   const [customModelPath, setCustomModelPath] = useState<string>('');
   const [showManualPathInput, setShowManualPathInput] = useState(false);
+  const [showTroubleshooting, setShowTroubleshooting] = useState(false);
 
-  // Check if we're in Electron on component mount
+  // Check if we're in Electron on component mount and periodically check model state
   useEffect(() => {
     const isElectronEnv = !!window.electron?.isElectron;
     setIsElectron(isElectronEnv);
@@ -38,6 +40,13 @@ const ModelLoader: React.FC = () => {
         loadDefaultModel();
       }, 1000);
     }
+
+    // Set up a periodic check for model state
+    const interval = setInterval(() => {
+      setIsModelLoaded(isModelInitialized());
+    }, 2000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Function to load default model
@@ -269,6 +278,10 @@ const ModelLoader: React.FC = () => {
     setShowManualPathInput(!showManualPathInput);
   };
 
+  const toggleTroubleshooting = () => {
+    setShowTroubleshooting(!showTroubleshooting);
+  };
+
   return (
     <>
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
@@ -323,6 +336,18 @@ const ModelLoader: React.FC = () => {
         >
           <HelpCircle size={16} />
         </Button>
+        
+        {!isModelLoaded && (
+          <Button 
+            variant="outline" 
+            size="icon" 
+            className="h-10 w-10 text-amber-600" 
+            onClick={toggleTroubleshooting}
+            title="Model Troubleshooting"
+          >
+            <ShieldAlert size={16} />
+          </Button>
+        )}
         
         {isModelLoaded && (
           <div className="flex items-center">
@@ -456,6 +481,66 @@ const ModelLoader: React.FC = () => {
           
           <DialogFooter>
             <Button onClick={() => setShowModelHelp(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showTroubleshooting} onOpenChange={setShowTroubleshooting}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Model Loading Troubleshooting</DialogTitle>
+            <DialogDescription>
+              Common issues and solutions for model loading problems
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <h3 className="font-medium">Common Issues</h3>
+            
+            <div className="space-y-3 text-sm">
+              <div className="border border-gray-200 rounded-lg p-3">
+                <h4 className="font-medium">Model Not Found</h4>
+                <p className="text-muted-foreground">The application cannot locate your model.h5 file.</p>
+                <div className="mt-2 bg-gray-50 p-2 rounded">
+                  <strong>Solution:</strong> Use the "Browse for Model" button to manually select your model.h5 file.
+                </div>
+              </div>
+              
+              <div className="border border-gray-200 rounded-lg p-3">
+                <h4 className="font-medium">Invalid Model Format</h4>
+                <p className="text-muted-foreground">The file exists but isn't recognized as a valid H5 model.</p>
+                <div className="mt-2 bg-gray-50 p-2 rounded">
+                  <strong>Solution:</strong> Ensure you're using a properly trained and saved Keras/TensorFlow H5 model.
+                </div>
+              </div>
+              
+              <div className="border border-gray-200 rounded-lg p-3">
+                <h4 className="font-medium">Python Backend Not Running</h4>
+                <p className="text-muted-foreground">The Python server required for H5 models is not running.</p>
+                <div className="mt-2 bg-gray-50 p-2 rounded">
+                  <strong>Solution:</strong> Restart the application. Check if Python and required libraries are installed.
+                </div>
+              </div>
+              
+              <div className="border border-gray-200 rounded-lg p-3">
+                <h4 className="font-medium">Permission Issues</h4>
+                <p className="text-muted-foreground">The application cannot access the model file due to permissions.</p>
+                <div className="mt-2 bg-gray-50 p-2 rounded">
+                  <strong>Solution:</strong> Copy the model to a location with proper read permissions (e.g., Desktop).
+                </div>
+              </div>
+            </div>
+            
+            <Alert className="bg-blue-50 border-blue-200">
+              <AlertTitle className="text-blue-700">Need to train a model?</AlertTitle>
+              <AlertDescription className="text-blue-600">
+                If you don't have a model.h5 file, you'll need to train one using TensorFlow/Keras or download a pre-trained model compatible with blood cell classification.
+              </AlertDescription>
+            </Alert>
+          </div>
+          
+          <DialogFooter>
+            <Button onClick={() => setShowTroubleshooting(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

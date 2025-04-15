@@ -1,13 +1,20 @@
 
 import * as tf from '@tensorflow/tfjs';
 import { AnalysisResult, CellCount, CellType, DetectedCell } from '../contexts/AnalysisContext';
+import { toast } from 'sonner';
 
 // Path to your model - will be set during runtime in Electron
 let modelPath = '';
 let isH5Model = false;
+let isModelLoaded = false;
 
 // Load the model once
 let model: tf.LayersModel | null = null;
+
+// Function to check if model is loaded
+export const isModelInitialized = (): boolean => {
+  return isModelLoaded && (!!model || isH5Model);
+};
 
 // Function to initialize the model with a local path
 export const initializeModel = async (path: string, forceH5 = false): Promise<void> => {
@@ -29,6 +36,7 @@ export const initializeModel = async (path: string, forceH5 = false): Promise<vo
           throw new Error(`Failed to validate H5 model file: ${result.error}`);
         }
         console.log('H5 model validated successfully');
+        isModelLoaded = true;
       }
       return;
     }
@@ -42,6 +50,7 @@ export const initializeModel = async (path: string, forceH5 = false): Promise<vo
       try {
         model = await tf.loadLayersModel(modelUrl);
         console.log('Model loaded successfully');
+        isModelLoaded = true;
       } catch (error) {
         console.error('Error loading model directly:', error);
         throw new Error(`Failed to load model: ${error instanceof Error ? error.message : String(error)}`);
@@ -51,6 +60,7 @@ export const initializeModel = async (path: string, forceH5 = false): Promise<vo
     }
   } catch (error) {
     console.error('Failed to load model:', error);
+    isModelLoaded = false;
     throw new Error(`Failed to load the model. ${error instanceof Error ? error.message : 'Please check the file path.'}`);
   }
 };
@@ -288,10 +298,12 @@ const generateRecommendations = (cellType: CellType | null): string[] => {
 export const analyzeBloodSample = async (imageUrl: string): Promise<AnalysisResult> => {
   console.log('Analyzing blood sample with model path:', modelPath);
   console.log('Is H5 model:', isH5Model);
+  console.log('Is model loaded:', isModelLoaded);
   
-  if (!modelPath) {
+  if (!isModelLoaded || !modelPath) {
     console.error('No model path set. Model has not been properly loaded.');
-    throw new Error('Model not properly loaded. Please ensure model is loaded before analysis.');
+    toast.error('Please load a model first. Click the "Load Model" or "Browse for Model" button.');
+    throw new Error('Model not properly loaded. Please load a model before analysis.');
   }
   
   // Ensure the image is exactly 360x360 using center crop approach
