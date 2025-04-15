@@ -254,8 +254,8 @@ function getModelPath() {
     return packagedAppPath;
   }
   
-  console.log('❌ Model not found in any location, returning user-specified path as fallback');
-  return userSpecifiedPath;
+  console.log('❌ Model not found in any location');
+  return null;
 }
 
 ipcMain.handle('select-model', async () => {
@@ -294,12 +294,17 @@ ipcMain.handle('select-model', async () => {
       console.log('Model not found automatically, letting user know to add model.h5');
       
       if (mainWindow) {
-        dialog.showMessageBox(mainWindow, {
+        const result = await dialog.showMessageBox(mainWindow, {
           type: 'warning',
           title: 'Model Not Found',
-          message: 'model.h5 file is required but not found. Please place the model.h5 file in the application directory and restart the application.',
-          buttons: ['OK']
+          message: 'model.h5 file is required but not found. Would you like to browse for it now?',
+          buttons: ['Yes', 'No'],
+          defaultId: 0
         });
+        
+        if (result.response === 0) {
+          return ipcMain.handle('browse-for-model')();
+        }
       }
       
       return null;
@@ -427,5 +432,75 @@ ipcMain.handle('test-axios', async () => {
     return { available: true, message: 'Axios is available in the main process' };
   } catch (error) {
     return { available: false, error: error.message };
+  }
+});
+
+ipcMain.handle('browse-for-model', async () => {
+  try {
+    console.log('Opening file dialog to browse for model...');
+    
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'],
+      filters: [
+        { name: 'H5 Models', extensions: ['h5'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      title: 'Select Model File'
+    });
+    
+    if (result.canceled || result.filePaths.length === 0) {
+      console.log('File selection was canceled');
+      return null;
+    }
+    
+    const selectedPath = result.filePaths[0];
+    console.log('User selected model at:', selectedPath);
+    
+    // Try to validate the file
+    try {
+      if (selectedPath.toLowerCase().endsWith('.h5')) {
+        const buffer = fs.readFileSync(selectedPath, { encoding: null, flag: 'r', length: 8 });
+        
+        const isH5 = buffer[0] === 137 && 
+                    buffer[1] === 72 && 
+                    buffer[2] === 68 && 
+                    buffer[3] === 70;
+        
+        if (!isH5) {
+          console.warn('File has .h5 extension but invalid H5 format signature');
+          
+          if (mainWindow) {
+            const warningResult = await dialog.showMessageBox(mainWindow, {
+              type: 'warning',
+              title: 'Invalid Model Format',
+              message: 'The file you selected does not appear to be a valid H5 model file. Do you want to try using it anyway?',
+              buttons: ['Yes', 'No'],
+              defaultId: 1
+            });
+            
+            if (warningResult.response === 1) {
+              return null;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error validating selected file:', err);
+    }
+    
+    return selectedPath;
+  } catch (error) {
+    console.error('Error browsing for model:', error);
+    return null;
+  }
+});
+
+ipcMain.handle('check-file-exists', async (event, filePath) => {
+  try {
+    console.log('Checking if file exists:', filePath);
+    return fs.existsSync(filePath);
+  } catch (error) {
+    console.error('Error checking if file exists:', error);
+    return false;
   }
 });

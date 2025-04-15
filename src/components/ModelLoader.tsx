@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Database, Check, AlertCircle, Download, HelpCircle, FileCheck, RefreshCw } from 'lucide-react';
+import { Database, Check, AlertCircle, Download, HelpCircle, FileCheck, RefreshCw, FolderOpen } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
 
 const ModelLoader: React.FC = () => {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
@@ -22,6 +23,8 @@ const ModelLoader: React.FC = () => {
   const [isH5Model, setIsH5Model] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [modelFormat, setModelFormat] = useState<string | null>(null);
+  const [customModelPath, setCustomModelPath] = useState<string>('');
+  const [showManualPathInput, setShowManualPathInput] = useState(false);
 
   // Check if we're in Electron on component mount
   useEffect(() => {
@@ -77,16 +80,18 @@ const ModelLoader: React.FC = () => {
           toast.error('Found model but failed to load. Check console for details.');
         }
       } else {
-        const errorMsg = 'No model.h5 found. Check if C:\\Users\\H\\Desktop\\app\\model.h5 exists.';
+        const errorMsg = 'No model.h5 found. Please select a model file manually.';
         console.warn(errorMsg);
         setLoadError(errorMsg);
-        toast.warning('Model not found. Please check if the specified path is correct: C:\\Users\\H\\Desktop\\app\\model.h5');
+        toast.warning('Model not found. Please use the Browse or Manual Path options below.');
+        setShowManualPathInput(true);
       }
     } catch (error) {
       console.error('Error loading default model:', error);
       const errorMessage = typeof error === 'string' ? error : error instanceof Error ? error.message : 'Failed to load default model';
       setLoadError(errorMessage);
       toast.error(errorMessage);
+      setShowManualPathInput(true);
     } finally {
       setIsLoading(false);
     }
@@ -113,12 +118,14 @@ const ModelLoader: React.FC = () => {
       } else {
         setLoadError('No model was selected or model failed to load');
         toast.error('No model was selected or model failed to load');
+        setShowManualPathInput(true);
       }
     } catch (error) {
       console.error('Error loading model:', error);
       const errorMessage = typeof error === 'string' ? error : error instanceof Error ? error.message : 'Failed to load model';
       setLoadError(errorMessage);
       toast.error(errorMessage);
+      setShowManualPathInput(true);
     } finally {
       setIsLoading(false);
     }
@@ -135,9 +142,131 @@ const ModelLoader: React.FC = () => {
     } catch (error) {
       console.error('Error reloading model:', error);
       toast.error('Failed to reload model');
+      setShowManualPathInput(true);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // New function to handle the "Browse" button click
+  const handleBrowseForModel = async () => {
+    if (!window.electron) {
+      toast.error("This feature is only available in the desktop app");
+      return;
+    }
+    
+    setIsLoading(true);
+    setLoadError(null);
+    
+    try {
+      // Use the new browseForModel method from Electron
+      const selectedPath = await window.electron.browseForModel();
+      
+      if (!selectedPath) {
+        toast.info('No file selected');
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log('User selected model path:', selectedPath);
+      setModelPath(selectedPath);
+      
+      // Check model format
+      const modelFormat = await window.electron.checkModelFormat(selectedPath);
+      if (modelFormat.error) {
+        throw new Error(`Model validation failed: ${modelFormat.error}`);
+      }
+      
+      setModelFormat(modelFormat.format);
+      
+      // Set H5 flag if it's an H5 model
+      if (selectedPath.toLowerCase().endsWith('.h5') || modelFormat.format === 'h5') {
+        setIsH5Model(true);
+        console.log('H5 model format detected');
+      }
+      
+      // Load the model using the selected path
+      const success = await (window as any).loadModel(selectedPath);
+      
+      if (success) {
+        setIsModelLoaded(true);
+        toast.success(`Model loaded successfully from: ${selectedPath}`);
+        setShowManualPathInput(false);
+      } else {
+        throw new Error('Failed to load the selected model');
+      }
+    } catch (error) {
+      console.error('Error loading model:', error);
+      const errorMessage = typeof error === 'string' ? error : error instanceof Error ? error.message : 'Failed to load model';
+      setLoadError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // New function to handle manual path input
+  const handleManualPathChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomModelPath(e.target.value);
+  };
+
+  // New function to load model from manual path
+  const handleLoadFromManualPath = async () => {
+    if (!customModelPath.trim() || !window.electron) {
+      toast.error("Please enter a valid file path");
+      return;
+    }
+    
+    setIsLoading(true);
+    setLoadError(null);
+    
+    try {
+      // Check if the file exists
+      const fileExists = await window.electron.checkFileExists(customModelPath);
+      
+      if (!fileExists) {
+        throw new Error(`File not found at path: ${customModelPath}`);
+      }
+      
+      console.log('Loading model from manual path:', customModelPath);
+      setModelPath(customModelPath);
+      
+      // Check model format
+      const modelFormat = await window.electron.checkModelFormat(customModelPath);
+      if (modelFormat.error) {
+        throw new Error(`Model validation failed: ${modelFormat.error}`);
+      }
+      
+      setModelFormat(modelFormat.format);
+      
+      // Set H5 flag if it's an H5 model
+      if (customModelPath.toLowerCase().endsWith('.h5') || modelFormat.format === 'h5') {
+        setIsH5Model(true);
+        console.log('H5 model format detected');
+      }
+      
+      // Load the model using the manual path
+      const success = await (window as any).loadModel(customModelPath);
+      
+      if (success) {
+        setIsModelLoaded(true);
+        toast.success(`Model loaded successfully from: ${customModelPath}`);
+        setShowManualPathInput(false);
+      } else {
+        throw new Error('Failed to load the model from the specified path');
+      }
+    } catch (error) {
+      console.error('Error loading model from manual path:', error);
+      const errorMessage = typeof error === 'string' ? error : error instanceof Error ? error.message : 'Failed to load model';
+      setLoadError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleManualPathInput = () => {
+    setShowManualPathInput(!showManualPathInput);
   };
 
   return (
@@ -160,6 +289,18 @@ const ModelLoader: React.FC = () => {
             </>
           )}
         </Button>
+        
+        {isElectron && (
+          <Button
+            onClick={handleBrowseForModel}
+            disabled={isLoading}
+            variant="outline"
+            className="flex items-center"
+          >
+            <FolderOpen size={16} className="mr-2" />
+            Browse for Model
+          </Button>
+        )}
         
         {isModelLoaded && (
           <Button
@@ -229,13 +370,47 @@ const ModelLoader: React.FC = () => {
           <AlertTitle>Error Loading Model</AlertTitle>
           <AlertDescription>
             {loadError}
-            {loadError.includes('not found') && (
+            {(loadError.includes('not found') || loadError.includes('failed')) && (
               <p className="mt-2">
-                Please make sure model.h5 exists at C:\Users\H\Desktop\app\model.h5 or in the project root directory.
+                Please use the "Browse for Model" button to select your model.h5 file directly, or specify the model path manually below.
               </p>
             )}
           </AlertDescription>
         </Alert>
+      )}
+
+      {showManualPathInput && isElectron && (
+        <div className="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+          <h3 className="text-sm font-medium mb-3">Manual Model Path</h3>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Input
+              placeholder="Enter full path to model.h5 file"
+              value={customModelPath}
+              onChange={handleManualPathChange}
+              className="flex-1"
+            />
+            <Button 
+              onClick={handleLoadFromManualPath} 
+              disabled={isLoading || !customModelPath.trim()}
+              size="sm"
+            >
+              Load from Path
+            </Button>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            Example: C:\Users\YourName\Desktop\model.h5
+          </p>
+        </div>
+      )}
+
+      {!showManualPathInput && isElectron && !isModelLoaded && (
+        <Button 
+          variant="link" 
+          onClick={toggleManualPathInput} 
+          className="px-0 text-sm text-gray-500 hover:text-gray-700"
+        >
+          + Specify model path manually
+        </Button>
       )}
 
       <Dialog open={showModelHelp} onOpenChange={setShowModelHelp}>
@@ -273,8 +448,8 @@ const ModelLoader: React.FC = () => {
               To use your CNN model:
             </p>
             <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>Place <code>model.h5</code> in the project root directory</li>
-              <li>The application will automatically locate and load it</li>
+              <li>Click "Browse for Model" to select your model.h5 file directly</li>
+              <li>Alternatively, place <code>model.h5</code> in the project root directory</li>
               <li>If "Model Loaded" appears in green, your model is ready for use</li>
             </ol>
           </div>

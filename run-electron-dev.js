@@ -40,11 +40,23 @@ async function main() {
       fs.mkdirSync(electronDir, { recursive: true });
     }
     
+    // Check if model.h5 file exists in various locations
+    const modelPath = path.join(__dirname, 'model.h5');
+    const userModelPath = 'C:\\Users\\H\\Desktop\\app\\model.h5';
+    
+    if (fs.existsSync(modelPath)) {
+      console.log('Model found at:', modelPath);
+    } else if (fs.existsSync(userModelPath)) {
+      console.log('Model found at:', userModelPath);
+    } else {
+      console.log('Model not found. You will need to browse for it in the application.');
+    }
+    
     console.log('Starting Electron app in development mode...');
     
     // Use npx vite with the full path to node_modules/.bin/vite to avoid "not found" errors
     console.log('Starting Vite development server...');
-    const viteProcess = exec('node ./node_modules/vite/bin/vite.js', { 
+    const viteProcess = exec('node ./node_modules/vite/bin/vite.js --port 8080', { 
       cwd: __dirname,
       env: process.env
     });

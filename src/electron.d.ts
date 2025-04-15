@@ -6,6 +6,8 @@ interface ElectronAPI {
   checkModelFormat: (modelPath: string) => Promise<{format?: string, path?: string, error?: string}>;
   readModelFile: (filePath: string) => Promise<{success: boolean, data?: string, error?: string}>;
   readModelDir: (dirPath: string) => Promise<string[] | {error: string}>;
+  checkFileExists: (filePath: string) => Promise<boolean>;
+  browseForModel: () => Promise<string | null>;
   isElectron: boolean;
   analyzeWithH5Model: (modelPath: string, imageDataUrl: string) => Promise<{
     detectedCells?: Array<{

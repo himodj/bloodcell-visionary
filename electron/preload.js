@@ -30,6 +30,12 @@ let electronAPI = {
   // Read files in a directory
   readModelDir: (dirPath) => ipcRenderer.invoke('read-model-dir', dirPath),
   
+  // New: Browse for model file with dialog
+  browseForModel: () => ipcRenderer.invoke('browse-for-model'),
+  
+  // New: Check if a file exists
+  checkFileExists: (filePath) => ipcRenderer.invoke('check-file-exists', filePath),
+  
   // Default implementation that will be replaced if axios loads
   analyzeWithH5Model: async (modelPath, imageDataUrl) => {
     console.log('Using fallback analyzeWithH5Model implementation - axios not loaded');
@@ -63,11 +69,12 @@ if (axios) {
   // Override the default implementation with the actual one
   electronAPI.analyzeWithH5Model = async (modelPath, imageDataUrl) => {
     try {
-      console.log('Sending image to Python backend for analysis');
+      console.log('Sending image to Python backend for analysis with model path:', modelPath);
       
       // Send the image to the Python server
       const response = await axios.post('http://localhost:5000/predict', {
-        image: imageDataUrl
+        image: imageDataUrl,
+        modelPath: modelPath // Pass the model path to the Python backend
       });
       
       console.log('Received prediction from Python backend');

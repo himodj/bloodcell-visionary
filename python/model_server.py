@@ -22,28 +22,52 @@ logger.addHandler(stderr_handler)
 
 app = Flask(__name__)
 
-# Load model once at startup
-model = None
-try:
-    model_path = os.environ.get('MODEL_PATH', 'model.h5')
-    logger.info(f"Loading model from {model_path}")
-    
-    if os.path.exists(model_path):
-        logger.info(f"Model file found: {model_path}")
-        model = tf.keras.models.load_model(model_path)
-        logger.info(f"Model loaded successfully from {model_path}")
-    else:
-        logger.error(f"Model file not found at {model_path}")
-        # Don't fail immediately, provide a fallback mechanism
-except Exception as e:
-    logger.error(f"Error loading model: {e}")
-    logger.error(traceback.format_exc())
+# Dictionary to cache loaded models
+model_cache = {}
+
+# Get default model path from environment
+default_model_path = os.environ.get('MODEL_PATH', 'model.h5')
+if os.path.exists(default_model_path):
+    logger.info(f"Default model file found: {default_model_path}")
+    try:
+        # Load the default model at startup if available
+        model_cache[default_model_path] = tf.keras.models.load_model(default_model_path)
+        logger.info(f"Default model loaded successfully from {default_model_path}")
+    except Exception as e:
+        logger.error(f"Error loading default model: {e}")
+        logger.error(traceback.format_exc())
+else:
+    logger.warning(f"Default model file not found at {default_model_path}")
 
 # Class labels (update with your actual classes)
 class_labels = [
     'Basophil', 'Eosinophil', 'Erythroblast', 'IGImmatureWhiteCell',
     'Lymphocyte', 'Monocyte', 'Neutrophil', 'Platelet', 'RBC'
 ]
+
+def load_model(model_path):
+    """
+    Load a model from the specified path, with caching.
+    Returns the model, or None if loading fails.
+    """
+    if model_path in model_cache:
+        logger.info(f"Using cached model from {model_path}")
+        return model_cache[model_path]
+    
+    if not os.path.exists(model_path):
+        logger.error(f"Model file not found at {model_path}")
+        return None
+    
+    try:
+        logger.info(f"Loading model from {model_path}")
+        model = tf.keras.models.load_model(model_path)
+        logger.info(f"Model loaded successfully from {model_path}")
+        model_cache[model_path] = model
+        return model
+    except Exception as e:
+        logger.error(f"Error loading model from {model_path}: {e}")
+        logger.error(traceback.format_exc())
+        return None
 
 def preprocess_image(image_data):
     """
@@ -130,13 +154,23 @@ def get_fallback_result():
 def predict():
     logger.info("Received prediction request")
     
-    if model is None:
-        logger.error("Model not loaded, returning fallback result")
-        return jsonify(get_fallback_result())
-    
     if 'image' not in request.json:
         logger.error("No image provided in request")
         return jsonify({'error': 'No image provided'}), 400
+    
+    # Get model path from request or use default
+    model_path = request.json.get('modelPath', default_model_path)
+    logger.info(f"Using model path: {model_path}")
+    
+    # Load the model based on the provided path
+    model = load_model(model_path)
+    
+    if model is None:
+        logger.error(f"Model could not be loaded from {model_path}, returning fallback result")
+        return jsonify({
+            **get_fallback_result(),
+            'error': f'Could not load model from {model_path}'
+        })
         
     try:
         # Get image from request
@@ -177,7 +211,8 @@ def predict():
         result = {
             'detectedCells': [cell],
             'cellCounts': cell_counts,
-            'timestamp': str(datetime.datetime.now())
+            'timestamp': str(datetime.datetime.now()),
+            'modelPath': model_path
         }
         
         return jsonify(result)
@@ -188,15 +223,26 @@ def predict():
         
         # Return fallback result instead of error
         logger.info("Returning fallback result due to processing error")
-        return jsonify(get_fallback_result())
+        fallback = get_fallback_result()
+        fallback['error'] = str(e)
+        return jsonify(fallback)
 
 @app.route('/health', methods=['GET'])
 def health_check():
     """Simple health check endpoint"""
     return jsonify({
         'status': 'ok',
-        'model_loaded': model is not None,
+        'models_loaded': list(model_cache.keys()),
         'timestamp': str(datetime.datetime.now())
+    })
+
+@app.route('/models', methods=['GET'])
+def list_models():
+    """List all loaded models"""
+    return jsonify({
+        'models': list(model_cache.keys()),
+        'default_model': default_model_path,
+        'model_count': len(model_cache)
     })
 
 if __name__ == '__main__':
@@ -205,7 +251,8 @@ if __name__ == '__main__':
     
     # Log server startup
     logger.info(f"Starting Flask server on port {port}")
-    logger.info(f"Model loaded: {model is not None}")
+    logger.info(f"Default model path: {default_model_path}")
+    logger.info(f"Default model loaded: {default_model_path in model_cache}")
     logger.info(f"Current working directory: {os.getcwd()}")
     
     # Run on port 5000 by default, make it accessible from outside
