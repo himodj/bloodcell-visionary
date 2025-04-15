@@ -12,6 +12,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { isModelInitialized } from '../utils/analysisUtils';
 
 const ModelLoader: React.FC = () => {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
@@ -28,8 +29,15 @@ const ModelLoader: React.FC = () => {
     const isElectronEnv = !!window.electron?.isElectron;
     setIsElectron(isElectronEnv);
     
-    // Try to auto-load the model if we're in Electron
-    if (isElectronEnv) {
+    // Also check if model is already initialized (to handle page refreshes)
+    const modelAlreadyInitialized = isModelInitialized();
+    if (modelAlreadyInitialized) {
+      setIsModelLoaded(true);
+      console.log('Model already initialized on component mount');
+    }
+    
+    // Try to auto-load the model if we're in Electron and model not already loaded
+    if (isElectronEnv && !modelAlreadyInitialized) {
       console.log('Electron environment detected, auto-loading model...');
       setTimeout(() => {
         loadDefaultModel();
