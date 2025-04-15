@@ -5,7 +5,7 @@ import './index.css';
 import { initializeModel } from './utils/analysisUtils';
 import { toast } from 'sonner';
 
-// Check if we're running in Electron - make sure this works correctly
+// Check if we're running in Electron
 const isElectron = typeof window !== 'undefined' && window.electron?.isElectron === true;
 
 // Keep track of loaded model state globally
@@ -22,23 +22,22 @@ let globalModelLoaded = false;
     try {
       let selectedModelPath = modelPath;
       
-      // If no model path was provided, prompt user to select one
+      // If no model path was provided, get the default model path
       if (!selectedModelPath) {
-        selectedModelPath = await window.electron.selectModel();
+        selectedModelPath = await window.electron.getDefaultModelPath();
       }
       
       if (!selectedModelPath) {
-        console.error('No model path selected or found');
-        toast.error('No model selected or found. Please ensure model.h5 is in the project directory.');
+        console.error('No model.h5 found in application directory');
+        toast.error('No model.h5 found. Please place model.h5 in the application directory.');
         globalModelLoaded = false;
         return false;
       }
       
-      console.log('Selected model path:', selectedModelPath);
+      console.log('Loading model from path:', selectedModelPath);
       
       // For H5 models, we need special handling
       if (selectedModelPath.toLowerCase().endsWith('.h5')) {
-        toast.success('H5 model detected. Loading specialized analysis engine.');
         console.log('Loading H5 model:', selectedModelPath);
         
         try {

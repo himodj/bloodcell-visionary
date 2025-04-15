@@ -215,13 +215,30 @@ app.on('will-quit', () => {
 });
 
 function getModelPath() {
-  console.log('Looking for model.h5 file in various locations...');
+  console.log('Looking for model.h5 file in application directory...');
   
-  const userSpecifiedPath = 'C:\\Users\\H\\Desktop\\app\\model.h5';
-  console.log('Checking user-specified model path:', userSpecifiedPath);
-  if (fs.existsSync(userSpecifiedPath)) {
-    console.log('✅ Found model at user-specified path:', userSpecifiedPath);
-    return userSpecifiedPath;
+  // First check the app root directory (top priority)
+  const appRootModelPath = path.join(app.getAppPath(), 'model.h5');
+  console.log('Checking app root directory:', appRootModelPath);
+  if (fs.existsSync(appRootModelPath)) {
+    console.log('✅ Found model at application root:', appRootModelPath);
+    return appRootModelPath;
+  }
+  
+  // Then check current working directory
+  const cwdModelPath = path.join(process.cwd(), 'model.h5');
+  console.log('Checking current working directory:', cwdModelPath);
+  if (fs.existsSync(cwdModelPath)) {
+    console.log('✅ Found model in current working directory:', cwdModelPath);
+    return cwdModelPath;
+  }
+  
+  // Then check one level up from app path
+  const parentDirModelPath = path.join(app.getAppPath(), '..', 'model.h5');
+  console.log('Checking parent directory:', parentDirModelPath);
+  if (fs.existsSync(parentDirModelPath)) {
+    console.log('✅ Found model in parent directory:', parentDirModelPath);
+    return parentDirModelPath;
   }
   
   if (isDev) {
@@ -240,24 +257,11 @@ function getModelPath() {
     return prodModelPath;
   }
 
-  const appModelPath = path.join(app.getAppPath(), 'model.h5');
-  console.log('Checking app model path:', appModelPath);
-  if (fs.existsSync(appModelPath)) {
-    console.log('✅ Found model at', appModelPath);
-    return appModelPath;
-  }
-  
-  const packagedAppPath = path.join(app.getAppPath(), '..', 'model.h5');
-  console.log('Checking packaged app path:', packagedAppPath);
-  if (fs.existsSync(packagedAppPath)) {
-    console.log('✅ Found model at', packagedAppPath);
-    return packagedAppPath;
-  }
-  
   console.log('❌ Model not found in any location');
   return null;
 }
 
+// Update the ipcMain.handle for select-model to use the new getModelPath function
 ipcMain.handle('select-model', async () => {
   try {
     const modelPath = getModelPath();
@@ -278,7 +282,7 @@ ipcMain.handle('select-model', async () => {
             dialog.showMessageBox(mainWindow, {
               type: 'warning',
               title: 'Invalid Model Format',
-              message: 'The file exists but doesn\'t appear to be a valid H5 model file. Please ensure you\'re using the correct model format.',
+              message: 'The file exists but doesn\'t appear to be a valid H5 model file.',
               buttons: ['OK']
             });
           }
@@ -291,20 +295,15 @@ ipcMain.handle('select-model', async () => {
       
       return modelPath;
     } else {
-      console.log('Model not found automatically, letting user know to add model.h5');
+      console.log('Model not found in application directory.');
       
       if (mainWindow) {
-        const result = await dialog.showMessageBox(mainWindow, {
+        dialog.showMessageBox(mainWindow, {
           type: 'warning',
           title: 'Model Not Found',
-          message: 'model.h5 file is required but not found. Would you like to browse for it now?',
-          buttons: ['Yes', 'No'],
-          defaultId: 0
+          message: 'model.h5 file is required but not found in the application directory.',
+          buttons: ['OK']
         });
-        
-        if (result.response === 0) {
-          return ipcMain.handle('browse-for-model')();
-        }
       }
       
       return null;
@@ -323,6 +322,7 @@ ipcMain.handle('select-model', async () => {
   }
 });
 
+// Update the get-default-model-path handler to use the getModelPath function
 ipcMain.handle('get-default-model-path', async () => {
   try {
     const modelPath = getModelPath();
