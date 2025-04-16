@@ -71,10 +71,11 @@ try {
         const axiosConfig = {
           headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Access-Control-Allow-Origin': '*'
           },
           // Increase timeout to allow for model loading/processing
-          timeout: 30000 
+          timeout: 60000 
         };
         
         // Send the image to the Python server
@@ -100,6 +101,10 @@ try {
         } else if (error.code === 'ERR_NETWORK') {
           errorMessage = 'Network error communicating with Python server';
           errorDetails = 'Check that the server is running and port 5000 is not blocked';
+        } else if (error.response) {
+          // The server responded with a status code outside the 2xx range
+          errorMessage = `Server error (${error.response.status})`;
+          errorDetails = error.response.data.error || error.response.statusText;
         }
         
         return {

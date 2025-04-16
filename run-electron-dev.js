@@ -56,7 +56,7 @@ async function main() {
     
     // Use npx vite with the full path to node_modules/.bin/vite to avoid "not found" errors
     console.log('Starting Vite development server...');
-    const viteProcess = exec('node ./node_modules/vite/bin/vite.js --port 8080', { 
+    const viteProcess = exec('npx vite --port 8080', { 
       cwd: __dirname,
       env: process.env
     });
