@@ -1,4 +1,3 @@
-
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -10,13 +9,21 @@ let mainWindow;
 let pythonProcess = null;
 
 function createWindow() {
-  // Determine the correct preload script path
+  // Determine the correct preload script path - use absolute path
   const preloadPath = path.join(__dirname, 'preload.js');
   console.log('Using preload script at:', preloadPath);
   
   // Make sure the preload script exists
   if (!fs.existsSync(preloadPath)) {
     console.error(`ERROR: Preload script not found at: ${preloadPath}`);
+    
+    // Log directory contents for debugging
+    try {
+      const dirContents = fs.readdirSync(__dirname);
+      console.log('Directory contents:', dirContents);
+    } catch (err) {
+      console.error('Could not read directory:', err);
+    }
   }
 
   mainWindow = new BrowserWindow({
@@ -27,6 +34,7 @@ function createWindow() {
       contextIsolation: true,
       preload: preloadPath,
       webSecurity: true,
+      sandbox: false, // Disable sandbox to allow Node.js modules in preload
     },
     title: "BloodCell Analyzer",
     icon: path.join(__dirname, 'icon.ico')
@@ -281,7 +289,6 @@ function getModelPath() {
   return null;
 }
 
-// Update the ipcMain.handle for select-model to use the getModelPath function
 ipcMain.handle('select-model', async () => {
   try {
     const modelPath = getModelPath();
@@ -342,7 +349,6 @@ ipcMain.handle('select-model', async () => {
   }
 });
 
-// Update the get-default-model-path handler to use the getModelPath function
 ipcMain.handle('get-default-model-path', async () => {
   try {
     const modelPath = getModelPath();
@@ -458,6 +464,11 @@ ipcMain.handle('test-axios', async () => {
 ipcMain.handle('browse-for-model', async () => {
   try {
     console.log('Opening file dialog to browse for model...');
+    
+    if (!mainWindow) {
+      console.error('Main window not available');
+      return null;
+    }
     
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: ['openFile'],
