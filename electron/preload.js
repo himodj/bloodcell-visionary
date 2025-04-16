@@ -67,20 +67,43 @@ try {
       try {
         console.log('Sending image to Python backend for analysis with model path:', modelPath);
         
+        // Configure axios with CORS settings
+        const axiosConfig = {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          // Increase timeout to allow for model loading/processing
+          timeout: 30000 
+        };
+        
         // Send the image to the Python server
         const response = await axios.post('http://localhost:5000/predict', {
           image: imageDataUrl,
-          modelPath: modelPath // Pass the model path to the Python backend
-        });
+          modelPath: modelPath
+        }, axiosConfig);
         
-        console.log('Received prediction from Python backend');
+        console.log('Received prediction from Python backend:', response.status);
         
         // Return the prediction result
         return response.data;
       } catch (error) {
         console.error('Error communicating with Python backend:', error);
+        
+        let errorMessage = 'Failed to analyze image';
+        let errorDetails = error.message;
+        
+        // Check for specific error types to provide better error messages
+        if (error.code === 'ECONNREFUSED') {
+          errorMessage = 'Python server is not running or not accessible';
+          errorDetails = 'Make sure the Python server is running on port 5000';
+        } else if (error.code === 'ERR_NETWORK') {
+          errorMessage = 'Network error communicating with Python server';
+          errorDetails = 'Check that the server is running and port 5000 is not blocked';
+        }
+        
         return {
-          error: `Failed to analyze image: ${error.message}`,
+          error: `${errorMessage}: ${errorDetails}`,
           stack: error.stack
         };
       }

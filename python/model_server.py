@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify
 import tensorflow as tf
 import numpy as np
@@ -10,6 +9,7 @@ import datetime
 import traceback
 import logging
 import sys
+from flask_cors import CORS
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -21,6 +21,7 @@ stderr_handler.setLevel(logging.ERROR)
 logger.addHandler(stderr_handler)
 
 app = Flask(__name__)
+CORS(app)
 
 # Dictionary to cache loaded models
 model_cache = {}
@@ -150,8 +151,14 @@ def get_fallback_result():
         'status': 'fallback'
     }
 
-@app.route('/predict', methods=['POST'])
+@app.route('/predict', methods=['POST', 'OPTIONS'])
 def predict():
+    # Handle preflight requests
+    if request.method == 'OPTIONS':
+        response = app.make_default_options_response()
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        return response
+        
     logger.info("Received prediction request")
     
     if 'image' not in request.json:

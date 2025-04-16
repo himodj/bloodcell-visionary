@@ -87,6 +87,37 @@ function createWindow() {
 function startPythonServer() {
   const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
   
+  // Install flask-cors if needed
+  try {
+    console.log('Installing required Python packages...');
+    const pipInstall = spawn(pythonCommand, ['-m', 'pip', 'install', 'flask-cors']);
+    
+    pipInstall.stdout.on('data', (data) => {
+      console.log(`pip install output: ${data}`);
+    });
+    
+    pipInstall.stderr.on('data', (data) => {
+      console.log(`pip install error: ${data}`);
+    });
+    
+    pipInstall.on('close', (code) => {
+      console.log(`pip install exited with code ${code}`);
+      if (code === 0) {
+        console.log('Successfully installed flask-cors');
+        startActualPythonServer();
+      } else {
+        console.warn('Failed to install flask-cors, trying to start server anyway');
+        startActualPythonServer();
+      }
+    });
+  } catch (error) {
+    console.error('Error installing flask-cors:', error);
+    startActualPythonServer();
+  }
+}
+
+function startActualPythonServer() {
+  const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
   const env = Object.assign({}, process.env);
   env.MODEL_PATH = getModelPath();
   
@@ -109,47 +140,33 @@ function startPythonServer() {
   }
   
   if (!fs.existsSync(scriptPath)) {
-    try {
-      const possibleSourcePaths = [
-        path.join(app.getAppPath(), 'python', 'model_server.py'),
-        path.join(__dirname, '..', 'python', 'model_server.py'),
-        path.join(process.resourcesPath, 'app.asar', 'python', 'model_server.py')
-      ];
-      
-      let sourceFile = null;
-      for (const sourcePath of possibleSourcePaths) {
-        if (fs.existsSync(sourcePath)) {
-          sourceFile = sourcePath;
-          console.log(`Found source Python script at: ${sourcePath}`);
-          break;
-        }
+    const possibleSourcePaths = [
+      path.join(app.getAppPath(), 'python', 'model_server.py'),
+      path.join(__dirname, '..', 'python', 'model_server.py'),
+      path.join(process.resourcesPath, 'app.asar', 'python', 'model_server.py')
+    ];
+    
+    let sourceFile = null;
+    for (const sourcePath of possibleSourcePaths) {
+      if (fs.existsSync(sourcePath)) {
+        sourceFile = sourcePath;
+        console.log(`Found source Python script at: ${sourcePath}`);
+        break;
       }
-      
-      if (sourceFile) {
-        fs.mkdirSync(path.dirname(scriptPath), { recursive: true });
-        fs.copyFileSync(sourceFile, scriptPath);
-        console.log(`Copied Python script from ${sourceFile} to ${scriptPath}`);
-      } else {
-        console.error(`Python script not found at any of the expected locations`);
-        
-        if (mainWindow) {
-          dialog.showMessageBox(mainWindow, {
-            type: 'error',
-            title: 'Server Error',
-            message: `Python script not found. The application may not work correctly.`,
-            buttons: ['OK']
-          });
-        }
-        return;
-      }
-    } catch (error) {
-      console.error(`Error copying Python script: ${error.message}`);
+    }
+    
+    if (sourceFile) {
+      fs.mkdirSync(path.dirname(scriptPath), { recursive: true });
+      fs.copyFileSync(sourceFile, scriptPath);
+      console.log(`Copied Python script from ${sourceFile} to ${scriptPath}`);
+    } else {
+      console.error(`Python script not found at any of the expected locations`);
       
       if (mainWindow) {
         dialog.showMessageBox(mainWindow, {
           type: 'error',
           title: 'Server Error',
-          message: `Failed to copy Python script: ${error.message}. The application may not work correctly.`,
+          message: `Python script not found. The application may not work correctly.`,
           buttons: ['OK']
         });
       }
