@@ -8,6 +8,12 @@ import { toast } from 'sonner';
 // Check if we're running in Electron
 const isElectron = typeof window !== 'undefined' && window.electron?.isElectron === true;
 
+// Log the Electron status for debugging
+console.log('Electron environment detected:', isElectron);
+if (!isElectron) {
+  console.warn('Electron API not available. Model loading functionality will be limited.');
+}
+
 // Keep track of loaded model state globally
 let globalModelLoaded = false;
 
@@ -24,7 +30,9 @@ let globalModelLoaded = false;
       
       // If no model path was provided, get the default model path
       if (!selectedModelPath) {
+        console.log('Requesting default model path from Electron...');
         selectedModelPath = await window.electron.getDefaultModelPath();
+        console.log('Received default model path:', selectedModelPath);
       }
       
       if (!selectedModelPath) {

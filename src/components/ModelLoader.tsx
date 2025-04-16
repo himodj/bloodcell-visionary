@@ -11,49 +11,61 @@ const ModelLoader: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isElectron, setIsElectron] = useState(false);
   const [modelPath, setModelPath] = useState<string | null>(null);
-  const [isH5Model, setIsH5Model] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Check if we're in Electron on component mount and periodically check model state
   useEffect(() => {
-    const isElectronEnv = !!window.electron?.isElectron;
-    setIsElectron(isElectronEnv);
-    
-    // Try to auto-load the model if we're in Electron
-    if (isElectronEnv) {
-      console.log('Electron environment detected, auto-loading model...');
-      setTimeout(() => {
-        loadDefaultModel();
-      }, 1000);
+    try {
+      const isElectronEnv = !!window.electron?.isElectron;
+      setIsElectron(isElectronEnv);
+      
+      console.log('Electron environment check:', isElectronEnv);
+      
+      // Try to auto-load the model if we're in Electron
+      if (isElectronEnv) {
+        console.log('Electron environment detected, auto-loading model...');
+        setTimeout(() => {
+          loadDefaultModel();
+        }, 1000);
+      }
+
+      // Set up a periodic check for model state
+      const interval = setInterval(() => {
+        const modelInitialized = isModelInitialized();
+        console.log('Model initialized check:', modelInitialized);
+        setIsModelLoaded(modelInitialized);
+      }, 2000);
+
+      return () => clearInterval(interval);
+    } catch (err) {
+      console.error('Error in ModelLoader useEffect:', err);
     }
-
-    // Set up a periodic check for model state
-    const interval = setInterval(() => {
-      setIsModelLoaded(isModelInitialized());
-    }, 2000);
-
-    return () => clearInterval(interval);
   }, []);
 
   // Function to load default model
   const loadDefaultModel = async () => {
     if (!window.electron) {
       console.error('Electron API not available');
+      setLoadError('Electron API not available. This feature requires the desktop application.');
       return;
     }
     
     try {
       setIsLoading(true);
       setLoadError(null);
+      
+      console.log('Requesting default model path from Electron...');
       const modelPath = await window.electron.getDefaultModelPath();
+      console.log('Received model path:', modelPath);
       
       if (modelPath) {
         console.log('Default model found at:', modelPath);
         setModelPath(modelPath);
-        setIsH5Model(true);
         
         // Call the global function we defined in main.tsx to load the model
+        console.log('Calling loadModel function...');
         const success = await (window as any).loadModel(modelPath);
+        
         if (success) {
           setIsModelLoaded(true);
           toast.success(`Model loaded successfully from: ${modelPath}`);
@@ -90,7 +102,9 @@ const ModelLoader: React.FC = () => {
     try {
       // Call the global function we defined in main.tsx with no parameter
       // to trigger a search for model.h5 in the default locations
+      console.log('Attempting to load model...');
       const success = await (window as any).loadModel();
+      
       if (success) {
         setIsModelLoaded(true);
         toast.success('Model loaded successfully');

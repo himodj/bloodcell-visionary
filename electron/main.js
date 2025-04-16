@@ -9,13 +9,22 @@ let mainWindow;
 let pythonProcess = null;
 
 function createWindow() {
+  // Determine the correct preload script path
+  const preloadPath = path.resolve(__dirname, 'preload.js');
+  console.log('Using preload script at:', preloadPath);
+  
+  // Make sure the preload script exists
+  if (!fs.existsSync(preloadPath)) {
+    console.error(`ERROR: Preload script not found at: ${preloadPath}`);
+  }
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
+      preload: preloadPath,
       webSecurity: true,
     },
     title: "BloodCell Analyzer",
