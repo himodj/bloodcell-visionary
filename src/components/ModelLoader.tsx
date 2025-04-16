@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Database, Check, RefreshCw } from 'lucide-react';
+import { Database, Check, RefreshCw, Download } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { isModelInitialized } from "../utils/analysisUtils";
 
@@ -74,7 +74,7 @@ const ModelLoader: React.FC = () => {
           toast.error('Found model but failed to load. Check console for details.');
         }
       } else {
-        const errorMsg = 'No model.h5 found in application directory. Please ensure model.h5 exists in the same folder as the application.';
+        const errorMsg = 'No model.h5 found. Please place model.h5 in the same folder as the application.';
         console.warn(errorMsg);
         setLoadError(errorMsg);
         toast.warning(errorMsg);
@@ -109,8 +109,8 @@ const ModelLoader: React.FC = () => {
         setIsModelLoaded(true);
         toast.success('Model loaded successfully');
       } else {
-        setLoadError('Could not find model.h5 in application directory.');
-        toast.error('Could not find model.h5 in application directory.');
+        setLoadError('Could not find model.h5. Please place model.h5 in the application directory.');
+        toast.error('Could not find model.h5. Please place model.h5 in the application directory.');
       }
     } catch (error) {
       console.error('Error loading model:', error);
@@ -187,8 +187,17 @@ const ModelLoader: React.FC = () => {
         )}
         
         {!isElectron && (
-          <div className="text-sm text-amber-600 flex items-center p-2 bg-amber-50 rounded border border-amber-200">
-            <span>Model loading requires desktop application. This app must be run in Electron mode.</span>
+          <div className="text-sm flex flex-col sm:flex-row items-start sm:items-center p-2 bg-amber-50 rounded border border-amber-200">
+            <span className="text-amber-600 mr-2">Model loading requires desktop app.</span>
+            <a 
+              href="https://github.com/yourusername/bloodcell-analyzer/releases" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-600 flex items-center hover:underline"
+            >
+              <Download size={14} className="mr-1" />
+              Download
+            </a>
           </div>
         )}
       </div>

@@ -1,3 +1,4 @@
+
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -10,7 +11,7 @@ let pythonProcess = null;
 
 function createWindow() {
   // Determine the correct preload script path
-  const preloadPath = path.resolve(__dirname, 'preload.js');
+  const preloadPath = path.join(__dirname, 'preload.js');
   console.log('Using preload script at:', preloadPath);
   
   // Make sure the preload script exists
@@ -50,6 +51,7 @@ function createWindow() {
   console.log('Loading URL:', startUrl);
   console.log('Environment:', process.env.NODE_ENV);
   console.log('App path:', app.getAppPath());
+  console.log('Current working directory:', process.cwd());
   
   if (isDev) {
     try {
@@ -226,7 +228,15 @@ app.on('will-quit', () => {
 function getModelPath() {
   console.log('Looking for model.h5 file in application directory...');
   
-  // First check the app root directory (top priority)
+  // First check the current directory where the app is running
+  const currentDirModelPath = path.join(process.cwd(), 'model.h5');
+  console.log('Checking current directory:', currentDirModelPath);
+  if (fs.existsSync(currentDirModelPath)) {
+    console.log('✅ Found model in current directory:', currentDirModelPath);
+    return currentDirModelPath;
+  }
+  
+  // Check the app root directory (top priority)
   const appRootModelPath = path.join(app.getAppPath(), 'model.h5');
   console.log('Checking app root directory:', appRootModelPath);
   if (fs.existsSync(appRootModelPath)) {
@@ -234,12 +244,13 @@ function getModelPath() {
     return appRootModelPath;
   }
   
-  // Then check current working directory
-  const cwdModelPath = path.join(process.cwd(), 'model.h5');
-  console.log('Checking current working directory:', cwdModelPath);
-  if (fs.existsSync(cwdModelPath)) {
-    console.log('✅ Found model in current working directory:', cwdModelPath);
-    return cwdModelPath;
+  // Check the directory where the executable is located
+  const execDir = path.dirname(app.getPath('exe'));
+  const execDirModelPath = path.join(execDir, 'model.h5');
+  console.log('Checking executable directory:', execDirModelPath);
+  if (fs.existsSync(execDirModelPath)) {
+    console.log('✅ Found model in executable directory:', execDirModelPath);
+    return execDirModelPath;
   }
   
   // Then check one level up from app path
@@ -270,7 +281,7 @@ function getModelPath() {
   return null;
 }
 
-// Update the ipcMain.handle for select-model to use the new getModelPath function
+// Update the ipcMain.handle for select-model to use the getModelPath function
 ipcMain.handle('select-model', async () => {
   try {
     const modelPath = getModelPath();
