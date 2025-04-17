@@ -1,3 +1,4 @@
+
 from flask import Flask, request, jsonify
 import tensorflow as tf
 import numpy as np
@@ -80,7 +81,8 @@ def preprocess_image(image_data):
     1. Decode base64 to image
     2. Center crop to square
     3. Resize to 360x360
-    4. Normalize pixel values
+    4. Convert to RGB (ensure 3 channels)
+    5. Normalize pixel values
     """
     try:
         # Decode base64 image
@@ -93,6 +95,11 @@ def preprocess_image(image_data):
         
         img = Image.open(io.BytesIO(base64.b64decode(image_data)))
         logger.info(f"Successfully decoded image: {img.size}, mode: {img.mode}")
+        
+        # Convert to RGB mode if it's not already
+        if img.mode != 'RGB':
+            logger.info(f"Converting image from {img.mode} to RGB mode")
+            img = img.convert('RGB')
         
         # Get dimensions for center crop
         width, height = img.size
@@ -107,10 +114,13 @@ def preprocess_image(image_data):
         # Crop and resize
         img = img.crop((left, top, right, bottom))
         img = img.resize((360, 360), Image.LANCZOS)
-        logger.info(f"Cropped and resized image to 360x360")
+        logger.info(f"Cropped and resized image to 360x360, mode: {img.mode}")
         
         # Convert to numpy array and normalize
         img_array = np.array(img) / 255.0
+        
+        # Log the shape to verify it's correct
+        logger.info(f"Image shape after processing: {img_array.shape}")
         
         # Add batch dimension
         img_array = np.expand_dims(img_array, axis=0)
@@ -121,39 +131,7 @@ def preprocess_image(image_data):
         logger.error(traceback.format_exc())
         raise
 
-def get_fallback_result():
-    """Provide a fallback result when the model fails"""
-    # Pick a random cell type
-    import random
-    cell_type = random.choice(class_labels)
-    confidence = 0.7 + random.random() * 0.25
-    
-    logger.warning(f"Using fallback prediction: {cell_type} with confidence {confidence:.4f}")
-    
-    # Create single detected cell
-    cell = {
-        "type": cell_type,
-        "confidence": confidence,
-        "boundingBox": {
-            "x": 120,  # Center of image
-            "y": 120,
-            "width": 120,
-            "height": 120
-        }
-    }
-    
-    # Initialize cell counts with zeros
-    cell_counts = {label: 0 for label in class_labels}
-    
-    # Set count to 1 for the detected cell type
-    cell_counts[cell_type] = 1
-    
-    return {
-        'detectedCells': [cell],
-        'cellCounts': cell_counts,
-        'timestamp': str(datetime.datetime.now()),
-        'status': 'fallback'
-    }
+# ... keep existing code (get_fallback_result function and other helper functions)
 
 @app.route('/predict', methods=['POST', 'OPTIONS'])
 def predict():
@@ -191,6 +169,9 @@ def predict():
         
         # Preprocess image
         processed_image = preprocess_image(image_data)
+        
+        # Log the processed image shape to verify dimensions
+        logger.info(f"Processed image shape before prediction: {processed_image.shape}")
         
         # Get prediction from model
         prediction = model.predict(processed_image)
@@ -240,23 +221,7 @@ def predict():
         fallback['error'] = str(e)
         return jsonify(fallback)
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Simple health check endpoint"""
-    return jsonify({
-        'status': 'ok',
-        'models_loaded': list(model_cache.keys()),
-        'timestamp': str(datetime.datetime.now())
-    })
-
-@app.route('/models', methods=['GET'])
-def list_models():
-    """List all loaded models"""
-    return jsonify({
-        'models': list(model_cache.keys()),
-        'default_model': default_model_path,
-        'model_count': len(model_cache)
-    })
+# ... keep existing code (health_check and list_models endpoints)
 
 if __name__ == '__main__':
     # Get port from environment or use default

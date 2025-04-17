@@ -1,4 +1,3 @@
-
 import * as tf from '@tensorflow/tfjs';
 import { AnalysisResult, CellCount, CellType, DetectedCell } from '../contexts/AnalysisContext';
 import { toast } from 'sonner';
@@ -109,6 +108,10 @@ export const resizeImageWithCenterCrop = (imageDataUrl: string): Promise<string>
         return;
       }
       
+      // Fill with white background to ensure we have RGB only
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
       // Calculate aspect ratio to determine positioning for center crop
       const sourceWidth = img.width;
       const sourceHeight = img.height;
@@ -134,8 +137,8 @@ export const resizeImageWithCenterCrop = (imageDataUrl: string): Promise<string>
         0, 0, 360, 360 // Destination rectangle (full 360x360 canvas)
       );
       
-      // Get the resized image as data URL
-      const resizedImageDataUrl = canvas.toDataURL('image/png');
+      // Get the resized image as data URL (explicitly specify output format as PNG)
+      const resizedImageDataUrl = canvas.toDataURL('image/png', 1.0);
       resolve(resizedImageDataUrl);
     };
     
