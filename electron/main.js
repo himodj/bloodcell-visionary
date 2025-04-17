@@ -1,4 +1,3 @@
-
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -88,10 +87,12 @@ function createWindow() {
 function startPythonServer() {
   const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
   
-  // Install flask-cors if needed
+  // Install necessary packages first
   try {
     console.log('Installing required Python packages...');
-    const pipInstall = spawn(pythonCommand, ['-m', 'pip', 'install', 'flask', 'flask-cors']);
+    // Install all required packages according to the requirements.txt
+    const packagesToInstall = ['flask', 'flask-cors', 'tensorflow', 'pillow', 'numpy'];
+    const pipInstall = spawn(pythonCommand, ['-m', 'pip', 'install', ...packagesToInstall]);
     
     pipInstall.stdout.on('data', (data) => {
       console.log(`pip install output: ${data}`);
@@ -103,16 +104,10 @@ function startPythonServer() {
     
     pipInstall.on('close', (code) => {
       console.log(`pip install exited with code ${code}`);
-      if (code === 0) {
-        console.log('Successfully installed flask-cors');
-        startActualPythonServer();
-      } else {
-        console.warn('Failed to install flask-cors, trying to start server anyway');
-        startActualPythonServer();
-      }
+      startActualPythonServer();
     });
   } catch (error) {
-    console.error('Error installing flask-cors:', error);
+    console.error('Error installing Python packages:', error);
     startActualPythonServer();
   }
 }

@@ -67,12 +67,11 @@ try {
       try {
         console.log('Sending image to Python backend for analysis with model path:', modelPath);
         
-        // Configure axios with CORS settings
+        // Configure axios with CORS settings - remove the Access-Control-Allow-Origin header from client requests
         const axiosConfig = {
           headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Accept': 'application/json'
           },
           // Increase timeout to allow for model loading/processing
           timeout: 60000 

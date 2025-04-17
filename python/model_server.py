@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify
 import tensorflow as tf
 import numpy as np
@@ -22,8 +21,11 @@ stderr_handler.setLevel(logging.ERROR)
 logger.addHandler(stderr_handler)
 
 app = Flask(__name__)
-# Enable CORS for all routes with all origins
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+# Enable CORS properly for all routes
+CORS(app, 
+     resources={r"/*": {"origins": "*"}}, 
+     allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Origin"],
+     supports_credentials=True)
 
 # Dictionary to cache loaded models
 model_cache = {}
@@ -158,7 +160,7 @@ def predict():
     # Handle preflight requests
     if request.method == 'OPTIONS':
         response = app.make_default_options_response()
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, Access-Control-Allow-Origin')
         response.headers.add('Access-Control-Allow-Methods', 'POST')
         response.headers.add('Access-Control-Allow-Origin', '*')
         return response
