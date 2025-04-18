@@ -21,7 +21,7 @@ const AnalysisResults: React.FC = () => {
   const pieData = Object.entries(cellCounts.detectedCells).map(([type, count]) => ({
     name: type,
     value: count,
-    color: getCellTypeColor(type)
+    color: getCellTypeColor(type as any)
   })).filter(item => item.value > 0);
   
   // Calculate average confidence level
