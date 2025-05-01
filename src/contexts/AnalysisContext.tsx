@@ -42,18 +42,21 @@ export interface AnalysisResult {
   abnormalityRate: number;
   recommendations: string[];
   possibleConditions: string[];
+  notes?: string; // Added notes field
 }
 
 // Define the context interface
 interface AnalysisContextType {
   isAnalyzing: boolean;
   analysisResult: AnalysisResult | null;
+  originalImage: string | null; // Added originalImage field
   startAnalysis: () => void;
   finishAnalysis: (result: AnalysisResult) => void;
   resetAnalysis: () => void;
   updateRecommendations: (recommendations: string[]) => void;
   updatePossibleConditions: (conditions: string[]) => void;
   updateProcessedImage: (imageUrl: string) => void;
+  setOriginalImage: (imageUrl: string | null) => void; // Added setOriginalImage function
 }
 
 // Create the context
@@ -68,6 +71,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
   // State variables
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [originalImage, setOriginalImage] = useState<string | null>(null); // Added originalImage state
 
   // Analysis workflow functions
   const startAnalysis = () => {
@@ -83,6 +87,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
   const resetAnalysis = () => {
     setIsAnalyzing(false);
     setAnalysisResult(null);
+    setOriginalImage(null); // Also reset the original image
   };
 
   // Update functions
@@ -116,12 +121,14 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
       value={{
         isAnalyzing,
         analysisResult,
+        originalImage,
         startAnalysis,
         finishAnalysis,
         resetAnalysis,
         updateRecommendations,
         updatePossibleConditions,
         updateProcessedImage,
+        setOriginalImage,
       }}
     >
       {children}

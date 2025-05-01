@@ -263,4 +263,3 @@ const ReportGenerator: React.FC = () => {
 };
 
 export default ReportGenerator;
-

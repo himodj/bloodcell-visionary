@@ -1,13 +1,13 @@
 
 import React, { useState, useRef } from 'react';
 import { useAnalysis } from '../contexts/AnalysisContext';
-import { handleImageUpload, resizeImageWithCenterCrop } from '../utils/analysisUtils';
+import { handleImageUpload, analyzeImage, resizeImageWithCenterCrop } from '../utils/analysisUtils';
 import { Button } from '@/components/ui/button';
 import { Upload, ImagePlus, X, Microscope, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 
 const ImageUploader: React.FC = () => {
-  const { setOriginalImage, startAnalysis, originalImage, isAnalyzing } = useAnalysis();
+  const { setOriginalImage, startAnalysis, originalImage, isAnalyzing, finishAnalysis } = useAnalysis();
   const [isDragging, setIsDragging] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -148,6 +148,26 @@ const ImageUploader: React.FC = () => {
     }
   };
 
+  const handleStartAnalysis = async () => {
+    if (!originalImage) {
+      toast.error('Please upload an image first');
+      return;
+    }
+    
+    try {
+      startAnalysis();
+      const result = await analyzeImage(originalImage);
+      finishAnalysis(result);
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      if (error instanceof Error) {
+        toast.error(`Analysis failed: ${error.message}`);
+      } else {
+        toast.error('Analysis failed with an unknown error');
+      }
+    }
+  };
+
   return (
     <div className="w-full max-w-xl mx-auto mb-8 animate-scale-up">
       <div className="text-center mb-6">
@@ -248,7 +268,7 @@ const ImageUploader: React.FC = () => {
           
           <div className="p-4 text-center">
             <Button 
-              onClick={startAnalysis}
+              onClick={handleStartAnalysis}
               disabled={isAnalyzing}
               className="neo-button bg-medical-red text-white hover:bg-medical-red/90 w-full"
             >
