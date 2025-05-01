@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Database, Check, RefreshCw, Download, FileWarning } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { isModelInitialized } from "../utils/analysisUtils";
+import { isModelInitialized, initializeModel } from "../utils/analysisUtils";
 
 const ModelLoader: React.FC = () => {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
@@ -66,16 +66,31 @@ const ModelLoader: React.FC = () => {
         console.log('Default model found at:', modelPath);
         setModelPath(modelPath);
         
-        // Call the global function we defined in main.tsx to load the model
-        console.log('Calling loadModel function...');
-        const success = await (window as any).loadModel(modelPath);
+        // First initialize the model in our front-end
+        const frontendInitSuccess = await initializeModel(modelPath);
         
-        if (success) {
+        if (!frontendInitSuccess) {
+          setLoadError('Failed to initialize model in frontend.');
+          return;
+        }
+        
+        // Now ensure the Python backend also has the model loaded
+        console.log('Ensuring Python backend has model loaded...');
+        const pythonReloadResult = await window.electron.reloadPythonModel(modelPath);
+        
+        if (pythonReloadResult.error) {
+          console.error('Error from Python model reload:', pythonReloadResult.error);
+          setLoadError(`Error from Python server: ${pythonReloadResult.error}`);
+          toast.error('Found model but Python server failed to load it. Check console for details.');
+          return;
+        }
+        
+        if (pythonReloadResult.success) {
           setIsModelLoaded(true);
           toast.success(`Model loaded successfully from: ${modelPath}`);
         } else {
-          setLoadError('Found model but failed to load. Check console for details.');
-          toast.error('Found model but failed to load. Check console for details.');
+          setLoadError('Failed to load model in Python backend.');
+          toast.error('Found model but failed to load in Python backend. Check console for details.');
         }
       } else {
         const errorMsg = 'No model.h5 found. Please place model.h5 in the same folder as the application.';
@@ -113,29 +128,35 @@ const ModelLoader: React.FC = () => {
         console.log('User selected model at:', selectedPath);
         setModelPath(selectedPath);
         
-        // Call the global function we defined in main.tsx to load the model
-        console.log('Loading user-selected model...');
-        const success = await (window as any).loadModel(selectedPath);
+        // Initialize model in frontend
+        const frontendInitSuccess = await initializeModel(selectedPath);
         
-        if (success) {
+        if (!frontendInitSuccess) {
+          setLoadError('Failed to initialize model in frontend.');
+          return;
+        }
+        
+        // Now ensure the Python backend also has the model loaded
+        console.log('Loading model in Python backend...');
+        const pythonReloadResult = await window.electron.reloadPythonModel(selectedPath);
+        
+        if (pythonReloadResult.error) {
+          console.error('Error from Python model reload:', pythonReloadResult.error);
+          setLoadError(`Error from Python server: ${pythonReloadResult.error}`);
+          toast.error('Selected model failed to load in Python backend. Check console for details.');
+          return;
+        }
+        
+        if (pythonReloadResult.success) {
           setIsModelLoaded(true);
           toast.success(`Model loaded successfully from: ${selectedPath}`);
         } else {
-          setLoadError('Selected model failed to load. Check console for details.');
-          toast.error('Selected model failed to load. Check console for details.');
+          setLoadError('Selected model failed to load in Python backend.');
+          toast.error('Selected model failed to load in Python backend. Check console for details.');
         }
       } else {
-        // Fall back to auto-detection if user cancels browsing
-        console.log('Attempting to load model from default location...');
-        const success = await (window as any).loadModel();
-        
-        if (success) {
-          setIsModelLoaded(true);
-          toast.success('Model loaded successfully');
-        } else {
-          setLoadError('Could not find model.h5. Please place model.h5 in the application directory.');
-          toast.error('Could not find model.h5. Please place model.h5 in the application directory.');
-        }
+        // Fall back to auto-detection
+        await loadDefaultModel();
       }
     } catch (error) {
       console.error('Error loading model:', error);
@@ -148,13 +169,28 @@ const ModelLoader: React.FC = () => {
   };
 
   const handleReloadModel = async () => {
-    if (!window.electron) return;
+    if (!window.electron || !modelPath) return;
     
     setIsLoading(true);
     
     try {
-      await loadDefaultModel();
-      toast.success('Model reloaded');
+      // First reinitialize in frontend
+      await initializeModel(modelPath, true);
+      
+      // Then reload in Python backend
+      const pythonReloadResult = await window.electron.reloadPythonModel(modelPath);
+      
+      if (pythonReloadResult.error) {
+        console.error('Error from Python model reload:', pythonReloadResult.error);
+        setLoadError(`Error from Python server: ${pythonReloadResult.error}`);
+        toast.error('Failed to reload model in Python backend. Check console for details.');
+      } else if (pythonReloadResult.success) {
+        setIsModelLoaded(true);
+        toast.success('Model reloaded successfully in both frontend and Python backend');
+      } else {
+        setLoadError('Failed to reload model in Python backend.');
+        toast.error('Failed to reload model in Python backend. Check server logs for details.');
+      }
     } catch (error) {
       console.error('Error reloading model:', error);
       toast.error('Failed to reload model');

@@ -51,41 +51,45 @@ def predict():
         # Get the image data from the request
         image_data = data['image'].split(',')[1] if ',' in data['image'] else data['image']
         
-        # Decode the base64 image
-        image_bytes = base64.b64decode(image_data)
-        image = Image.open(io.BytesIO(image_bytes))
-        
-        # Resize and preprocess the image
-        image = image.resize((224, 224))  # Assuming model input size
-        image = np.array(image) / 255.0  # Normalize to [0,1]
-        
-        # Add batch dimension
-        image = np.expand_dims(image, axis=0)
-        
-        # Make prediction
-        logger.info("Making prediction with model")
-        predictions = default_model.predict(image)
-        
-        # Get the predicted class
-        predicted_class_index = np.argmax(predictions[0])
-        confidence = float(predictions[0][predicted_class_index])
-        
-        if predicted_class_index < len(class_labels):
-            predicted_class = class_labels[predicted_class_index]
-        else:
-            predicted_class = f"Unknown Class {predicted_class_index}"
-            logger.error(f"Predicted class index {predicted_class_index} is out of bounds for class_labels of length {len(class_labels)}")
-        
-        # Create a response with the top prediction
-        response = {
-            'cell_type': predicted_class,
-            'confidence': confidence,
-            'all_probabilities': predictions[0].tolist(),
-            'class_labels': class_labels
-        }
-        
-        logger.info(f"Prediction successful: {predicted_class} with confidence {confidence}")
-        return jsonify(response), 200
+        try:
+            # Decode the base64 image
+            image_bytes = base64.b64decode(image_data)
+            image = Image.open(io.BytesIO(image_bytes))
+            
+            # Resize and preprocess the image
+            image = image.resize((224, 224))  # Assuming model input size
+            image = np.array(image) / 255.0  # Normalize to [0,1]
+            
+            # Add batch dimension
+            image = np.expand_dims(image, axis=0)
+            
+            # Make prediction
+            logger.info("Making prediction with model")
+            predictions = default_model.predict(image)
+            
+            # Get the predicted class
+            predicted_class_index = np.argmax(predictions[0])
+            confidence = float(predictions[0][predicted_class_index])
+            
+            if predicted_class_index < len(class_labels):
+                predicted_class = class_labels[predicted_class_index]
+            else:
+                predicted_class = f"Unknown Class {predicted_class_index}"
+                logger.error(f"Predicted class index {predicted_class_index} is out of bounds for class_labels of length {len(class_labels)}")
+            
+            # Create a response with the top prediction
+            response = {
+                'cell_type': predicted_class,
+                'confidence': confidence,
+                'all_probabilities': predictions[0].tolist(),
+                'class_labels': class_labels
+            }
+            
+            logger.info(f"Prediction successful: {predicted_class} with confidence {confidence}")
+            return jsonify(response), 200
+        except Exception as img_error:
+            logger.error(f"Error processing image: {img_error}")
+            return jsonify({'error': f'Error processing image: {str(img_error)}'}), 500
         
     except Exception as e:
         logger.error(f"Error during prediction: {e}")
@@ -93,6 +97,7 @@ def predict():
 
 def load_model(model_path=None):
     global default_model, default_model_path, default_model_loaded
+    default_model_loaded = False  # Reset flag
     
     try:
         # If no model path provided, try to use default
@@ -126,13 +131,21 @@ def load_model(model_path=None):
                 except RuntimeError as e:
                     logger.error(f"Error setting GPU memory growth: {e}")
             
-            default_model = tf.keras.models.load_model(model_path)
+            # Load model with explicit flag for allowing growth
+            tf_config = tf.compat.v1.ConfigProto()
+            tf_config.gpu_options.allow_growth = True
+            tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=tf_config))
+            
+            # Try to explicitly load the model with a timeout
+            default_model = tf.keras.models.load_model(model_path, compile=False)
             
             # Test the model with a simple prediction to ensure it's working
             test_input = np.zeros((1, 224, 224, 3), dtype=np.float32)
+            logger.info("Running test prediction to verify model...")
             test_output = default_model.predict(test_input)
             logger.info(f"Model test prediction shape: {test_output.shape}")
             
+            # If we got here, the model is working
             default_model_path = model_path
             default_model_loaded = True
             logger.info(f"Default model loaded successfully from {model_path}")
@@ -157,6 +170,17 @@ def model_status():
         'model_path': default_model_path,
         'loaded': default_model_loaded
     })
+
+@app.route('/load_model', methods=['POST'])
+def load_model_endpoint():
+    try:
+        data = request.json
+        model_path = data.get('model_path') if data else None
+        success = load_model(model_path)
+        return jsonify({'success': success, 'loaded': default_model_loaded, 'path': default_model_path})
+    except Exception as e:
+        logger.error(f"Error in load_model endpoint: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Try to load the default model

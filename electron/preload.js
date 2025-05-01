@@ -1,3 +1,4 @@
+
 // Import required Node.js modules
 try {
   const { contextBridge, ipcRenderer } = require('electron');
@@ -38,6 +39,15 @@ try {
         error: 'Python backend communication is not available. Could not load axios module.',
         stack: 'Module not found: axios'
       };
+    },
+    
+    // Force reload the model on the Python server
+    reloadPythonModel: async (modelPath) => {
+      console.log('Using fallback reloadPythonModel implementation - axios not loaded');
+      return {
+        error: 'Python backend communication is not available. Could not load axios module.',
+        stack: 'Module not found: axios'
+      };
     }
   };
 
@@ -61,22 +71,65 @@ try {
   if (axios) {
     console.log('Axios is available, setting up analyzeWithH5Model with actual implementation');
     
+    // Configure axios without the Access-Control-Allow-Origin header
+    const axiosConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      // Increase timeout to allow for model loading/processing
+      timeout: 60000 
+    };
+    
+    // Add reloadPythonModel implementation
+    electronAPI.reloadPythonModel = async (modelPath) => {
+      try {
+        console.log('Attempting to reload Python model at path:', modelPath);
+        
+        const response = await axios.post('http://localhost:5000/load_model', {
+          model_path: modelPath
+        }, axiosConfig);
+        
+        console.log('Model reload response:', response.data);
+        return response.data;
+      } catch (error) {
+        console.error('Error reloading Python model:', error);
+        return {
+          error: `Failed to reload model: ${error.message}`,
+          stack: error.stack
+        };
+      }
+    };
+    
     // Override the default implementation with the actual one
     electronAPI.analyzeWithH5Model = async (modelPath, imageDataUrl) => {
       try {
         console.log('Sending image to Python backend for analysis with model path:', modelPath);
         
-        // Configure axios without the Access-Control-Allow-Origin header
-        const axiosConfig = {
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          // Increase timeout to allow for model loading/processing
-          timeout: 60000 
-        };
+        // First make sure the model is loaded by checking status
+        try {
+          const statusResponse = await axios.get('http://localhost:5000/model/status', axiosConfig);
+          console.log('Model status:', statusResponse.data);
+          
+          // If model isn't loaded, try to load it
+          if (!statusResponse.data.loaded) {
+            console.log('Model not loaded, attempting to load it...');
+            const loadResponse = await axios.post('http://localhost:5000/load_model', {
+              model_path: modelPath
+            }, axiosConfig);
+            
+            console.log('Model load response:', loadResponse.data);
+            
+            if (!loadResponse.data.success) {
+              throw new Error(`Failed to load model: ${loadResponse.data.error || 'Unknown error'}`);
+            }
+          }
+        } catch (statusError) {
+          console.warn('Error checking model status:', statusError);
+          // Continue anyway, the predict endpoint will return an appropriate error
+        }
         
-        // Send the image to the Python server
+        // Now send the image to the Python server
         const response = await axios.post('http://localhost:5000/predict', {
           image: imageDataUrl
         }, axiosConfig);
@@ -133,7 +186,8 @@ try {
       readModelDir: () => Promise.resolve([]),
       browseForModel: () => Promise.resolve(null),
       checkFileExists: () => Promise.resolve(false),
-      analyzeWithH5Model: () => Promise.resolve({ error: 'Not in Electron environment' })
+      analyzeWithH5Model: () => Promise.resolve({ error: 'Not in Electron environment' }),
+      reloadPythonModel: () => Promise.resolve({ error: 'Not in Electron environment' })
     };
     console.log('Created browser fallback for electron API');
   } catch (fallbackError) {

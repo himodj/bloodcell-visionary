@@ -9,7 +9,18 @@ interface ElectronAPI {
   checkFileExists: (filePath: string) => Promise<boolean>;
   browseForModel: () => Promise<string | null>;
   isElectron: boolean;
+  reloadPythonModel: (modelPath: string) => Promise<{
+    success?: boolean;
+    loaded?: boolean;
+    path?: string;
+    error?: string;
+    stack?: string;
+  }>;
   analyzeWithH5Model: (modelPath: string, imageDataUrl: string) => Promise<{
+    cell_type?: string;
+    confidence?: number;
+    all_probabilities?: number[];
+    class_labels?: string[];
     detectedCells?: Array<{
       type: string;
       confidence: number;
