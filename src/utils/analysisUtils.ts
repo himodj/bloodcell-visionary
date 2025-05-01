@@ -1,4 +1,3 @@
-
 import { CellType, AnalysisResult, AnalyzedCell } from '../contexts/AnalysisContext';
 import { toast } from 'sonner';
 
@@ -118,6 +117,27 @@ export const handleImageUpload = async (file: File): Promise<string> => {
   }
 };
 
+// Define the response type from the Python server
+interface PythonServerResponse {
+  cell_type?: string;
+  confidence?: number;
+  all_probabilities?: number[];
+  class_labels?: string[];
+  error?: string;
+  detectedCells?: Array<{
+    type: string;
+    confidence: number;
+    boundingBox: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+  }>;
+  cellCounts?: Record<string, number>;
+  timestamp?: string;
+}
+
 // Analyze image with backend API
 export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult> => {
   if (!window.electron || !modelInitialized) {
@@ -127,7 +147,7 @@ export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult
   console.log('Sending image for analysis...');
   
   // Call the electron method to analyze the image
-  const response = await window.electron.analyzeWithH5Model(modelPath, imageDataUrl);
+  const response = await window.electron.analyzeWithH5Model(modelPath, imageDataUrl) as PythonServerResponse;
   
   if (response.error) {
     throw new Error(`Analysis failed: ${response.error}`);

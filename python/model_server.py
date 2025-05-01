@@ -92,9 +92,9 @@ def predict():
         return jsonify({'error': str(e)}), 500
 
 def load_model(model_path=None):
+    global default_model, default_model_path, default_model_loaded
+    
     try:
-        global default_model, default_model_path, default_model_loaded
-        
         # If no model path provided, try to use default
         if model_path is None:
             if os.environ.get('MODEL_PATH'):
@@ -113,20 +113,41 @@ def load_model(model_path=None):
         logger.info(f"Default model file found: {model_path}")
         
         try:
-            # Load the model
+            # Load the model with error capturing
             logger.info(f"Loading model from {model_path}...")
+            
+            # Set memory growth to avoid OOM errors
+            gpus = tf.config.experimental.list_physical_devices('GPU')
+            if gpus:
+                try:
+                    for gpu in gpus:
+                        tf.config.experimental.set_memory_growth(gpu, True)
+                    logger.info(f"Set memory growth for {len(gpus)} GPUs")
+                except RuntimeError as e:
+                    logger.error(f"Error setting GPU memory growth: {e}")
+            
             default_model = tf.keras.models.load_model(model_path)
-            logger.info(f"Model summary: {default_model.summary()}")
+            
+            # Test the model with a simple prediction to ensure it's working
+            test_input = np.zeros((1, 224, 224, 3), dtype=np.float32)
+            test_output = default_model.predict(test_input)
+            logger.info(f"Model test prediction shape: {test_output.shape}")
+            
             default_model_path = model_path
             default_model_loaded = True
             logger.info(f"Default model loaded successfully from {model_path}")
             return True
         except Exception as model_error:
             logger.error(f"Error loading model from {model_path}: {model_error}")
+            # Log more detailed error information
+            import traceback
+            logger.error(f"Detailed traceback: {traceback.format_exc()}")
             return False
         
     except Exception as e:
         logger.error(f"General error in load_model function: {e}")
+        import traceback
+        logger.error(f"Detailed traceback: {traceback.format_exc()}")
         return False
 
 @app.route('/model/status', methods=['GET'])
@@ -142,8 +163,8 @@ if __name__ == '__main__':
     success = load_model()
     
     # Log application state
-    logger.info(f"Default model path: {default_model_path}")
     logger.info(f"Default model loaded: {default_model_loaded} (success: {success})")
+    logger.info(f"Default model path: {default_model_path}")
     logger.info(f"Current working directory: {os.getcwd()}")
     logger.info(f"Class labels: {class_labels}")
     
