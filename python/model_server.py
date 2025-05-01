@@ -37,8 +37,15 @@ default_model_loaded = False
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
+        # Check if model is loaded
+        global default_model
+        if default_model is None:
+            logger.error("Model not loaded when prediction was attempted")
+            return jsonify({'error': 'Model not loaded'}), 500
+            
         data = request.json
         if not data or 'image' not in data:
+            logger.error("No image data provided in request")
             return jsonify({'error': 'No image data provided'}), 400
         
         # Get the image data from the request
@@ -56,10 +63,7 @@ def predict():
         image = np.expand_dims(image, axis=0)
         
         # Make prediction
-        global default_model
-        if default_model is None:
-            return jsonify({'error': 'Model not loaded'}), 500
-            
+        logger.info("Making prediction with model")
         predictions = default_model.predict(image)
         
         # Get the predicted class
@@ -80,6 +84,7 @@ def predict():
             'class_labels': class_labels
         }
         
+        logger.info(f"Prediction successful: {predicted_class} with confidence {confidence}")
         return jsonify(response), 200
         
     except Exception as e:
@@ -107,16 +112,21 @@ def load_model(model_path=None):
             
         logger.info(f"Default model file found: {model_path}")
         
-        # Load the model
-        default_model = tf.keras.models.load_model(model_path)
-        default_model_path = model_path
-        default_model_loaded = True
-        
-        logger.info(f"Default model loaded successfully from {model_path}")
-        return True
+        try:
+            # Load the model
+            logger.info(f"Loading model from {model_path}...")
+            default_model = tf.keras.models.load_model(model_path)
+            logger.info(f"Model summary: {default_model.summary()}")
+            default_model_path = model_path
+            default_model_loaded = True
+            logger.info(f"Default model loaded successfully from {model_path}")
+            return True
+        except Exception as model_error:
+            logger.error(f"Error loading model from {model_path}: {model_error}")
+            return False
         
     except Exception as e:
-        logger.error(f"Error loading model: {e}")
+        logger.error(f"General error in load_model function: {e}")
         return False
 
 @app.route('/model/status', methods=['GET'])
@@ -129,11 +139,11 @@ def model_status():
 
 if __name__ == '__main__':
     # Try to load the default model
-    load_model()
+    success = load_model()
     
     # Log application state
     logger.info(f"Default model path: {default_model_path}")
-    logger.info(f"Default model loaded: {default_model_loaded}")
+    logger.info(f"Default model loaded: {default_model_loaded} (success: {success})")
     logger.info(f"Current working directory: {os.getcwd()}")
     logger.info(f"Class labels: {class_labels}")
     

@@ -139,15 +139,19 @@ export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult
   let cellType: CellType;
   let confidence: number;
   
-  if (response.detectedCells && response.detectedCells.length > 0) {
-    // If we have the new API format with detectedCells array
+  // Handle the response format from our Python server
+  if (response.cell_type) {
+    cellType = mapToCellType(response.cell_type);
+    confidence = response.confidence || 0.8;
+  } else if (response.detectedCells && response.detectedCells.length > 0) {
+    // Fallback to older format with detectedCells array
     const cell = response.detectedCells[0];
     cellType = mapToCellType(cell.type);
     confidence = cell.confidence;
   } else {
-    // Fallback to old format
-    cellType = mapToCellType('Lymphocyte'); // Default to most common type
-    confidence = 0.8; // Default confidence
+    // Absolute fallback
+    cellType = mapToCellType('Lymphocyte');
+    confidence = 0.8;
   }
   
   // Create a cell object

@@ -1,4 +1,3 @@
-
 // Import required Node.js modules
 try {
   const { contextBridge, ipcRenderer } = require('electron');
@@ -79,8 +78,7 @@ try {
         
         // Send the image to the Python server
         const response = await axios.post('http://localhost:5000/predict', {
-          image: imageDataUrl,
-          modelPath: modelPath
+          image: imageDataUrl
         }, axiosConfig);
         
         console.log('Received prediction from Python backend:', response.status);
