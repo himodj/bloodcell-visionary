@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { useAnalysis } from '../contexts/AnalysisContext';
 import { handleImageUpload, analyzeImage, resizeImageWithCenterCrop } from '../utils/analysisUtils';

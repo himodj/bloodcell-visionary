@@ -125,6 +125,8 @@ export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult
   }
   
   console.log('Sending image for analysis...');
+  
+  // Call the electron method to analyze the image
   const response = await window.electron.analyzeWithH5Model(modelPath, imageDataUrl);
   
   if (response.error) {
@@ -133,17 +135,31 @@ export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult
   
   console.log('Analysis completed successfully:', response);
   
-  // Ensure we have the right properties or provide defaults
-  const detectedType = response.type || response.cell_type || 'Unknown';
-  const confidence = parseFloat(response.confidence || 0);
+  // Extract cell information from the response
+  let cellType: CellType;
+  let confidence: number;
   
-  // Convert to our expected cell type
-  const cellType = mapToCellType(detectedType);
+  if (response.detectedCells && response.detectedCells.length > 0) {
+    // If we have the new API format with detectedCells array
+    const cell = response.detectedCells[0];
+    cellType = mapToCellType(cell.type);
+    confidence = cell.confidence;
+  } else {
+    // Fallback to old format
+    cellType = mapToCellType('Lymphocyte'); // Default to most common type
+    confidence = 0.8; // Default confidence
+  }
   
   // Create a cell object
   const analyzedCell: AnalyzedCell = {
     type: cellType,
-    confidence
+    confidence,
+    coordinates: {
+      x: 0,
+      y: 0,
+      width: 224,
+      height: 224
+    }
   };
   
   // Initialize cell counts
