@@ -1,6 +1,6 @@
 
 flask==2.0.1
 flask-cors==3.0.10
-tensorflow==2.8.0
-numpy==1.22.3
-pillow==9.0.1
+tensorflow>=1.15,<3.0
+numpy>=1.16.0
+pillow>=8.0.0

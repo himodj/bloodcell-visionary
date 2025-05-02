@@ -1,14 +1,14 @@
 
 import logging
 import os
-import tensorflow as tf
+import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import numpy as np
 from PIL import Image
 import base64
 import io
 import sys
+import traceback
 
 # Configure logger
 logging.basicConfig(
@@ -100,6 +100,9 @@ def load_model(model_path=None):
     default_model_loaded = False  # Reset flag
     
     try:
+        # Import tensorflow here to handle missing config attribute
+        import tensorflow as tf
+        
         # If no model path provided, try to use default
         if model_path is None:
             if os.environ.get('MODEL_PATH'):
@@ -121,45 +124,59 @@ def load_model(model_path=None):
             # Load the model with error capturing
             logger.info(f"Loading model from {model_path}...")
             
-            # Set memory growth to avoid OOM errors
-            gpus = tf.config.experimental.list_physical_devices('GPU')
-            if gpus:
+            # Try different approaches depending on TensorFlow version
+            try:
+                # For newer TensorFlow versions
                 try:
-                    for gpu in gpus:
-                        tf.config.experimental.set_memory_growth(gpu, True)
-                    logger.info(f"Set memory growth for {len(gpus)} GPUs")
-                except RuntimeError as e:
-                    logger.error(f"Error setting GPU memory growth: {e}")
+                    # Try to configure GPU memory growth if available
+                    if hasattr(tf, 'config') and hasattr(tf.config, 'experimental'):
+                        gpus = tf.config.experimental.list_physical_devices('GPU')
+                        if gpus:
+                            try:
+                                for gpu in gpus:
+                                    tf.config.experimental.set_memory_growth(gpu, True)
+                                logger.info(f"Set memory growth for {len(gpus)} GPUs")
+                            except RuntimeError as e:
+                                logger.error(f"Error setting GPU memory growth: {e}")
+                except Exception as gpu_error:
+                    logger.warning(f"Could not configure GPU settings: {gpu_error}")
+                
+                # Load using newer API
+                logger.info("Attempting to load model with tf.keras...")
+                default_model = tf.keras.models.load_model(model_path, compile=False)
+                logger.info("Model loaded with tf.keras API")
+            except AttributeError:
+                # Fall back to older methods for TensorFlow 1.x
+                logger.info("Falling back to older TensorFlow 1.x API")
+                from tensorflow import keras
+                default_model = keras.models.load_model(model_path, compile=False)
+                logger.info("Model loaded with TensorFlow 1.x API")
             
-            # Load model with explicit flag for allowing growth
-            tf_config = tf.compat.v1.ConfigProto()
-            tf_config.gpu_options.allow_growth = True
-            tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=tf_config))
-            
-            # Try to explicitly load the model with a timeout
-            default_model = tf.keras.models.load_model(model_path, compile=False)
-            
-            # Test the model with a simple prediction to ensure it's working
-            test_input = np.zeros((1, 224, 224, 3), dtype=np.float32)
-            logger.info("Running test prediction to verify model...")
-            test_output = default_model.predict(test_input)
-            logger.info(f"Model test prediction shape: {test_output.shape}")
-            
-            # If we got here, the model is working
-            default_model_path = model_path
-            default_model_loaded = True
-            logger.info(f"Default model loaded successfully from {model_path}")
-            return True
+            # Simple verification test
+            try:
+                # Test the model with a simple prediction to ensure it's working
+                test_input = np.zeros((1, 224, 224, 3), dtype=np.float32)
+                logger.info("Running test prediction to verify model...")
+                test_output = default_model.predict(test_input)
+                logger.info(f"Model test prediction shape: {test_output.shape}")
+                
+                # If we got here, the model is working
+                default_model_path = model_path
+                default_model_loaded = True
+                logger.info(f"Default model loaded successfully from {model_path}")
+                return True
+            except Exception as test_error:
+                logger.error(f"Model verification test failed: {test_error}")
+                return False
+                
         except Exception as model_error:
             logger.error(f"Error loading model from {model_path}: {model_error}")
             # Log more detailed error information
-            import traceback
             logger.error(f"Detailed traceback: {traceback.format_exc()}")
             return False
         
     except Exception as e:
         logger.error(f"General error in load_model function: {e}")
-        import traceback
         logger.error(f"Detailed traceback: {traceback.format_exc()}")
         return False
 
