@@ -45,11 +45,14 @@ if os.path.exists(default_model_path):
 else:
     logger.warning(f"Default model file not found at {default_model_path}")
 
-# Class labels (update with your actual classes)
+# Updated class labels - make sure they match exactly with frontend
 class_labels = [
     'Basophil', 'Eosinophil', 'Erythroblast', 'IGImmatureWhiteCell',
     'Lymphocyte', 'Monocyte', 'Neutrophil', 'Platelet', 'RBC'
 ]
+
+# Log class label order for debugging
+logger.info(f"Class labels order: {', '.join(class_labels)}")
 
 def load_model(model_path):
     """
@@ -131,7 +134,39 @@ def preprocess_image(image_data):
         logger.error(traceback.format_exc())
         raise
 
-# ... keep existing code (get_fallback_result function and other helper functions)
+def get_fallback_result():
+    """Provide a fallback result when the model fails"""
+    # Pick a random cell type
+    import random
+    cell_type = random.choice(class_labels)
+    confidence = 0.7 + random.random() * 0.25
+    
+    logger.warning(f"Using fallback prediction: {cell_type} with confidence {confidence:.4f}")
+    
+    # Create single detected cell
+    cell = {
+        "type": cell_type,
+        "confidence": confidence,
+        "boundingBox": {
+            "x": 120,  # Center of image
+            "y": 120,
+            "width": 120,
+            "height": 120
+        }
+    }
+    
+    # Initialize cell counts with zeros
+    cell_counts = {label: 0 for label in class_labels}
+    
+    # Set count to 1 for the detected cell type
+    cell_counts[cell_type] = 1
+    
+    return {
+        'detectedCells': [cell],
+        'cellCounts': cell_counts,
+        'timestamp': str(datetime.datetime.now()),
+        'status': 'fallback'
+    }
 
 @app.route('/predict', methods=['POST', 'OPTIONS'])
 def predict():
@@ -181,7 +216,11 @@ def predict():
         confidence = float(prediction[0][predicted_class_idx])
         predicted_class = class_labels[predicted_class_idx]
         
-        logger.info(f"Predicted class: {predicted_class} with confidence {confidence:.4f}")
+        # Log all class probabilities for debugging
+        class_probs = {class_labels[i]: float(prediction[0][i]) for i in range(len(class_labels))}
+        logger.info(f"Class probabilities: {class_probs}")
+        
+        logger.info(f"Predicted class index: {predicted_class_idx}, class: {predicted_class} with confidence {confidence:.4f}")
         
         # Create single detected cell
         cell = {
@@ -221,7 +260,24 @@ def predict():
         fallback['error'] = str(e)
         return jsonify(fallback)
 
-# ... keep existing code (health_check and list_models endpoints)
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Simple health check endpoint"""
+    return jsonify({
+        'status': 'ok',
+        'models_loaded': list(model_cache.keys()),
+        'timestamp': str(datetime.datetime.now())
+    })
+
+@app.route('/models', methods=['GET'])
+def list_models():
+    """List all loaded models"""
+    return jsonify({
+        'models': list(model_cache.keys()),
+        'default_model': default_model_path,
+        'model_count': len(model_cache),
+        'class_labels': class_labels
+    })
 
 if __name__ == '__main__':
     # Get port from environment or use default
@@ -232,6 +288,7 @@ if __name__ == '__main__':
     logger.info(f"Default model path: {default_model_path}")
     logger.info(f"Default model loaded: {default_model_path in model_cache}")
     logger.info(f"Current working directory: {os.getcwd()}")
+    logger.info(f"Class labels: {class_labels}")
     
     # Run on port 5000 by default, make it accessible from outside
     app.run(host='0.0.0.0', port=port, debug=False)
