@@ -14,6 +14,7 @@ const ModelLoader: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [electronAvailable, setElectronAvailable] = useState(false);
   const [loadAttempts, setLoadAttempts] = useState(0);
+  const [showAdvancedHelp, setShowAdvancedHelp] = useState(false);
   
   // Check if we're in Electron on component mount and periodically check model state
   useEffect(() => {
@@ -84,17 +85,22 @@ const ModelLoader: React.FC = () => {
           console.error('Error from Python model reload:', pythonReloadResult.error);
           
           // Show more detailed error message
-          const errorMsg = `Error loading model: ${pythonReloadResult.error}`;
+          let errorMsg = `Error loading model: ${pythonReloadResult.error}`;
           setLoadError(errorMsg);
           toast.error('Model loading failed. Check console for details.');
+          setShowAdvancedHelp(true);
           
-          // Check if this is a TensorFlow compatibility issue
+          // Check if this is a TensorFlow/Keras compatibility issue
           if (pythonReloadResult.error.includes('tensorflow') || 
-              pythonReloadResult.error.includes('keras')) {
+              pythonReloadResult.error.includes('keras') ||
+              pythonReloadResult.error.includes('attribute') ||
+              pythonReloadResult.error.includes('version')) {
             setLoadError(
-              'TensorFlow compatibility issue detected. Please make sure that your Python ' +
-              'environment has both TensorFlow and Keras installed correctly. You may need to ' +
-              'install keras explicitly with: pip install keras'
+              'TensorFlow/Keras compatibility issue detected. Try running these commands in your command prompt:' +
+              '\n\n1. pip install tensorflow==2.12.0' +
+              '\n2. pip install keras==2.12.0' +
+              '\n3. pip install h5py==3.8.0' +
+              '\n\nThen restart the application.'
             );
           }
           
@@ -164,6 +170,7 @@ const ModelLoader: React.FC = () => {
           const errorMsg = `Error loading model: ${pythonReloadResult.error}`;
           setLoadError(errorMsg);
           toast.error('Model loading failed. Check console for details.');
+          setShowAdvancedHelp(true);
           return;
         }
         
@@ -205,6 +212,7 @@ const ModelLoader: React.FC = () => {
         console.error('Error from Python model reload:', pythonReloadResult.error);
         setLoadError(`Error from Python server: ${pythonReloadResult.error}`);
         toast.error('Failed to reload model in Python backend. Check console for details.');
+        setShowAdvancedHelp(true);
       } else if (pythonReloadResult.success) {
         setIsModelLoaded(true);
         toast.success('Model reloaded successfully in both frontend and Python backend');
@@ -289,14 +297,28 @@ const ModelLoader: React.FC = () => {
         <Alert variant="destructive" className="mb-6">
           <AlertTitle>Error Loading Model</AlertTitle>
           <AlertDescription>
-            {loadError}
-            <p className="mt-2">
+            <div className="whitespace-pre-line">{loadError}</div>
+            <div className="mt-2">
               {loadAttempts > 1 ? (
-                "Multiple load attempts have failed. Try installing keras explicitly with 'pip install keras'."
+                <p>Multiple load attempts have failed. Please check your Python environment configuration.</p>
               ) : (
-                "Please make sure the file 'model.h5' exists in the same folder as the application."
+                <p>Please make sure the file 'model.h5' exists in the same folder as the application.</p>
               )}
-            </p>
+            </div>
+            {showAdvancedHelp && (
+              <div className="mt-4 p-3 bg-gray-100 rounded text-sm">
+                <p className="font-bold mb-2">Advanced Troubleshooting:</p>
+                <ol className="list-decimal list-inside">
+                  <li>Verify you have Python 3.8-3.10 installed</li>
+                  <li>Try reinstalling TensorFlow and Keras with specific versions:</li>
+                  <code className="block bg-black text-white p-2 mt-1 mb-2">
+                    pip install tensorflow==2.12.0 keras==2.12.0 h5py==3.8.0
+                  </code>
+                  <li>Make sure your model.h5 file is a valid TensorFlow/Keras model</li>
+                  <li>Restart the application after making changes</li>
+                </ol>
+              </div>
+            )}
           </AlertDescription>
         </Alert>
       )}
