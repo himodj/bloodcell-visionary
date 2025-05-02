@@ -100,9 +100,6 @@ def load_model(model_path=None):
     default_model_loaded = False  # Reset flag
     
     try:
-        # Import tensorflow here to handle missing config attribute
-        import tensorflow as tf
-        
         # If no model path provided, try to use default
         if model_path is None:
             if os.environ.get('MODEL_PATH'):
@@ -120,58 +117,61 @@ def load_model(model_path=None):
             
         logger.info(f"Default model file found: {model_path}")
         
+        # Try different approaches to load the model based on what's available
+        models_loaded = False
+        error_messages = []
+        
+        # First try importing TensorFlow
         try:
-            # Load the model with error capturing
-            logger.info(f"Loading model from {model_path}...")
+            import tensorflow as tf
+            logger.info(f"TensorFlow version: {tf.__version__}")
             
-            # Try different approaches depending on TensorFlow version
+            # Try method 1: direct tf.keras (TF 2.x)
             try:
-                # For newer TensorFlow versions
-                try:
-                    # Try to configure GPU memory growth if available
-                    if hasattr(tf, 'config') and hasattr(tf.config, 'experimental'):
-                        gpus = tf.config.experimental.list_physical_devices('GPU')
-                        if gpus:
-                            try:
-                                for gpu in gpus:
-                                    tf.config.experimental.set_memory_growth(gpu, True)
-                                logger.info(f"Set memory growth for {len(gpus)} GPUs")
-                            except RuntimeError as e:
-                                logger.error(f"Error setting GPU memory growth: {e}")
-                except Exception as gpu_error:
-                    logger.warning(f"Could not configure GPU settings: {gpu_error}")
-                
-                # Load using newer API
-                logger.info("Attempting to load model with tf.keras...")
+                logger.info("Trying to load model with tf.keras (TF 2.x)")
                 default_model = tf.keras.models.load_model(model_path, compile=False)
-                logger.info("Model loaded with tf.keras API")
-            except AttributeError:
-                # Fall back to older methods for TensorFlow 1.x
-                logger.info("Falling back to older TensorFlow 1.x API")
-                from tensorflow import keras
-                default_model = keras.models.load_model(model_path, compile=False)
-                logger.info("Model loaded with TensorFlow 1.x API")
+                logger.info("Model loaded successfully with tf.keras (TF 2.x)")
+                models_loaded = True
+            except (AttributeError, ImportError) as e:
+                error_messages.append(f"tf.keras attempt failed: {str(e)}")
+                
+                # Try method 2: importing keras directly (standalone or TF 1.x)
+                try:
+                    logger.info("Trying to load model with standalone Keras")
+                    import keras
+                    default_model = keras.models.load_model(model_path, compile=False)
+                    logger.info("Model loaded successfully with standalone Keras")
+                    models_loaded = True
+                except (ImportError, Exception) as e:
+                    error_messages.append(f"standalone keras attempt failed: {str(e)}")
+                    
+                    # Try method 3: tensorflow.python.keras (some TF versions)
+                    try:
+                        logger.info("Trying to load model with tensorflow.python.keras")
+                        from tensorflow.python.keras.models import load_model
+                        default_model = load_model(model_path, compile=False)
+                        logger.info("Model loaded successfully with tensorflow.python.keras")
+                        models_loaded = True
+                    except (ImportError, Exception) as e:
+                        error_messages.append(f"tensorflow.python.keras attempt failed: {str(e)}")
             
+            if not models_loaded:
+                raise ImportError(f"Failed to load model using any known method: {', '.join(error_messages)}")
+                
             # Simple verification test
-            try:
-                # Test the model with a simple prediction to ensure it's working
-                test_input = np.zeros((1, 224, 224, 3), dtype=np.float32)
-                logger.info("Running test prediction to verify model...")
-                test_output = default_model.predict(test_input)
-                logger.info(f"Model test prediction shape: {test_output.shape}")
-                
-                # If we got here, the model is working
-                default_model_path = model_path
-                default_model_loaded = True
-                logger.info(f"Default model loaded successfully from {model_path}")
-                return True
-            except Exception as test_error:
-                logger.error(f"Model verification test failed: {test_error}")
-                return False
-                
-        except Exception as model_error:
-            logger.error(f"Error loading model from {model_path}: {model_error}")
-            # Log more detailed error information
+            test_input = np.zeros((1, 224, 224, 3), dtype=np.float32)
+            logger.info("Running test prediction to verify model...")
+            test_output = default_model.predict(test_input)
+            logger.info(f"Model test prediction shape: {test_output.shape}")
+            
+            # If we got here, the model is working
+            default_model_path = model_path
+            default_model_loaded = True
+            logger.info(f"Default model loaded successfully from {model_path}")
+            return True
+            
+        except Exception as tf_error:
+            logger.error(f"Error loading TensorFlow or model: {tf_error}")
             logger.error(f"Detailed traceback: {traceback.format_exc()}")
             return False
         

@@ -13,6 +13,7 @@ const ModelLoader: React.FC = () => {
   const [modelPath, setModelPath] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [electronAvailable, setElectronAvailable] = useState(false);
+  const [loadAttempts, setLoadAttempts] = useState(0);
   
   // Check if we're in Electron on component mount and periodically check model state
   useEffect(() => {
@@ -57,6 +58,7 @@ const ModelLoader: React.FC = () => {
     try {
       setIsLoading(true);
       setLoadError(null);
+      setLoadAttempts(prev => prev + 1);
       
       console.log('Requesting default model path from Electron...');
       const modelPath = await window.electron.getDefaultModelPath();
@@ -80,8 +82,22 @@ const ModelLoader: React.FC = () => {
         
         if (pythonReloadResult.error) {
           console.error('Error from Python model reload:', pythonReloadResult.error);
-          setLoadError(`Error from Python server: ${pythonReloadResult.error}`);
-          toast.error('Found model but Python server failed to load it. Check console for details.');
+          
+          // Show more detailed error message
+          const errorMsg = `Error loading model: ${pythonReloadResult.error}`;
+          setLoadError(errorMsg);
+          toast.error('Model loading failed. Check console for details.');
+          
+          // Check if this is a TensorFlow compatibility issue
+          if (pythonReloadResult.error.includes('tensorflow') || 
+              pythonReloadResult.error.includes('keras')) {
+            setLoadError(
+              'TensorFlow compatibility issue detected. Please make sure that your Python ' +
+              'environment has both TensorFlow and Keras installed correctly. You may need to ' +
+              'install keras explicitly with: pip install keras'
+            );
+          }
+          
           return;
         }
         
@@ -118,6 +134,7 @@ const ModelLoader: React.FC = () => {
 
     setIsLoading(true);
     setLoadError(null);
+    setLoadAttempts(prev => prev + 1);
     
     try {
       // Try first to use browseForModel to let user pick the file
@@ -142,8 +159,11 @@ const ModelLoader: React.FC = () => {
         
         if (pythonReloadResult.error) {
           console.error('Error from Python model reload:', pythonReloadResult.error);
-          setLoadError(`Error from Python server: ${pythonReloadResult.error}`);
-          toast.error('Selected model failed to load in Python backend. Check console for details.');
+          
+          // Show more detailed error message
+          const errorMsg = `Error loading model: ${pythonReloadResult.error}`;
+          setLoadError(errorMsg);
+          toast.error('Model loading failed. Check console for details.');
           return;
         }
         
@@ -172,6 +192,7 @@ const ModelLoader: React.FC = () => {
     if (!window.electron || !modelPath) return;
     
     setIsLoading(true);
+    setLoadAttempts(prev => prev + 1);
     
     try {
       // First reinitialize in frontend
@@ -270,7 +291,11 @@ const ModelLoader: React.FC = () => {
           <AlertDescription>
             {loadError}
             <p className="mt-2">
-              Please make sure the file "model.h5" exists in the same folder as the application.
+              {loadAttempts > 1 ? (
+                "Multiple load attempts have failed. Try installing keras explicitly with 'pip install keras'."
+              ) : (
+                "Please make sure the file 'model.h5' exists in the same folder as the application."
+              )}
             </p>
           </AlertDescription>
         </Alert>

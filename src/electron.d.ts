@@ -15,6 +15,7 @@ interface ElectronAPI {
     path?: string;
     error?: string;
     stack?: string;
+    details?: string;
   }>;
   analyzeWithH5Model: (modelPath: string, imageDataUrl: string) => Promise<{
     cell_type?: string;
@@ -35,6 +36,7 @@ interface ElectronAPI {
     timestamp?: string;
     error?: string;
     stack?: string;
+    details?: string;
   }>;
 }
 
