@@ -17,6 +17,18 @@ interface ElectronAPI {
     stack?: string;
     details?: string;
   }>;
+  getPythonEnvironmentInfo: () => Promise<{
+    python_version?: string;
+    platform?: string;
+    modules?: Record<string, {
+      installed: boolean;
+      version?: string;
+      path?: string;
+    }>;
+    error?: string;
+    stack?: string;
+    details?: string;
+  }>;
   analyzeWithH5Model: (modelPath: string, imageDataUrl: string) => Promise<{
     cell_type?: string;
     confidence?: number;

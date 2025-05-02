@@ -2,9 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Database, Check, RefreshCw, Download, FileWarning } from 'lucide-react';
+import { Database, Check, RefreshCw, Download, FileWarning, Activity } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { isModelInitialized, initializeModel } from "../utils/analysisUtils";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const ModelLoader: React.FC = () => {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
@@ -15,6 +16,8 @@ const ModelLoader: React.FC = () => {
   const [electronAvailable, setElectronAvailable] = useState(false);
   const [loadAttempts, setLoadAttempts] = useState(0);
   const [showAdvancedHelp, setShowAdvancedHelp] = useState(false);
+  const [environmentInfo, setEnvironmentInfo] = useState<Record<string, any>>({});
+  const [isCheckingEnv, setIsCheckingEnv] = useState(false);
   
   // Check if we're in Electron on component mount and periodically check model state
   useEffect(() => {
@@ -48,6 +51,32 @@ const ModelLoader: React.FC = () => {
     }
   }, []);
 
+  // Function to check environment diagnostics
+  const checkEnvironment = async () => {
+    if (!window.electron) {
+      toast.error('Environment check requires the desktop application');
+      return;
+    }
+    
+    setIsCheckingEnv(true);
+    
+    try {
+      const envInfo = await window.electron.getPythonEnvironmentInfo();
+      setEnvironmentInfo(envInfo);
+      
+      if (envInfo.error) {
+        toast.error(`Could not retrieve environment info: ${envInfo.error}`);
+      } else {
+        toast.success('Environment diagnostics retrieved successfully');
+      }
+    } catch (error) {
+      console.error('Error checking environment:', error);
+      toast.error('Failed to check environment');
+    } finally {
+      setIsCheckingEnv(false);
+    }
+  };
+
   // Function to load default model
   const loadDefaultModel = async () => {
     if (!window.electron) {
@@ -68,6 +97,37 @@ const ModelLoader: React.FC = () => {
       if (modelPath) {
         console.log('Default model found at:', modelPath);
         setModelPath(modelPath);
+        
+        // First, let's check the environment
+        let envInfo = null;
+        try {
+          envInfo = await window.electron.getPythonEnvironmentInfo();
+          setEnvironmentInfo(envInfo);
+          
+          if (envInfo.error) {
+            console.warn('Environment check warning:', envInfo.error);
+          } else {
+            console.log('Environment info:', envInfo);
+            
+            // Check for TensorFlow and Keras modules
+            const hasTensorflow = envInfo.modules?.tensorflow?.installed;
+            const hasKeras = envInfo.modules?.keras?.installed;
+            
+            if (!hasTensorflow) {
+              setLoadError('TensorFlow is not installed properly in your Python environment.');
+              toast.error('TensorFlow is missing or not properly installed');
+              return;
+            }
+            
+            if (!hasKeras) {
+              setLoadError('Keras is not installed properly in your Python environment.');
+              toast.error('Keras is missing or not properly installed');
+              return;
+            }
+          }
+        } catch (envError) {
+          console.error('Error checking environment:', envError);
+        }
         
         // First initialize the model in our front-end
         const frontendInitSuccess = await initializeModel(modelPath);
@@ -90,18 +150,16 @@ const ModelLoader: React.FC = () => {
           toast.error('Model loading failed. Check console for details.');
           setShowAdvancedHelp(true);
           
-          // Check if this is a TensorFlow/Keras compatibility issue
-          if (pythonReloadResult.error.includes('tensorflow') || 
-              pythonReloadResult.error.includes('keras') ||
-              pythonReloadResult.error.includes('attribute') ||
-              pythonReloadResult.error.includes('version')) {
-            setLoadError(
-              'TensorFlow/Keras compatibility issue detected. Try running these commands in your command prompt:' +
-              '\n\n1. pip install tensorflow==2.12.0' +
-              '\n2. pip install keras==2.12.0' +
-              '\n3. pip install h5py==3.8.0' +
-              '\n\nThen restart the application.'
-            );
+          // Based on environment info, give more specific guidance
+          if (envInfo) {
+            if (envInfo.modules?.tensorflow?.version !== envInfo.modules?.keras?.version) {
+              setLoadError(
+                `TensorFlow (${envInfo.modules?.tensorflow?.version}) and Keras (${envInfo.modules?.keras?.version}) versions are mismatched. ` +
+                'Try running these commands in your command prompt:' +
+                '\n\n1. pip install tensorflow==2.12.0 keras==2.12.0 h5py==3.8.0' +
+                '\n2. Restart the application'
+              );
+            }
           }
           
           return;
@@ -262,6 +320,18 @@ const ModelLoader: React.FC = () => {
           </Button>
         )}
         
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-10"
+          onClick={checkEnvironment}
+          disabled={isCheckingEnv || !electronAvailable}
+          title="Check Python environment"
+        >
+          <Activity size={16} className={isCheckingEnv ? "animate-pulse mr-2" : "mr-2"} />
+          Environment
+        </Button>
+        
         {isModelLoaded && (
           <div className="flex items-center">
             <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
@@ -293,6 +363,39 @@ const ModelLoader: React.FC = () => {
         )}
       </div>
 
+      {Object.keys(environmentInfo).length > 0 && !environmentInfo.error && (
+        <Accordion type="single" collapsible className="mb-6">
+          <AccordionItem value="environment">
+            <AccordionTrigger className="text-sm font-medium">
+              Python Environment Diagnostics
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="text-sm bg-gray-50 p-3 rounded-md">
+                <div className="mb-2">
+                  <span className="font-semibold">Python Version:</span> {environmentInfo.python_version}
+                </div>
+                <div className="mb-2">
+                  <span className="font-semibold">Platform:</span> {environmentInfo.platform}
+                </div>
+                <div className="mb-2">
+                  <span className="font-semibold">Modules:</span>
+                  <ul className="list-disc pl-6 mt-1">
+                    {environmentInfo.modules && Object.entries(environmentInfo.modules).map(([name, info]: [string, any]) => (
+                      <li key={name}>
+                        {name}: {info.installed ? 
+                          <span className="text-green-600">Installed (v{info.version})</span> : 
+                          <span className="text-red-600">Not installed</span>
+                        }
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      )}
+
       {loadError && !isModelLoaded && (
         <Alert variant="destructive" className="mb-6">
           <AlertTitle>Error Loading Model</AlertTitle>
@@ -316,7 +419,18 @@ const ModelLoader: React.FC = () => {
                   </code>
                   <li>Make sure your model.h5 file is a valid TensorFlow/Keras model</li>
                   <li>Restart the application after making changes</li>
+                  <li>Run the Environment diagnostics to check your Python setup</li>
                 </ol>
+                <Button 
+                  onClick={checkEnvironment} 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2" 
+                  disabled={isCheckingEnv || !electronAvailable}
+                >
+                  <Activity size={14} className="mr-1" /> 
+                  Run Environment Diagnostics
+                </Button>
               </div>
             )}
           </AlertDescription>

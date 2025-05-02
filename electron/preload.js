@@ -50,6 +50,16 @@ try {
         stack: 'Module not found: axios',
         details: 'This error typically occurs when the application cannot find the axios library. Please make sure axios is installed properly.'
       };
+    },
+    
+    // Get environment information from the Python server
+    getPythonEnvironmentInfo: async () => {
+      console.log('Using fallback getPythonEnvironmentInfo implementation - axios not loaded');
+      return {
+        error: 'Python backend communication is not available. Could not load axios module.',
+        stack: 'Module not found: axios',
+        details: 'This error typically occurs when the application cannot find the axios library. Please make sure axios is installed properly.'
+      };
     }
   };
 
@@ -71,7 +81,7 @@ try {
 
   // Check if we successfully loaded axios
   if (axios) {
-    console.log('Axios is available, setting up analyzeWithH5Model with actual implementation');
+    console.log('Axios is available, setting up API methods with actual implementation');
     
     // Configure axios without the Access-Control-Allow-Origin header
     const axiosConfig = {
@@ -81,6 +91,33 @@ try {
       },
       // Increase timeout to allow for model loading/processing
       timeout: 60000 
+    };
+    
+    // Add getPythonEnvironmentInfo implementation
+    electronAPI.getPythonEnvironmentInfo = async () => {
+      try {
+        console.log('Getting Python environment info...');
+        const response = await axios.get('http://localhost:5000/environment', axiosConfig);
+        console.log('Environment info response:', response.status);
+        return response.data;
+      } catch (error) {
+        console.error('Error getting Python environment info:', error);
+        
+        let details = '';
+        if (error.code === 'ECONNREFUSED') {
+          details = 'The Python backend server is not running or is not accessible.';
+        } else if (error.response) {
+          details = `Server responded with status code ${error.response.status}. ${error.response.data?.error || ''}`;
+        } else {
+          details = 'This may be a network issue or a problem with the Python server.';
+        }
+        
+        return {
+          error: `Failed to get environment info: ${error.message}`,
+          stack: error.stack,
+          details
+        };
+      }
     };
     
     // Add reloadPythonModel implementation
@@ -94,6 +131,15 @@ try {
           console.log('Python server status check:', statusResponse.status, statusResponse.data);
         } catch (statusError) {
           console.warn('Error checking Python server status:', statusError);
+          
+          // Try to get environment info for better diagnostics
+          try {
+            const envInfo = await axios.get('http://localhost:5000/environment', axiosConfig);
+            console.log('Python environment info:', envInfo.data);
+          } catch (envError) {
+            console.warn('Failed to get environment info:', envError);
+          }
+          
           if (statusError.code === 'ECONNREFUSED') {
             return {
               error: 'Python backend server is not running',
@@ -238,7 +284,8 @@ try {
       browseForModel: () => Promise.resolve(null),
       checkFileExists: () => Promise.resolve(false),
       analyzeWithH5Model: () => Promise.resolve({ error: 'Not in Electron environment' }),
-      reloadPythonModel: () => Promise.resolve({ error: 'Not in Electron environment' })
+      reloadPythonModel: () => Promise.resolve({ error: 'Not in Electron environment' }),
+      getPythonEnvironmentInfo: () => Promise.resolve({ error: 'Not in Electron environment' })
     };
     console.log('Created browser fallback for electron API');
   } catch (fallbackError) {

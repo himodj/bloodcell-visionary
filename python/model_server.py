@@ -9,6 +9,7 @@ import base64
 import io
 import sys
 import traceback
+import importlib
 
 # Configure logger
 logging.basicConfig(
@@ -95,6 +96,51 @@ def predict():
         logger.error(f"Error during prediction: {e}")
         return jsonify({'error': str(e)}), 500
 
+def check_tensorflow_installation():
+    """Check if TensorFlow is properly installed and usable"""
+    try:
+        # Check what packages are available
+        logger.info("Checking environment...")
+        if 'keras' in sys.modules:
+            logger.info("Keras is already imported")
+        
+        if 'tensorflow' in sys.modules:
+            logger.info("TensorFlow is already imported")
+        
+        # Try direct import
+        try:
+            import tensorflow as tf
+            if hasattr(tf, '__version__'):
+                logger.info(f"Successfully imported TensorFlow version {tf.__version__}")
+                return True, tf
+            else:
+                logger.error("TensorFlow imported but has no __version__ attribute")
+                
+                # Try to get more information
+                logger.info(f"TensorFlow module path: {tf.__file__}")
+                logger.info(f"Available attributes in TensorFlow: {dir(tf)[:20]}")
+                
+                # Return the module anyway
+                return True, tf
+                
+        except ImportError as e:
+            logger.error(f"Failed to import TensorFlow: {e}")
+            
+        # Try importing keras directly 
+        try:
+            import keras
+            logger.info(f"Successfully imported standalone Keras version {keras.__version__}")
+            return True, keras
+        except ImportError as e:
+            logger.error(f"Failed to import standalone Keras: {e}")
+        
+        return False, None
+        
+    except Exception as e:
+        logger.error(f"Error checking TensorFlow installation: {e}")
+        logger.error(traceback.format_exc())
+        return False, None
+
 def load_model(model_path=None):
     global default_model, default_model_path, default_model_loaded
     default_model_loaded = False  # Reset flag
@@ -117,71 +163,64 @@ def load_model(model_path=None):
             
         logger.info(f"Default model file found: {model_path}")
         
+        # First try to check if we can even import TensorFlow
+        tf_ok, tf_or_keras = check_tensorflow_installation()
+        
+        if not tf_ok:
+            logger.error("Cannot import TensorFlow or Keras. Please check your Python installation.")
+            return False
+        
         # Try different approaches to load the model based on what's available
         models_loaded = False
         error_messages = []
         
-        # First try importing standalone keras - simplest approach
-        try:
-            import keras
-            logger.info("Attempting to load model with standalone Keras...")
-            default_model = keras.models.load_model(model_path, compile=False)
-            logger.info("Model loaded successfully with standalone Keras")
-            models_loaded = True
-        except (ImportError, Exception) as e:
-            error_messages.append(f"Standalone keras attempt failed: {str(e)}")
-            
-            # Next, try with tensorflow.keras
+        # First try standalone keras if that's what we got back
+        if tf_or_keras.__name__ == 'keras':
             try:
-                import tensorflow as tf
-                logger.info("Attempting to load model with tensorflow.keras...")
-                default_model = tf.keras.models.load_model(model_path, compile=False)
-                logger.info("Model loaded successfully with tensorflow.keras")
+                logger.info("Loading model with standalone Keras...")
+                default_model = tf_or_keras.models.load_model(model_path, compile=False)
+                logger.info("Model loaded successfully with standalone Keras")
                 models_loaded = True
-            except (AttributeError, ImportError, Exception) as e:
-                error_messages.append(f"tensorflow.keras attempt failed: {str(e)}")
+            except Exception as e:
+                error_messages.append(f"Standalone keras attempt failed: {str(e)}")
+        else:
+            # Try with the TensorFlow module we got
+            try:
+                logger.info("Loading model using available TensorFlow...")
                 
-                # Last resort: try an older approach with direct Keras import from TF
-                try:
-                    import tensorflow as tf
-                    from tensorflow import keras
-                    logger.info("Attempting to load model with imported keras from tensorflow...")
-                    default_model = keras.models.load_model(model_path, compile=False)
-                    logger.info("Model loaded successfully with keras imported from tensorflow")
+                # Check if this TensorFlow has keras
+                if hasattr(tf_or_keras, 'keras'):
+                    default_model = tf_or_keras.keras.models.load_model(model_path, compile=False)
+                    logger.info("Model loaded successfully with tf.keras")
                     models_loaded = True
-                except (ImportError, Exception) as e:
-                    error_messages.append(f"tensorflow keras import attempt failed: {str(e)}")
-
-                    # Final attempt: try with h5py directly if everything else failed
-                    try:
-                        logger.info("Attempting fallback mode with direct h5py load...")
-                        import h5py
-                        h5_file = h5py.File(model_path, 'r')
-                        
-                        # Just verify we can open the file
-                        if 'model_weights' in h5_file or 'layer_names' in h5_file:
-                            logger.info("H5 file is valid but we need Keras to load it properly")
-                            h5_file.close()
-                            
-                            # Install keras explicitly if needed
-                            try:
-                                logger.info("Attempting to install keras package...")
-                                import pip
-                                pip.main(['install', 'keras'])
-                                
-                                # Try again after installing
-                                import keras
-                                default_model = keras.models.load_model(model_path, compile=False)
-                                logger.info("Model loaded successfully after keras installation")
-                                models_loaded = True
-                            except Exception as pip_err:
-                                error_messages.append(f"pip install keras attempt failed: {str(pip_err)}")
-                        else:
-                            h5_file.close()
-                            logger.error("H5 file does not appear to be a valid Keras model")
-                            error_messages.append("H5 file is not a valid Keras model format")
-                    except Exception as h5_err:
-                        error_messages.append(f"h5py fallback attempt failed: {str(h5_err)}")
+                # Maybe it's an older version with different API
+                elif hasattr(tf_or_keras, 'saved_model'):
+                    default_model = tf_or_keras.saved_model.load(model_path)
+                    logger.info("Model loaded successfully with tf.saved_model")
+                    models_loaded = True
+                else:
+                    logger.error("TensorFlow available but lacks keras and saved_model modules")
+                    error_messages.append("TensorFlow lacks needed modules")
+            except (AttributeError, ImportError, Exception) as e:
+                error_messages.append(f"TensorFlow loading attempt failed: {str(e)}")
+                
+        if not models_loaded:
+            # Try a different approach - install and import keras directly
+            try:
+                logger.info("Attempting to install and import standalone keras...")
+                import pip
+                pip.main(['install', 'keras'])
+                
+                # Force reimport of keras
+                if 'keras' in sys.modules:
+                    del sys.modules['keras']
+                
+                import keras
+                default_model = keras.models.load_model(model_path, compile=False)
+                logger.info("Model loaded successfully with fresh keras installation")
+                models_loaded = True
+            except Exception as pip_err:
+                error_messages.append(f"Keras installation attempt failed: {str(pip_err)}")
             
         if not models_loaded:
             error_msg = f"Failed to load model using any known method: {', '.join(error_messages)}"
@@ -228,6 +267,36 @@ def load_model_endpoint():
     except Exception as e:
         logger.error(f"Error in load_model endpoint: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/environment', methods=['GET'])
+def environment_info():
+    """Return information about the Python environment"""
+    try:
+        env_info = {
+            'python_version': sys.version,
+            'platform': sys.platform,
+            'modules': {}
+        }
+        
+        # Check for key modules
+        for module_name in ['tensorflow', 'keras', 'numpy', 'h5py']:
+            try:
+                module = importlib.import_module(module_name)
+                version = getattr(module, '__version__', 'Unknown version')
+                env_info['modules'][module_name] = {
+                    'installed': True,
+                    'version': version,
+                    'path': getattr(module, '__file__', 'Unknown path')
+                }
+            except ImportError:
+                env_info['modules'][module_name] = {
+                    'installed': False
+                }
+        
+        return jsonify(env_info)
+    except Exception as e:
+        logger.error(f"Error getting environment info: {e}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Try to load the default model
