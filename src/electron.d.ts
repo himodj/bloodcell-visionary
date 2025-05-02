@@ -3,37 +3,13 @@ interface ElectronAPI {
   selectModel: () => Promise<string | null>;
   getDefaultModelPath: () => Promise<string | null>;
   getModelDir: (modelJsonPath: string) => Promise<string>;
-  checkModelFormat: (modelPath: string) => Promise<{format?: string, path?: string, error?: string, size?: number}>;
-  readModelFile: (filePath: string) => Promise<{success: boolean, data?: string, format?: string, size?: number, error?: string, message?: string}>;
+  checkModelFormat: (modelPath: string) => Promise<{format?: string, path?: string, error?: string}>;
+  readModelFile: (filePath: string) => Promise<{success: boolean, data?: string, error?: string}>;
   readModelDir: (dirPath: string) => Promise<string[] | {error: string}>;
   checkFileExists: (filePath: string) => Promise<boolean>;
   browseForModel: () => Promise<string | null>;
   isElectron: boolean;
-  reloadPythonModel: (modelPath: string) => Promise<{
-    success?: boolean;
-    loaded?: boolean;
-    path?: string;
-    error?: string;
-    stack?: string;
-    details?: string;
-  }>;
-  getPythonEnvironmentInfo: () => Promise<{
-    python_version?: string;
-    platform?: string;
-    modules?: Record<string, {
-      installed: boolean;
-      version?: string;
-      path?: string;
-    }>;
-    error?: string;
-    stack?: string;
-    details?: string;
-  }>;
   analyzeWithH5Model: (modelPath: string, imageDataUrl: string) => Promise<{
-    cell_type?: string;
-    confidence?: number;
-    all_probabilities?: number[];
-    class_labels?: string[];
     detectedCells?: Array<{
       type: string;
       confidence: number;
@@ -48,7 +24,6 @@ interface ElectronAPI {
     timestamp?: string;
     error?: string;
     stack?: string;
-    details?: string;
   }>;
 }
 

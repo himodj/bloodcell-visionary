@@ -4,12 +4,9 @@ const fs = require('fs');
 const url = require('url');
 const { spawn } = require('child_process');
 const isDev = process.env.NODE_ENV === 'development';
-const http = require('http');
 
 let mainWindow;
 let pythonProcess = null;
-let loadAttempts = 0;
-const MAX_LOAD_ATTEMPTS = 30; // Maximum number of retries
 
 function createWindow() {
   // Determine the correct preload script path - use absolute path
@@ -51,18 +48,19 @@ function createWindow() {
     callback(false);
   });
 
-  if (isDev) {
-    loadDevServer();
-  } else {
-    const startUrl = url.format({
-      pathname: path.join(__dirname, '../dist/index.html'),
-      protocol: 'file:',
-      slashes: true,
-    });
-    console.log('Loading production URL:', startUrl);
-    mainWindow.loadURL(startUrl);
-  }
+  const startUrl = isDev
+    ? 'http://localhost:8080'
+    : url.format({
+        pathname: path.join(__dirname, '../dist/index.html'),
+        protocol: 'file:',
+        slashes: true,
+      });
 
+  console.log('Loading URL:', startUrl);
+  console.log('Environment:', process.env.NODE_ENV);
+  console.log('App path:', app.getAppPath());
+  console.log('Current working directory:', process.cwd());
+  
   if (isDev) {
     try {
       console.log('Installing DevTools in development mode');
@@ -74,50 +72,15 @@ function createWindow() {
       console.error('Failed to install developer tools:', e);
     }
   }
+  
+  mainWindow.loadURL(startUrl);
+
+  if (isDev) {
+    mainWindow.webContents.openDevTools();
+  }
 
   mainWindow.on('closed', () => {
     mainWindow = null;
-  });
-}
-
-function checkDevServer(callback) {
-  http.get('http://localhost:8080', (response) => {
-    if (response.statusCode === 200) {
-      callback(true);
-    } else {
-      callback(false);
-    }
-  }).on('error', () => {
-    callback(false);
-  });
-}
-
-function loadDevServer() {
-  const startUrl = 'http://localhost:8080';
-  console.log(`Attempt ${loadAttempts + 1}/${MAX_LOAD_ATTEMPTS} to connect to dev server...`);
-  
-  checkDevServer((available) => {
-    if (available) {
-      console.log('Dev server is available, loading URL:', startUrl);
-      mainWindow.loadURL(startUrl).catch(err => {
-        console.error('Error loading URL:', err);
-      });
-    } else {
-      loadAttempts++;
-      if (loadAttempts < MAX_LOAD_ATTEMPTS) {
-        console.log(`Dev server not available yet. Retrying in 1 second...`);
-        setTimeout(loadDevServer, 1000);
-      } else {
-        console.error('Failed to connect to dev server after maximum attempts');
-        dialog.showMessageBox(mainWindow, {
-          type: 'error',
-          title: 'Connection Error',
-          message: 'Failed to connect to development server at http://localhost:8080',
-          detail: 'Please ensure the Vite server is running before starting Electron.',
-          buttons: ['OK']
-        });
-      }
-    }
   });
 }
 
