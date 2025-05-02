@@ -113,15 +113,9 @@ const ModelLoader: React.FC = () => {
             const hasTensorflow = envInfo.modules?.tensorflow?.installed;
             const hasKeras = envInfo.modules?.keras?.installed;
             
-            if (!hasTensorflow) {
-              setLoadError('TensorFlow is not installed properly in your Python environment.');
-              toast.error('TensorFlow is missing or not properly installed');
-              return;
-            }
-            
-            if (!hasKeras) {
-              setLoadError('Keras is not installed properly in your Python environment.');
-              toast.error('Keras is missing or not properly installed');
+            if (!hasTensorflow && !hasKeras) {
+              setLoadError('Neither TensorFlow nor Keras is installed properly in your Python environment.');
+              toast.error('TensorFlow and Keras are missing or not properly installed');
               return;
             }
           }
