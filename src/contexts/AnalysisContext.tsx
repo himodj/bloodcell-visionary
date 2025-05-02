@@ -1,172 +1,127 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { analyzeBloodSample, isModelInitialized } from '../utils/analysisUtils';
-import { toast } from 'sonner';
 
+// Define cell types based on the provided order
 export type CellType = 
-  | 'RBC' 
-  | 'Platelet' 
+  | 'IG Immature White Cell'
   | 'Basophil'
   | 'Eosinophil'
   | 'Erythroblast'
-  | 'IGImmatureWhiteCell'
   | 'Lymphocyte'
   | 'Monocyte'
-  | 'Neutrophil';
+  | 'Neutrophil'
+  | 'Platelet';
 
-export interface DetectedCell {
+// Define the structure of an analyzed cell
+export interface AnalyzedCell {
   type: CellType;
-  boundingBox: {
+  confidence: number;
+  coordinates?: {
     x: number;
     y: number;
     width: number;
     height: number;
   };
-  confidence: number;
 }
 
-export interface CellCount {
-  normal: {
-    rbc: number;
-    platelets: number;
-  };
-  abnormal: {
-    rbc: number;
-    platelets: number;
-  };
-  total: number;
+// Define the structure of cell counts
+export interface CellCounts {
+  totalCells: number;
+  normalCells: number;
+  abnormalCells: number;
   detectedCells: Record<CellType, number>;
 }
 
+// Define the structure of the analysis result
 export interface AnalysisResult {
-  image: string | null;
-  processedImage: string | null;
-  cellCounts: CellCount;
-  abnormalityRate: number;
-  possibleConditions: string[];
-  recommendations: string[];
+  image: string;
+  processedImage?: string;
   analysisDate: Date;
-  detectedCells: DetectedCell[];
-  reportLayout: 'standard' | 'compact' | 'detailed';
-  notes: string;
+  cellCounts: CellCounts;
+  detectedCells: AnalyzedCell[];
+  abnormalityRate: number;
+  recommendations: string[];
+  possibleConditions: string[];
 }
 
+// Define the context interface
 interface AnalysisContextType {
   isAnalyzing: boolean;
-  originalImage: string | null;
   analysisResult: AnalysisResult | null;
-  error: string | null;
-  setOriginalImage: (image: string | null) => void;
   startAnalysis: () => void;
-  setAnalysisResult: (result: AnalysisResult | null) => void;
+  finishAnalysis: (result: AnalysisResult) => void;
   resetAnalysis: () => void;
-  setError: (error: string | null) => void;
-  updateReportLayout: (layout: 'standard' | 'compact' | 'detailed') => void;
   updateRecommendations: (recommendations: string[]) => void;
   updatePossibleConditions: (conditions: string[]) => void;
-  updateNotes: (notes: string) => void;
+  updateProcessedImage: (imageUrl: string) => void;
 }
 
+// Create the context
 const AnalysisContext = createContext<AnalysisContextType | undefined>(undefined);
 
-export const AnalysisProvider: React.FC<{children: ReactNode}> = ({ children }) => {
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [originalImage, setOriginalImage] = useState<string | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+// Create the provider component
+interface AnalysisProviderProps {
+  children: ReactNode;
+}
 
-  const startAnalysis = async () => {
-    if (!originalImage) {
-      toast.error("Please upload an image first");
-      return;
-    }
-    
-    // Check if model is loaded before proceeding
-    if (!isModelInitialized()) {
-      toast.error("Please load a model first. Click the 'Load Model' or 'Browse for Model' button.");
-      setError("Model not loaded. Please load a model first.");
-      return;
-    }
-    
+export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) => {
+  // State variables
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+
+  // Analysis workflow functions
+  const startAnalysis = () => {
     setIsAnalyzing(true);
-    setError(null);
-    
-    try {
-      // Use the real model analysis
-      const result = await analyzeBloodSample(originalImage);
-      setAnalysisResult(result);
-    } catch (error) {
-      console.error('Analysis error:', error);
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError('An unknown error occurred during analysis');
-      }
-      toast.error(error instanceof Error ? error.message : 'Analysis failed');
-    } finally {
-      setIsAnalyzing(false);
-    }
+    setAnalysisResult(null);
+  };
+
+  const finishAnalysis = (result: AnalysisResult) => {
+    setIsAnalyzing(false);
+    setAnalysisResult(result);
   };
 
   const resetAnalysis = () => {
-    setOriginalImage(null);
-    setAnalysisResult(null);
     setIsAnalyzing(false);
-    setError(null);
+    setAnalysisResult(null);
   };
 
-  const updateReportLayout = (layout: 'standard' | 'compact' | 'detailed') => {
-    if (analysisResult) {
-      setAnalysisResult({
-        ...analysisResult,
-        reportLayout: layout
-      });
-    }
-  };
-
+  // Update functions
   const updateRecommendations = (recommendations: string[]) => {
-    if (analysisResult) {
-      setAnalysisResult({
-        ...analysisResult,
-        recommendations
-      });
-    }
+    if (!analysisResult) return;
+    setAnalysisResult({
+      ...analysisResult,
+      recommendations,
+    });
   };
 
   const updatePossibleConditions = (conditions: string[]) => {
-    if (analysisResult) {
-      setAnalysisResult({
-        ...analysisResult,
-        possibleConditions: conditions
-      });
-    }
+    if (!analysisResult) return;
+    setAnalysisResult({
+      ...analysisResult,
+      possibleConditions: conditions,
+    });
   };
 
-  const updateNotes = (notes: string) => {
-    if (analysisResult) {
-      setAnalysisResult({
-        ...analysisResult,
-        notes
-      });
-    }
+  const updateProcessedImage = (imageUrl: string) => {
+    if (!analysisResult) return;
+    setAnalysisResult({
+      ...analysisResult,
+      processedImage: imageUrl,
+    });
   };
 
+  // Return the provider
   return (
     <AnalysisContext.Provider
       value={{
         isAnalyzing,
-        originalImage,
         analysisResult,
-        error,
-        setOriginalImage,
         startAnalysis,
-        setAnalysisResult,
+        finishAnalysis,
         resetAnalysis,
-        setError,
-        updateReportLayout,
         updateRecommendations,
         updatePossibleConditions,
-        updateNotes
+        updateProcessedImage,
       }}
     >
       {children}
@@ -174,7 +129,8 @@ export const AnalysisProvider: React.FC<{children: ReactNode}> = ({ children }) 
   );
 };
 
-export const useAnalysis = () => {
+// Create a custom hook for using the context
+export const useAnalysis = (): AnalysisContextType => {
   const context = useContext(AnalysisContext);
   if (context === undefined) {
     throw new Error('useAnalysis must be used within an AnalysisProvider');

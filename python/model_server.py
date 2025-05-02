@@ -1,294 +1,142 @@
 
-from flask import Flask, request, jsonify
+import logging
+import os
 import tensorflow as tf
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 import numpy as np
 from PIL import Image
-import io
 import base64
-import os
-import datetime
-import traceback
-import logging
+import io
 import sys
-from flask_cors import CORS
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Configure logger
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
-# Add stderr handler to make sure we see all errors
-stderr_handler = logging.StreamHandler(sys.stderr)
-stderr_handler.setLevel(logging.ERROR)
-logger.addHandler(stderr_handler)
-
-app = Flask(__name__)
-# Enable CORS properly for all routes
-CORS(app, 
-     resources={r"/*": {"origins": "*"}}, 
-     allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Origin"],
-     supports_credentials=True)
-
-# Dictionary to cache loaded models
-model_cache = {}
-
-# Get default model path from environment
-default_model_path = os.environ.get('MODEL_PATH', 'model.h5')
-if os.path.exists(default_model_path):
-    logger.info(f"Default model file found: {default_model_path}")
-    try:
-        # Load the default model at startup if available
-        model_cache[default_model_path] = tf.keras.models.load_model(default_model_path)
-        logger.info(f"Default model loaded successfully from {default_model_path}")
-    except Exception as e:
-        logger.error(f"Error loading default model: {e}")
-        logger.error(traceback.format_exc())
-else:
-    logger.warning(f"Default model file not found at {default_model_path}")
-
-# Updated class labels - make sure they match exactly with frontend
+# Update class labels to match the specified order (no RBC)
 class_labels = [
-    'Basophil', 'Eosinophil', 'Erythroblast', 'IGImmatureWhiteCell',
-    'Lymphocyte', 'Monocyte', 'Neutrophil', 'Platelet', 'RBC'
+    'IG Immature White Cell', 'Basophil', 'Eosinophil', 'Erythroblast',  
+    'Lymphocyte', 'Monocyte', 'Neutrophil', 'Platelet'
 ]
 
 # Log class label order for debugging
 logger.info(f"Class labels order: {', '.join(class_labels)}")
 
-def load_model(model_path):
-    """
-    Load a model from the specified path, with caching.
-    Returns the model, or None if loading fails.
-    """
-    if model_path in model_cache:
-        logger.info(f"Using cached model from {model_path}")
-        return model_cache[model_path]
-    
-    if not os.path.exists(model_path):
-        logger.error(f"Model file not found at {model_path}")
-        return None
-    
-    try:
-        logger.info(f"Loading model from {model_path}")
-        model = tf.keras.models.load_model(model_path)
-        logger.info(f"Model loaded successfully from {model_path}")
-        model_cache[model_path] = model
-        return model
-    except Exception as e:
-        logger.error(f"Error loading model from {model_path}: {e}")
-        logger.error(traceback.format_exc())
-        return None
+app = Flask(__name__)
+CORS(app)
 
-def preprocess_image(image_data):
-    """
-    Preprocess image exactly as during training:
-    1. Decode base64 to image
-    2. Center crop to square
-    3. Resize to 360x360
-    4. Convert to RGB (ensure 3 channels)
-    5. Normalize pixel values
-    """
+# Initialize global variables
+default_model = None
+default_model_path = None
+default_model_loaded = False
+
+@app.route('/predict', methods=['POST'])
+def predict():
     try:
-        # Decode base64 image
-        try:
-            # Try to split at comma - standard base64 image format
-            image_data = image_data.split(',')[1]
-        except:
-            # If no comma, assume it's already just the base64 data
-            pass
+        data = request.json
+        if not data or 'image' not in data:
+            return jsonify({'error': 'No image data provided'}), 400
         
-        img = Image.open(io.BytesIO(base64.b64decode(image_data)))
-        logger.info(f"Successfully decoded image: {img.size}, mode: {img.mode}")
+        # Get the image data from the request
+        image_data = data['image'].split(',')[1] if ',' in data['image'] else data['image']
         
-        # Convert to RGB mode if it's not already
-        if img.mode != 'RGB':
-            logger.info(f"Converting image from {img.mode} to RGB mode")
-            img = img.convert('RGB')
+        # Decode the base64 image
+        image_bytes = base64.b64decode(image_data)
+        image = Image.open(io.BytesIO(image_bytes))
         
-        # Get dimensions for center crop
-        width, height = img.size
-        new_dim = min(width, height)
-        
-        # Calculate crop coordinates
-        left = (width - new_dim) // 2
-        top = (height - new_dim) // 2
-        right = left + new_dim
-        bottom = top + new_dim
-        
-        # Crop and resize
-        img = img.crop((left, top, right, bottom))
-        img = img.resize((360, 360), Image.LANCZOS)
-        logger.info(f"Cropped and resized image to 360x360, mode: {img.mode}")
-        
-        # Convert to numpy array and normalize
-        img_array = np.array(img) / 255.0
-        
-        # Log the shape to verify it's correct
-        logger.info(f"Image shape after processing: {img_array.shape}")
+        # Resize and preprocess the image
+        image = image.resize((224, 224))  # Assuming model input size
+        image = np.array(image) / 255.0  # Normalize to [0,1]
         
         # Add batch dimension
-        img_array = np.expand_dims(img_array, axis=0)
+        image = np.expand_dims(image, axis=0)
         
-        return img_array
-    except Exception as e:
-        logger.error(f"Error preprocessing image: {e}")
-        logger.error(traceback.format_exc())
-        raise
-
-def get_fallback_result():
-    """Provide a fallback result when the model fails"""
-    # Pick a random cell type
-    import random
-    cell_type = random.choice(class_labels)
-    confidence = 0.7 + random.random() * 0.25
-    
-    logger.warning(f"Using fallback prediction: {cell_type} with confidence {confidence:.4f}")
-    
-    # Create single detected cell
-    cell = {
-        "type": cell_type,
-        "confidence": confidence,
-        "boundingBox": {
-            "x": 120,  # Center of image
-            "y": 120,
-            "width": 120,
-            "height": 120
+        # Make prediction
+        global default_model
+        if default_model is None:
+            return jsonify({'error': 'Model not loaded'}), 500
+            
+        predictions = default_model.predict(image)
+        
+        # Get the predicted class
+        predicted_class_index = np.argmax(predictions[0])
+        confidence = float(predictions[0][predicted_class_index])
+        
+        if predicted_class_index < len(class_labels):
+            predicted_class = class_labels[predicted_class_index]
+        else:
+            predicted_class = f"Unknown Class {predicted_class_index}"
+            logger.error(f"Predicted class index {predicted_class_index} is out of bounds for class_labels of length {len(class_labels)}")
+        
+        # Create a response with the top prediction
+        response = {
+            'cell_type': predicted_class,
+            'confidence': confidence,
+            'all_probabilities': predictions[0].tolist(),
+            'class_labels': class_labels
         }
-    }
-    
-    # Initialize cell counts with zeros
-    cell_counts = {label: 0 for label in class_labels}
-    
-    # Set count to 1 for the detected cell type
-    cell_counts[cell_type] = 1
-    
-    return {
-        'detectedCells': [cell],
-        'cellCounts': cell_counts,
-        'timestamp': str(datetime.datetime.now()),
-        'status': 'fallback'
-    }
+        
+        return jsonify(response), 200
+        
+    except Exception as e:
+        logger.error(f"Error during prediction: {e}")
+        return jsonify({'error': str(e)}), 500
 
-@app.route('/predict', methods=['POST', 'OPTIONS'])
-def predict():
-    # Handle preflight requests
-    if request.method == 'OPTIONS':
-        response = app.make_default_options_response()
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, Access-Control-Allow-Origin')
-        response.headers.add('Access-Control-Allow-Methods', 'POST')
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        return response
-        
-    logger.info("Received prediction request")
-    
-    if 'image' not in request.json:
-        logger.error("No image provided in request")
-        return jsonify({'error': 'No image provided'}), 400
-    
-    # Get model path from request or use default
-    model_path = request.json.get('modelPath', default_model_path)
-    logger.info(f"Using model path: {model_path}")
-    
-    # Load the model based on the provided path
-    model = load_model(model_path)
-    
-    if model is None:
-        logger.error(f"Model could not be loaded from {model_path}, returning fallback result")
-        return jsonify({
-            **get_fallback_result(),
-            'error': f'Could not load model from {model_path}'
-        })
-        
+def load_model(model_path=None):
     try:
-        # Get image from request
-        image_data = request.json['image']
+        global default_model, default_model_path, default_model_loaded
         
-        # Preprocess image
-        processed_image = preprocess_image(image_data)
+        # If no model path provided, try to use default
+        if model_path is None:
+            if os.environ.get('MODEL_PATH'):
+                model_path = os.environ.get('MODEL_PATH')
+                logger.info(f"Using model path from environment: {model_path}")
+            else:
+                # Try to find model in the current directory
+                current_dir = os.getcwd()
+                model_path = os.path.join(current_dir, 'model.h5')
+                logger.info(f"Trying default model path: {model_path}")
         
-        # Log the processed image shape to verify dimensions
-        logger.info(f"Processed image shape before prediction: {processed_image.shape}")
+        if not os.path.exists(model_path):
+            logger.error(f"Model file not found at: {model_path}")
+            return False
+            
+        logger.info(f"Default model file found: {model_path}")
         
-        # Get prediction from model
-        prediction = model.predict(processed_image)
+        # Load the model
+        default_model = tf.keras.models.load_model(model_path)
+        default_model_path = model_path
+        default_model_loaded = True
         
-        # Get class with highest probability
-        predicted_class_idx = np.argmax(prediction[0])
-        confidence = float(prediction[0][predicted_class_idx])
-        predicted_class = class_labels[predicted_class_idx]
-        
-        # Log all class probabilities for debugging
-        class_probs = {class_labels[i]: float(prediction[0][i]) for i in range(len(class_labels))}
-        logger.info(f"Class probabilities: {class_probs}")
-        
-        logger.info(f"Predicted class index: {predicted_class_idx}, class: {predicted_class} with confidence {confidence:.4f}")
-        
-        # Create single detected cell
-        cell = {
-            "type": predicted_class,
-            "confidence": confidence,
-            "boundingBox": {
-                "x": 120,  # Center of image
-                "y": 120,
-                "width": 120,
-                "height": 120
-            }
-        }
-        
-        # Initialize cell counts with zeros
-        cell_counts = {label: 0 for label in class_labels}
-        
-        # Set count to 1 for the detected cell type
-        cell_counts[predicted_class] = 1
-        
-        # Create response with single detected cell
-        result = {
-            'detectedCells': [cell],
-            'cellCounts': cell_counts,
-            'timestamp': str(datetime.datetime.now()),
-            'modelPath': model_path
-        }
-        
-        return jsonify(result)
+        logger.info(f"Default model loaded successfully from {model_path}")
+        return True
         
     except Exception as e:
-        logger.error(f"Error processing request: {e}")
-        logger.error(traceback.format_exc())
-        
-        # Return fallback result instead of error
-        logger.info("Returning fallback result due to processing error")
-        fallback = get_fallback_result()
-        fallback['error'] = str(e)
-        return jsonify(fallback)
+        logger.error(f"Error loading model: {e}")
+        return False
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Simple health check endpoint"""
+@app.route('/model/status', methods=['GET'])
+def model_status():
+    global default_model_path, default_model_loaded
     return jsonify({
-        'status': 'ok',
-        'models_loaded': list(model_cache.keys()),
-        'timestamp': str(datetime.datetime.now())
-    })
-
-@app.route('/models', methods=['GET'])
-def list_models():
-    """List all loaded models"""
-    return jsonify({
-        'models': list(model_cache.keys()),
-        'default_model': default_model_path,
-        'model_count': len(model_cache),
-        'class_labels': class_labels
+        'model_path': default_model_path,
+        'loaded': default_model_loaded
     })
 
 if __name__ == '__main__':
-    # Get port from environment or use default
-    port = int(os.environ.get('PORT', 5000))
+    # Try to load the default model
+    load_model()
     
-    # Log server startup
-    logger.info(f"Starting Flask server on port {port}")
+    # Log application state
     logger.info(f"Default model path: {default_model_path}")
-    logger.info(f"Default model loaded: {default_model_path in model_cache}")
+    logger.info(f"Default model loaded: {default_model_loaded}")
     logger.info(f"Current working directory: {os.getcwd()}")
     logger.info(f"Class labels: {class_labels}")
     
-    # Run on port 5000 by default, make it accessible from outside
-    app.run(host='0.0.0.0', port=port, debug=False)
+    # Start the Flask server
+    logger.info("Starting Flask server on port 5000")
+    app.run(host='0.0.0.0', port=5000)
