@@ -1,14 +1,15 @@
 
 import logging
 import os
-import tensorflow as tf
+import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import numpy as np
 from PIL import Image
 import base64
 import io
 import sys
+import traceback
+import importlib
 
 # Configure logger
 logging.basicConfig(
@@ -37,59 +38,108 @@ default_model_loaded = False
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
+        # Check if model is loaded
+        global default_model
+        if default_model is None:
+            logger.error("Model not loaded when prediction was attempted")
+            return jsonify({'error': 'Model not loaded'}), 500
+            
         data = request.json
         if not data or 'image' not in data:
+            logger.error("No image data provided in request")
             return jsonify({'error': 'No image data provided'}), 400
         
         # Get the image data from the request
         image_data = data['image'].split(',')[1] if ',' in data['image'] else data['image']
         
-        # Decode the base64 image
-        image_bytes = base64.b64decode(image_data)
-        image = Image.open(io.BytesIO(image_bytes))
-        
-        # Resize and preprocess the image
-        image = image.resize((224, 224))  # Assuming model input size
-        image = np.array(image) / 255.0  # Normalize to [0,1]
-        
-        # Add batch dimension
-        image = np.expand_dims(image, axis=0)
-        
-        # Make prediction
-        global default_model
-        if default_model is None:
-            return jsonify({'error': 'Model not loaded'}), 500
+        try:
+            # Decode the base64 image
+            image_bytes = base64.b64decode(image_data)
+            image = Image.open(io.BytesIO(image_bytes))
             
-        predictions = default_model.predict(image)
-        
-        # Get the predicted class
-        predicted_class_index = np.argmax(predictions[0])
-        confidence = float(predictions[0][predicted_class_index])
-        
-        if predicted_class_index < len(class_labels):
-            predicted_class = class_labels[predicted_class_index]
-        else:
-            predicted_class = f"Unknown Class {predicted_class_index}"
-            logger.error(f"Predicted class index {predicted_class_index} is out of bounds for class_labels of length {len(class_labels)}")
-        
-        # Create a response with the top prediction
-        response = {
-            'cell_type': predicted_class,
-            'confidence': confidence,
-            'all_probabilities': predictions[0].tolist(),
-            'class_labels': class_labels
-        }
-        
-        return jsonify(response), 200
+            # Resize and preprocess the image
+            image = image.resize((224, 224))  # Assuming model input size
+            image = np.array(image) / 255.0  # Normalize to [0,1]
+            
+            # Add batch dimension
+            image = np.expand_dims(image, axis=0)
+            
+            # Make prediction
+            logger.info("Making prediction with model")
+            predictions = default_model.predict(image)
+            
+            # Get the predicted class
+            predicted_class_index = np.argmax(predictions[0])
+            confidence = float(predictions[0][predicted_class_index])
+            
+            if predicted_class_index < len(class_labels):
+                predicted_class = class_labels[predicted_class_index]
+            else:
+                predicted_class = f"Unknown Class {predicted_class_index}"
+                logger.error(f"Predicted class index {predicted_class_index} is out of bounds for class_labels of length {len(class_labels)}")
+            
+            # Create a response with the top prediction
+            response = {
+                'cell_type': predicted_class,
+                'confidence': confidence,
+                'all_probabilities': predictions[0].tolist(),
+                'class_labels': class_labels
+            }
+            
+            logger.info(f"Prediction successful: {predicted_class} with confidence {confidence}")
+            return jsonify(response), 200
+        except Exception as img_error:
+            logger.error(f"Error processing image: {img_error}")
+            return jsonify({'error': f'Error processing image: {str(img_error)}'}), 500
         
     except Exception as e:
         logger.error(f"Error during prediction: {e}")
         return jsonify({'error': str(e)}), 500
 
-def load_model(model_path=None):
+def check_tensorflow_installation():
+    """Check if TensorFlow is properly installed and usable"""
     try:
-        global default_model, default_model_path, default_model_loaded
+        logger.info("Checking TensorFlow installation...")
         
+        # First, check if Keras is available directly (standalone)
+        try:
+            import keras
+            logger.info(f"Successfully imported standalone Keras version: {getattr(keras, '__version__', 'Unknown')}")
+            logger.info(f"Keras path: {getattr(keras, '__file__', 'Unknown')}")
+            return True, keras
+        except ImportError as e:
+            logger.warning(f"Failed to import standalone Keras: {e}")
+        
+        # Next, try importing TensorFlow
+        try:
+            import tensorflow as tf
+            version = getattr(tf, '__version__', 'Unknown')
+            logger.info(f"Successfully imported TensorFlow version: {version}")
+            logger.info(f"TensorFlow path: {getattr(tf, '__file__', 'Unknown')}")
+            
+            # Check if keras is available through tensorflow
+            if hasattr(tf, 'keras'):
+                logger.info("TensorFlow has keras attribute")
+                return True, tf
+            else:
+                logger.warning("TensorFlow does not have keras attribute")
+                
+            return True, tf
+        except ImportError as e:
+            logger.error(f"Failed to import TensorFlow: {e}")
+        
+        return False, None
+        
+    except Exception as e:
+        logger.error(f"Error checking TensorFlow installation: {e}")
+        logger.error(traceback.format_exc())
+        return False, None
+
+def load_model(model_path=None):
+    global default_model, default_model_path, default_model_loaded
+    default_model_loaded = False  # Reset flag
+    
+    try:
         # If no model path provided, try to use default
         if model_path is None:
             if os.environ.get('MODEL_PATH'):
@@ -107,16 +157,74 @@ def load_model(model_path=None):
             
         logger.info(f"Default model file found: {model_path}")
         
-        # Load the model
-        default_model = tf.keras.models.load_model(model_path)
-        default_model_path = model_path
-        default_model_loaded = True
+        # Try different approaches to load the model
+        tf_or_keras_ok, module = check_tensorflow_installation()
+        if not tf_or_keras_ok:
+            logger.error("Neither TensorFlow nor Keras could be imported")
+            return False
+            
+        # Try to load the model using the available module
+        logger.info(f"Loading model from {model_path}...")
         
-        logger.info(f"Default model loaded successfully from {model_path}")
-        return True
-        
+        if module.__name__ == 'keras':
+            # Using standalone keras
+            try:
+                logger.info("Attempting to load model with standalone keras...")
+                default_model = module.models.load_model(model_path, compile=False)
+                logger.info("Successfully loaded model with standalone keras")
+                default_model_path = model_path
+                default_model_loaded = True
+                return True
+            except Exception as e:
+                logger.error(f"Error loading model with standalone keras: {e}")
+                logger.error(traceback.format_exc())
+                
+        elif module.__name__ == 'tensorflow':
+            # Using tensorflow
+            try:
+                if hasattr(module, 'keras'):
+                    logger.info("Attempting to load model with tf.keras...")
+                    default_model = module.keras.models.load_model(model_path, compile=False)
+                    logger.info("Successfully loaded model with tf.keras")
+                    default_model_path = model_path
+                    default_model_loaded = True
+                    return True
+                else:
+                    # Try alternate approach for older tensorflow
+                    logger.info("Attempting to load model with older TensorFlow API...")
+                    try:
+                        # For TensorFlow 1.x compatibility
+                        from tensorflow.python.keras.models import load_model
+                        default_model = load_model(model_path, compile=False)
+                        logger.info("Successfully loaded model with tensorflow.python.keras")
+                        default_model_path = model_path
+                        default_model_loaded = True
+                        return True
+                    except ImportError:
+                        logger.error("Could not import keras from tensorflow.python")
+                        
+                    # Try to import keras directly as a fallback
+                    try:
+                        logger.info("Attempting alternative import of keras...")
+                        import keras
+                        default_model = keras.models.load_model(model_path, compile=False)
+                        logger.info("Successfully loaded model with imported keras")
+                        default_model_path = model_path
+                        default_model_loaded = True
+                        return True
+                    except ImportError as ke:
+                        logger.error(f"Could not import keras: {ke}")
+            except Exception as e:
+                logger.error(f"Error loading model with tensorflow: {e}")
+                logger.error(traceback.format_exc())
+                
+        # If we get here, all attempts failed
+        logger.error("All attempts to load the model failed")
+        return False
+            
     except Exception as e:
-        logger.error(f"Error loading model: {e}")
+        logger.error(f"Error loading TensorFlow or model: {e}")
+        logger.error(f"Detailed traceback: {traceback.format_exc()}")
         return False
 
 @app.route('/model/status', methods=['GET'])
@@ -127,13 +235,54 @@ def model_status():
         'loaded': default_model_loaded
     })
 
+@app.route('/load_model', methods=['POST'])
+def load_model_endpoint():
+    try:
+        data = request.json
+        model_path = data.get('model_path') if data else None
+        success = load_model(model_path)
+        return jsonify({'success': success, 'loaded': default_model_loaded, 'path': default_model_path})
+    except Exception as e:
+        logger.error(f"Error in load_model endpoint: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/environment', methods=['GET'])
+def environment_info():
+    """Return information about the Python environment"""
+    try:
+        env_info = {
+            'python_version': sys.version,
+            'platform': sys.platform,
+            'modules': {}
+        }
+        
+        # Check for key modules
+        for module_name in ['tensorflow', 'keras', 'numpy', 'h5py']:
+            try:
+                module = importlib.import_module(module_name)
+                version = getattr(module, '__version__', 'Unknown version')
+                env_info['modules'][module_name] = {
+                    'installed': True,
+                    'version': version,
+                    'path': getattr(module, '__file__', 'Unknown path')
+                }
+            except ImportError:
+                env_info['modules'][module_name] = {
+                    'installed': False
+                }
+        
+        return jsonify(env_info)
+    except Exception as e:
+        logger.error(f"Error getting environment info: {e}")
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     # Try to load the default model
-    load_model()
+    success = load_model()
     
     # Log application state
+    logger.info(f"Default model loaded: {default_model_loaded} (success: {success})")
     logger.info(f"Default model path: {default_model_path}")
-    logger.info(f"Default model loaded: {default_model_loaded}")
     logger.info(f"Current working directory: {os.getcwd()}")
     logger.info(f"Class labels: {class_labels}")
     
