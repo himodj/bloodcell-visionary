@@ -1,5 +1,7 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { analyzeImage } from '../utils/analysisUtils';
+import { toast } from 'sonner';
 
 // Define cell types based on the provided order
 export type CellType = 
@@ -74,9 +76,28 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
   const [originalImage, setOriginalImage] = useState<string | null>(null); // Added originalImage state
 
   // Analysis workflow functions
-  const startAnalysis = () => {
-    setIsAnalyzing(true);
-    setAnalysisResult(null);
+  const startAnalysis = async () => {
+    if (!originalImage) {
+      toast.error('No image selected for analysis');
+      return;
+    }
+    
+    try {
+      setIsAnalyzing(true);
+      setAnalysisResult(null);
+      
+      // Perform the analysis
+      const result = await analyzeImage(originalImage);
+      
+      // Update state with the results
+      finishAnalysis(result);
+      
+      toast.success('Analysis completed successfully');
+    } catch (error) {
+      console.error('Error during analysis:', error);
+      setIsAnalyzing(false);
+      toast.error(`Analysis failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
 
   const finishAnalysis = (result: AnalysisResult) => {

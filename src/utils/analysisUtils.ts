@@ -1,3 +1,4 @@
+
 import { CellType, AnalysisResult, AnalyzedCell } from '../contexts/AnalysisContext';
 import { toast } from 'sonner';
 
@@ -146,81 +147,85 @@ export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult
   
   console.log('Sending image for analysis...');
   
-  // Call the electron method to analyze the image
-  const response = await window.electron.analyzeWithH5Model(modelPath, imageDataUrl) as PythonServerResponse;
-  
-  if (response.error) {
-    throw new Error(`Analysis failed: ${response.error}`);
-  }
-  
-  console.log('Analysis completed successfully:', response);
-  
-  // Extract cell information from the response
-  let cellType: CellType;
-  let confidence: number;
-  
-  // Handle the response format from our Python server
-  if (response.cell_type) {
-    cellType = mapToCellType(response.cell_type);
-    confidence = response.confidence || 0.8;
-  } else if (response.detectedCells && response.detectedCells.length > 0) {
-    // Fallback to older format with detectedCells array
-    const cell = response.detectedCells[0];
-    cellType = mapToCellType(cell.type);
-    confidence = cell.confidence;
-  } else {
-    // Absolute fallback
-    cellType = mapToCellType('Lymphocyte');
-    confidence = 0.8;
-  }
-  
-  // Create a cell object
-  const analyzedCell: AnalyzedCell = {
-    type: cellType,
-    confidence,
-    coordinates: {
-      x: 0,
-      y: 0,
-      width: 224,
-      height: 224
+  try {
+    // Call the electron method to analyze the image
+    const response = await window.electron.analyzeWithH5Model(modelPath, imageDataUrl) as PythonServerResponse;
+    
+    if (response.error) {
+      throw new Error(`Model analysis failed: ${response.error}`);
     }
-  };
-  
-  // Initialize cell counts
-  const cellCounts: Record<CellType, number> = {
-    'IG Immature White Cell': 0,
-    'Basophil': 0,
-    'Eosinophil': 0,
-    'Erythroblast': 0,
-    'Lymphocyte': 0,
-    'Monocyte': 0,
-    'Neutrophil': 0,
-    'Platelet': 0
-  };
-  
-  // Increment the detected cell type
-  cellCounts[cellType] = 1;
-  
-  // Determine if the cell is abnormal based on its type
-  const isAbnormal = ['IG Immature White Cell', 'Basophil', 'Eosinophil'].includes(cellType);
-  
-  // Create analysis result
-  const result: AnalysisResult = {
-    image: imageDataUrl,
-    analysisDate: new Date(),
-    cellCounts: {
-      totalCells: 1,
-      normalCells: isAbnormal ? 0 : 1,
-      abnormalCells: isAbnormal ? 1 : 0,
-      detectedCells: cellCounts
-    },
-    detectedCells: [analyzedCell],
-    abnormalityRate: isAbnormal ? 1.0 : 0.0,
-    recommendations: generateRecommendations(cellType),
-    possibleConditions: generatePossibleConditions(cellType)
-  };
-  
-  return result;
+    
+    console.log('Analysis completed successfully:', response);
+    
+    // Extract cell information from the response
+    let cellType: CellType;
+    let confidence: number;
+    
+    // Handle the response format from our Python server
+    if (response.cell_type) {
+      cellType = mapToCellType(response.cell_type);
+      confidence = response.confidence || 0.8;
+    } else if (response.detectedCells && response.detectedCells.length > 0) {
+      // Fallback to older format with detectedCells array
+      const cell = response.detectedCells[0];
+      cellType = mapToCellType(cell.type);
+      confidence = cell.confidence;
+    } else {
+      // This is an error case - the model should always return a cell type
+      throw new Error('No cell type detected in model response');
+    }
+    
+    // Create a cell object
+    const analyzedCell: AnalyzedCell = {
+      type: cellType,
+      confidence,
+      coordinates: {
+        x: 0,
+        y: 0,
+        width: 224,
+        height: 224
+      }
+    };
+    
+    // Initialize cell counts
+    const cellCounts: Record<CellType, number> = {
+      'IG Immature White Cell': 0,
+      'Basophil': 0,
+      'Eosinophil': 0,
+      'Erythroblast': 0,
+      'Lymphocyte': 0,
+      'Monocyte': 0,
+      'Neutrophil': 0,
+      'Platelet': 0
+    };
+    
+    // Increment the detected cell type
+    cellCounts[cellType] = 1;
+    
+    // Determine if the cell is abnormal based on its type
+    const isAbnormal = ['IG Immature White Cell', 'Basophil', 'Eosinophil'].includes(cellType);
+    
+    // Create analysis result
+    const result: AnalysisResult = {
+      image: imageDataUrl,
+      analysisDate: new Date(),
+      cellCounts: {
+        totalCells: 1,
+        normalCells: isAbnormal ? 0 : 1,
+        abnormalCells: isAbnormal ? 1 : 0,
+        detectedCells: cellCounts
+      },
+      detectedCells: [analyzedCell],
+      abnormalityRate: isAbnormal ? 1.0 : 0.0,
+      recommendations: generateRecommendations(cellType),
+      possibleConditions: generatePossibleConditions(cellType)
+    };
+    
+    return result;
+  } catch (error) {
+    console.error('Error during Python backend analysis:', error);
+    throw error;
+  }
 };
 
 // Map string to valid CellType

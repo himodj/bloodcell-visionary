@@ -98,31 +98,6 @@ const ModelLoader: React.FC = () => {
         console.log('Default model found at:', modelPath);
         setModelPath(modelPath);
         
-        // First, let's check the environment
-        let envInfo = null;
-        try {
-          envInfo = await window.electron.getPythonEnvironmentInfo();
-          setEnvironmentInfo(envInfo);
-          
-          if (envInfo.error) {
-            console.warn('Environment check warning:', envInfo.error);
-          } else {
-            console.log('Environment info:', envInfo);
-            
-            // Check for TensorFlow and Keras modules
-            const hasTensorflow = envInfo.modules?.tensorflow?.installed;
-            const hasKeras = envInfo.modules?.keras?.installed;
-            
-            if (!hasTensorflow && !hasKeras) {
-              setLoadError('Neither TensorFlow nor Keras is installed properly in your Python environment.');
-              toast.error('TensorFlow and Keras are missing or not properly installed');
-              return;
-            }
-          }
-        } catch (envError) {
-          console.error('Error checking environment:', envError);
-        }
-        
         // First initialize the model in our front-end
         const frontendInitSuccess = await initializeModel(modelPath);
         
@@ -144,16 +119,19 @@ const ModelLoader: React.FC = () => {
           toast.error('Model loading failed. Check console for details.');
           setShowAdvancedHelp(true);
           
-          // Based on environment info, give more specific guidance
-          if (envInfo) {
-            if (envInfo.modules?.tensorflow?.version !== envInfo.modules?.keras?.version) {
-              setLoadError(
-                `TensorFlow (${envInfo.modules?.tensorflow?.version}) and Keras (${envInfo.modules?.keras?.version}) versions are mismatched. ` +
-                'Try running these commands in your command prompt:' +
-                '\n\n1. pip install tensorflow==2.12.0 keras==2.12.0 h5py==3.8.0' +
-                '\n2. Restart the application'
-              );
+          // Based on environment info, try to provide more guidance
+          try {
+            const envInfo = await window.electron.getPythonEnvironmentInfo();
+            setEnvironmentInfo(envInfo);
+            
+            if (envInfo && envInfo.modules) {
+              // Provide version compatibility information if available
+              if (envInfo.modules.tensorflow && envInfo.modules.keras) {
+                setLoadError((prevError) => `${prevError}\n\nTensorFlow version: ${envInfo.modules.tensorflow.version || 'unknown'}\nKeras version: ${envInfo.modules.keras.version || 'unknown'}`);
+              }
             }
+          } catch (envError) {
+            console.error('Failed to get environment info:', envError);
           }
           
           return;
@@ -409,7 +387,7 @@ const ModelLoader: React.FC = () => {
                   <li>Verify you have Python 3.8-3.10 installed</li>
                   <li>Try reinstalling TensorFlow and Keras with specific versions:</li>
                   <code className="block bg-black text-white p-2 mt-1 mb-2">
-                    pip install tensorflow==2.12.0 keras==2.12.0 h5py==3.8.0
+                    pip install tensorflow==2.7.0 keras==2.7.0 h5py==3.7.0
                   </code>
                   <li>Make sure your model.h5 file is a valid TensorFlow/Keras model</li>
                   <li>Restart the application after making changes</li>
