@@ -99,13 +99,18 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
           await window.electron.getDefaultModelPath()
         );
         
+        console.log('Model status check result:', modelStatus);
+        
         if (!modelStatus.loaded) {
-          toast.error('Model is not loaded. Please load model first.');
+          toast.error('Model is not loaded properly. Please try reloading the model first.');
           setIsAnalyzing(false);
           return;
         }
       } catch (statusError) {
         console.error('Error checking model status:', statusError);
+        toast.error('Failed to check model status. Please reload the model.');
+        setIsAnalyzing(false);
+        return;
       }
       
       // Perform the analysis

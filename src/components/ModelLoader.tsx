@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -80,7 +79,9 @@ const ModelLoader: React.FC = () => {
       const path = modelPath || await window.electron.getDefaultModelPath();
       
       if (path) {
+        console.log("Checking Python model status for path:", path);
         const result = await window.electron.reloadPythonModel(path);
+        console.log("Python model status result:", result);
         setModelCheckStatus(result.loaded ? 'success' : 'error');
         return result;
       }
@@ -105,6 +106,7 @@ const ModelLoader: React.FC = () => {
     
     try {
       const envInfo = await window.electron.getPythonEnvironmentInfo();
+      console.log("Environment info received:", envInfo);
       setEnvironmentInfo(envInfo);
       
       if (envInfo.error) {
@@ -152,6 +154,7 @@ const ModelLoader: React.FC = () => {
         // Now ensure the Python backend also has the model loaded
         console.log('Ensuring Python backend has model loaded...');
         const pythonReloadResult = await window.electron.reloadPythonModel(modelPath);
+        console.log('Python model reload result:', pythonReloadResult);
         
         if (pythonReloadResult.error) {
           console.error('Error from Python model reload:', pythonReloadResult.error);
@@ -180,7 +183,7 @@ const ModelLoader: React.FC = () => {
           return;
         }
         
-        if (pythonReloadResult.success) {
+        if (pythonReloadResult.loaded) {
           setIsModelLoaded(true);
           toast.success(`Model loaded successfully from: ${modelPath}`);
           setModelCheckStatus('success');
@@ -251,7 +254,7 @@ const ModelLoader: React.FC = () => {
           return;
         }
         
-        if (pythonReloadResult.success) {
+        if (pythonReloadResult.loaded) {
           setIsModelLoaded(true);
           toast.success(`Model loaded successfully from: ${selectedPath}`);
           setModelCheckStatus('success');
@@ -275,6 +278,7 @@ const ModelLoader: React.FC = () => {
     }
   };
 
+  // Function to handle model reload
   const handleReloadModel = async () => {
     if (!window.electron || !modelPath) return;
     
@@ -287,6 +291,7 @@ const ModelLoader: React.FC = () => {
       
       // Then reload in Python backend
       const pythonReloadResult = await window.electron.reloadPythonModel(modelPath);
+      console.log('Model reload result:', pythonReloadResult);
       
       if (pythonReloadResult.error) {
         console.error('Error from Python model reload:', pythonReloadResult.error);
@@ -294,7 +299,7 @@ const ModelLoader: React.FC = () => {
         toast.error('Failed to reload model in Python backend. Check console for details.');
         setShowAdvancedHelp(true);
         setModelCheckStatus('error');
-      } else if (pythonReloadResult.success) {
+      } else if (pythonReloadResult.loaded) {
         setIsModelLoaded(true);
         toast.success('Model reloaded successfully in both frontend and Python backend');
         setModelCheckStatus('success');
@@ -441,7 +446,7 @@ const ModelLoader: React.FC = () => {
                   <li>Verify you have Python 3.8-3.10 installed</li>
                   <li>Try reinstalling TensorFlow and Keras with specific versions:</li>
                   <code className="block bg-black text-white p-2 mt-1 mb-2">
-                    pip install tensorflow==2.7.0 keras==2.7.0 h5py==3.1.0
+                    pip install tensorflow==2.10.0 keras==2.10.0 h5py==3.1.0
                   </code>
                   <li>Make sure your model.h5 file is a valid TensorFlow/Keras model</li>
                   <li>Restart the application after making changes</li>

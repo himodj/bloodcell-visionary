@@ -118,28 +118,8 @@ def load_model(model_path=None):
             
         logger.info(f"Default model file found: {model_path}")
         
-        # First check if TensorFlow is properly installed
-        try:
-            import tensorflow as tf
-            # Check version without using __version__ directly (which might not be available in some TF versions)
-            tf_version = getattr(tf, '__version__', 'Unknown')
-            logger.info(f"TensorFlow successfully imported, version info: {tf_version}")
-        except Exception as tf_error:
-            logger.error(f"Error importing TensorFlow: {tf_error}")
-            return False
-        
         # Try multiple approaches to load the model
-        try:
-            logger.info("Attempting to load model with tf.keras...")
-            import tensorflow as tf
-            default_model = tf.keras.models.load_model(model_path, compile=False)
-            logger.info("Successfully loaded model with tf.keras")
-            default_model_path = model_path
-            default_model_loaded = True
-            return True
-        except Exception as ke:
-            logger.error(f"Error loading with tf.keras: {ke}")
-        
+        # First try with standalone keras
         try:
             import keras
             logger.info("Attempting to load model with standalone Keras...")
@@ -148,8 +128,32 @@ def load_model(model_path=None):
             default_model_path = model_path
             default_model_loaded = True
             return True
+        except Exception as ke:
+            logger.error(f"Error loading with standalone keras: {ke}")
+            
+        # Then try with tf.keras if the first approach failed
+        try:
+            logger.info("Attempting to load model with tf.keras...")
+            import tensorflow as tf
+            # Check version without using __version__ directly (which might not be available in some TF versions)
+            tf_version = getattr(tf, '__version__', 'Unknown')
+            logger.info(f"TensorFlow successfully imported, version info: {tf_version}")
+            
+            # Use different approaches based on TF version
+            if hasattr(tf, 'keras'):
+                default_model = tf.keras.models.load_model(model_path, compile=False)
+                logger.info("Successfully loaded model with tf.keras")
+            else:
+                # For older TF versions
+                import keras
+                default_model = keras.models.load_model(model_path, compile=False)
+                logger.info("Successfully loaded model with keras (from TF dependency)")
+                
+            default_model_path = model_path
+            default_model_loaded = True
+            return True
         except Exception as ke2:
-            logger.error(f"Error loading with keras: {ke2}")
+            logger.error(f"Error loading with tf.keras: {ke2}")
         
         # If all approaches failed
         logger.error("All attempts to load the model failed")
