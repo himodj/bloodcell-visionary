@@ -118,12 +118,13 @@ def load_model(model_path=None):
             
         logger.info(f"Default model file found: {model_path}")
         
-        # Try multiple approaches to load the model
-        # First try with standalone keras
+        # Multiple attempts with different approaches to load the model
+        # First try standalone keras
         try:
-            import keras
             logger.info("Attempting to load model with standalone Keras...")
-            default_model = keras.models.load_model(model_path, compile=False)
+            import keras
+            from keras.models import load_model
+            default_model = load_model(model_path, compile=False)
             logger.info("Successfully loaded model with standalone keras")
             default_model_path = model_path
             default_model_loaded = True
@@ -131,29 +132,41 @@ def load_model(model_path=None):
         except Exception as ke:
             logger.error(f"Error loading with standalone keras: {ke}")
             
-        # Then try with tf.keras if the first approach failed
+        # Try TF import directly for older TF versions
         try:
-            logger.info("Attempting to load model with tf.keras...")
+            logger.info("Attempting to load model with direct TF import...")
             import tensorflow as tf
-            # Check version without using __version__ directly (which might not be available in some TF versions)
+            # Check the version info if possible
             tf_version = getattr(tf, '__version__', 'Unknown')
-            logger.info(f"TensorFlow successfully imported, version info: {tf_version}")
+            logger.info(f"TensorFlow version: {tf_version}")
             
-            # Use different approaches based on TF version
+            # For TF 2.x that has separate keras package
             if hasattr(tf, 'keras'):
+                logger.info("Using tf.keras for model loading")
                 default_model = tf.keras.models.load_model(model_path, compile=False)
-                logger.info("Successfully loaded model with tf.keras")
             else:
-                # For older TF versions
+                logger.info("No tf.keras found, trying to import keras separately")
                 import keras
                 default_model = keras.models.load_model(model_path, compile=False)
-                logger.info("Successfully loaded model with keras (from TF dependency)")
                 
+            logger.info("Successfully loaded model")
             default_model_path = model_path
             default_model_loaded = True
             return True
         except Exception as ke2:
-            logger.error(f"Error loading with tf.keras: {ke2}")
+            logger.error(f"Error loading with direct TF: {ke2}")
+            
+        # Last resort - try with specific imports
+        try:
+            logger.info("Attempting alternative loading method...")
+            from keras.models import load_model
+            default_model = load_model(model_path, compile=False)
+            logger.info("Successfully loaded model with alternative method")
+            default_model_path = model_path
+            default_model_loaded = True
+            return True
+        except Exception as ke3:
+            logger.error(f"Error loading with alternative method: {ke3}")
         
         # If all approaches failed
         logger.error("All attempts to load the model failed")
@@ -193,7 +206,7 @@ def environment_info():
             'modules': {}
         }
         
-        # Check for key modules
+        # Check for key modules and their locations
         for module_name in ['tensorflow', 'keras', 'numpy', 'h5py']:
             try:
                 module = importlib.import_module(module_name)
@@ -211,6 +224,31 @@ def environment_info():
                 env_info['modules'][module_name] = {
                     'installed': False
                 }
+        
+        # Additional diagnostics for TensorFlow
+        try:
+            import tensorflow as tf
+            env_info['tensorflow_details'] = {
+                'version': tf.__version__ if hasattr(tf, '__version__') else 'Unknown',
+                'has_keras': hasattr(tf, 'keras'),
+                'gpu_available': len(tf.config.list_physical_devices('GPU')) > 0 if hasattr(tf, 'config') else 'Unknown'
+            }
+        except ImportError:
+            env_info['tensorflow_details'] = {
+                'error': 'TensorFlow not available'
+            }
+            
+        # Additional diagnostics for Keras
+        try:
+            import keras
+            env_info['keras_details'] = {
+                'version': keras.__version__ if hasattr(keras, '__version__') else 'Unknown',
+                'backend': keras.backend.backend() if hasattr(keras, 'backend') else 'Unknown'
+            }
+        except ImportError:
+            env_info['keras_details'] = {
+                'error': 'Keras not available'
+            }
         
         return jsonify(env_info)
     except Exception as e:

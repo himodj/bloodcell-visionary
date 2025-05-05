@@ -5,6 +5,7 @@ import App from './App.tsx';
 import './index.css';
 import { initializeModel } from './utils/analysisUtils';
 import { toast } from 'sonner';
+import { AnalysisProvider } from './contexts/AnalysisContext';
 
 // Check if we're running in Electron
 const isElectron = typeof window !== 'undefined' && window.electron?.isElectron === true;
@@ -102,6 +103,8 @@ let globalModelLoaded = false;
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <AnalysisProvider>
+      <App />
+    </AnalysisProvider>
   </React.StrictMode>,
 );
