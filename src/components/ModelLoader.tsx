@@ -18,6 +18,7 @@ const ModelLoader: React.FC = () => {
   const [showAdvancedHelp, setShowAdvancedHelp] = useState(false);
   const [environmentInfo, setEnvironmentInfo] = useState<Record<string, any>>({});
   const [isCheckingEnv, setIsCheckingEnv] = useState(false);
+  const [modelCheckStatus, setModelCheckStatus] = useState<'unchecked' | 'checking' | 'success' | 'error'>('unchecked');
   
   // Check if we're in Electron on component mount and periodically check model state
   useEffect(() => {
@@ -39,10 +40,26 @@ const ModelLoader: React.FC = () => {
       }
 
       // Set up a periodic check for model state
-      const interval = setInterval(() => {
+      const interval = setInterval(async () => {
         const modelInitialized = isModelInitialized();
         console.log('Model initialized check:', modelInitialized);
         setIsModelLoaded(modelInitialized);
+        
+        // If model is initialized, check server status too
+        if (modelInitialized && window.electron) {
+          try {
+            const status = await checkPythonModelStatus();
+            if (!status.loaded) {
+              console.log('Frontend model initialized but Python model not loaded');
+              setModelCheckStatus('error');
+            } else {
+              console.log('Both frontend and Python model loaded');
+              setModelCheckStatus('success');
+            }
+          } catch (err) {
+            console.error('Error checking Python model status:', err);
+          }
+        }
       }, 2000);
 
       return () => clearInterval(interval);
@@ -50,6 +67,32 @@ const ModelLoader: React.FC = () => {
       console.error('Error in ModelLoader useEffect:', err);
     }
   }, []);
+
+  // Function to check Python model status
+  const checkPythonModelStatus = async () => {
+    if (!window.electron) {
+      return { loaded: false, error: 'Electron not available' };
+    }
+    
+    setModelCheckStatus('checking');
+    try {
+      // If model path is available, try to reload it
+      const path = modelPath || await window.electron.getDefaultModelPath();
+      
+      if (path) {
+        const result = await window.electron.reloadPythonModel(path);
+        setModelCheckStatus(result.loaded ? 'success' : 'error');
+        return result;
+      }
+      
+      setModelCheckStatus('error');
+      return { loaded: false, error: 'No model path' };
+    } catch (err) {
+      console.error('Error checking Python model status:', err);
+      setModelCheckStatus('error');
+      return { loaded: false, error: String(err) };
+    }
+  };
 
   // Function to check environment diagnostics
   const checkEnvironment = async () => {
@@ -140,21 +183,25 @@ const ModelLoader: React.FC = () => {
         if (pythonReloadResult.success) {
           setIsModelLoaded(true);
           toast.success(`Model loaded successfully from: ${modelPath}`);
+          setModelCheckStatus('success');
         } else {
           setLoadError('Failed to load model in Python backend.');
           toast.error('Found model but failed to load in Python backend. Check console for details.');
+          setModelCheckStatus('error');
         }
       } else {
         const errorMsg = 'No model.h5 found. Please place model.h5 in the same folder as the application.';
         console.warn(errorMsg);
         setLoadError(errorMsg);
         toast.warning(errorMsg);
+        setModelCheckStatus('error');
       }
     } catch (error) {
       console.error('Error loading default model:', error);
       const errorMessage = typeof error === 'string' ? error : error instanceof Error ? error.message : 'Failed to load default model';
       setLoadError(errorMessage);
       toast.error(errorMessage);
+      setModelCheckStatus('error');
     } finally {
       setIsLoading(false);
     }
@@ -207,9 +254,11 @@ const ModelLoader: React.FC = () => {
         if (pythonReloadResult.success) {
           setIsModelLoaded(true);
           toast.success(`Model loaded successfully from: ${selectedPath}`);
+          setModelCheckStatus('success');
         } else {
           setLoadError('Selected model failed to load in Python backend.');
           toast.error('Selected model failed to load in Python backend. Check console for details.');
+          setModelCheckStatus('error');
         }
       } else {
         // Fall back to auto-detection
@@ -220,6 +269,7 @@ const ModelLoader: React.FC = () => {
       const errorMessage = typeof error === 'string' ? error : error instanceof Error ? error.message : 'Failed to load model';
       setLoadError(errorMessage);
       toast.error(errorMessage);
+      setModelCheckStatus('error');
     } finally {
       setIsLoading(false);
     }
@@ -243,16 +293,20 @@ const ModelLoader: React.FC = () => {
         setLoadError(`Error from Python server: ${pythonReloadResult.error}`);
         toast.error('Failed to reload model in Python backend. Check console for details.');
         setShowAdvancedHelp(true);
+        setModelCheckStatus('error');
       } else if (pythonReloadResult.success) {
         setIsModelLoaded(true);
         toast.success('Model reloaded successfully in both frontend and Python backend');
+        setModelCheckStatus('success');
       } else {
         setLoadError('Failed to reload model in Python backend.');
         toast.error('Failed to reload model in Python backend. Check server logs for details.');
+        setModelCheckStatus('error');
       }
     } catch (error) {
       console.error('Error reloading model:', error);
       toast.error('Failed to reload model');
+      setModelCheckStatus('error');
     } finally {
       setIsLoading(false);
     }
@@ -387,7 +441,7 @@ const ModelLoader: React.FC = () => {
                   <li>Verify you have Python 3.8-3.10 installed</li>
                   <li>Try reinstalling TensorFlow and Keras with specific versions:</li>
                   <code className="block bg-black text-white p-2 mt-1 mb-2">
-                    pip install tensorflow==2.7.0 keras==2.7.0 h5py==3.7.0
+                    pip install tensorflow==2.7.0 keras==2.7.0 h5py==3.1.0
                   </code>
                   <li>Make sure your model.h5 file is a valid TensorFlow/Keras model</li>
                   <li>Restart the application after making changes</li>

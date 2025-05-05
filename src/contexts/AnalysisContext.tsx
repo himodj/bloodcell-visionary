@@ -86,6 +86,28 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
       setIsAnalyzing(true);
       setAnalysisResult(null);
       
+      // Check for Electron environment
+      if (!window.electron) {
+        toast.error('Analysis requires the desktop application');
+        setIsAnalyzing(false);
+        return;
+      }
+      
+      // Check model status before analysis
+      try {
+        const modelStatus = await window.electron.reloadPythonModel(
+          await window.electron.getDefaultModelPath()
+        );
+        
+        if (!modelStatus.loaded) {
+          toast.error('Model is not loaded. Please load model first.');
+          setIsAnalyzing(false);
+          return;
+        }
+      } catch (statusError) {
+        console.error('Error checking model status:', statusError);
+      }
+      
       // Perform the analysis
       const result = await analyzeImage(originalImage);
       

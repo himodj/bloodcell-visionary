@@ -118,47 +118,40 @@ def load_model(model_path=None):
             
         logger.info(f"Default model file found: {model_path}")
         
-        # Try to import keras directly first - simplest approach
+        # First check if TensorFlow is properly installed
+        try:
+            import tensorflow as tf
+            # Check version without using __version__ directly (which might not be available in some TF versions)
+            tf_version = getattr(tf, '__version__', 'Unknown')
+            logger.info(f"TensorFlow successfully imported, version info: {tf_version}")
+        except Exception as tf_error:
+            logger.error(f"Error importing TensorFlow: {tf_error}")
+            return False
+        
+        # Try multiple approaches to load the model
+        try:
+            logger.info("Attempting to load model with tf.keras...")
+            import tensorflow as tf
+            default_model = tf.keras.models.load_model(model_path, compile=False)
+            logger.info("Successfully loaded model with tf.keras")
+            default_model_path = model_path
+            default_model_loaded = True
+            return True
+        except Exception as ke:
+            logger.error(f"Error loading with tf.keras: {ke}")
+        
         try:
             import keras
-            logger.info("Successfully imported standalone Keras")
+            logger.info("Attempting to load model with standalone Keras...")
             default_model = keras.models.load_model(model_path, compile=False)
             logger.info("Successfully loaded model with standalone keras")
             default_model_path = model_path
             default_model_loaded = True
             return True
-        except ImportError:
-            logger.warning("Could not import keras directly, trying alternatives")
-        except Exception as ke:
-            logger.error(f"Error loading with keras: {ke}")
-        
-        # Try tensorflow.keras approach
-        try:
-            import tensorflow.keras as keras
-            logger.info("Successfully imported tensorflow.keras")
-            default_model = keras.models.load_model(model_path, compile=False)
-            logger.info("Successfully loaded model with tensorflow.keras")
-            default_model_path = model_path
-            default_model_loaded = True
-            return True
-        except ImportError:
-            logger.warning("Could not import tensorflow.keras, trying another approach")
-        except Exception as tke:
-            logger.error(f"Error loading with tensorflow.keras: {tke}")
-        
-        # If previous attempts failed, try another approach
-        try:
-            # This works in some environments
-            import keras
-            default_model = keras.models.load_model(model_path, compile=False)
-            logger.info("Successfully loaded model with keras (second attempt)")
-            default_model_path = model_path
-            default_model_loaded = True
-            return True
         except Exception as ke2:
-            logger.error(f"Error in second keras attempt: {ke2}")
+            logger.error(f"Error loading with keras: {ke2}")
         
-        # All attempts failed
+        # If all approaches failed
         logger.error("All attempts to load the model failed")
         return False
             
@@ -200,7 +193,11 @@ def environment_info():
         for module_name in ['tensorflow', 'keras', 'numpy', 'h5py']:
             try:
                 module = importlib.import_module(module_name)
-                version = getattr(module, '__version__', 'Unknown version')
+                try:
+                    version = getattr(module, '__version__', 'Unknown version')
+                except:
+                    version = 'Available but version unknown'
+                    
                 env_info['modules'][module_name] = {
                     'installed': True,
                     'version': version,
