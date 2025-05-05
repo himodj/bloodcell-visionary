@@ -18,10 +18,16 @@ if (!isElectron) {
 
 // Keep track of loaded model state globally
 let globalModelLoaded = false;
+let usingFallbackMode = false;
 
 // Define a global function to check if model is loaded
 (window as any).isModelLoaded = () => {
   return globalModelLoaded;
+};
+
+// Define flag for fallback mode
+(window as any).isUsingFallbackMode = () => {
+  return usingFallbackMode;
 };
 
 // Define a global function to load model that can be called from UI
@@ -35,6 +41,7 @@ let globalModelLoaded = false;
       if (process.env.NODE_ENV === 'development') {
         console.log('Development environment detected - enabling mock model mode');
         globalModelLoaded = true;
+        usingFallbackMode = true;
         toast.success('Development mode: Mock model enabled');
         return true;
       }
@@ -86,19 +93,48 @@ let globalModelLoaded = false;
         
         if (!pythonServerLoaded.success) {
           console.warn('Python server could not load the model, but frontend initialization succeeded');
-          toast.warning('Model partially loaded. Python server could not load the model, but frontend analysis will work.');
-          globalModelLoaded = true; // We still set this to true because frontend analysis can work
+          toast.warning('Model partially loaded. Python server could not load the model, but frontend analysis will work in fallback mode.');
+          
+          // Set fallback mode but still consider model loaded for UI
+          usingFallbackMode = true;
+          globalModelLoaded = true;
+          
+          // Try to get environment info to help diagnose
+          try {
+            const envInfo = await window.electron.getPythonEnvironmentInfo();
+            console.log('Python environment info:', envInfo);
+            
+            // Check specifically for common issues
+            if (envInfo.modules) {
+              if (!envInfo.modules.keras.installed) {
+                toast.error('Keras module not detected. Please install it using: pip install keras==2.10.0');
+              }
+              if (!envInfo.modules.tensorflow.installed) {
+                toast.error('TensorFlow module not detected. Please install it using: pip install tensorflow==2.10.0');
+              }
+            }
+          } catch (envError) {
+            console.error('Failed to get environment info:', envError);
+          }
+          
           return true;
         }
         
         toast.success('Model loaded successfully and ready for analysis');
         globalModelLoaded = true;
+        usingFallbackMode = false;
         return true;
       } catch (error) {
         console.error('Error registering H5 model:', error);
         toast.error('Error loading H5 model: ' + (error instanceof Error ? error.message : String(error)));
-        globalModelLoaded = false;
-        return false;
+        
+        // Set fallback mode to allow UI to function
+        console.log('Enabling fallback mode after error');
+        usingFallbackMode = true;
+        globalModelLoaded = true;
+        toast.warning('Using fallback mode for analysis - results will be simulated');
+        
+        return true; // Return true to allow UI to function in fallback mode
       }
     }
     
@@ -107,18 +143,31 @@ let globalModelLoaded = false;
       await initializeModel(selectedModelPath);
       console.log('Model initialized successfully');
       globalModelLoaded = true;
+      usingFallbackMode = false;
       return true;
     } catch (error) {
       console.error('Failed to load model:', error);
       toast.error('Failed to load model: ' + (error instanceof Error ? error.message : String(error)));
-      globalModelLoaded = false;
-      return false;
+      
+      // Enable fallback mode
+      console.log('Enabling fallback mode after frontend model initialization error');
+      usingFallbackMode = true;
+      globalModelLoaded = true;
+      toast.warning('Using fallback mode for analysis - results will be simulated');
+      
+      return true; // Return true to allow UI to function in fallback mode
     }
   } catch (error) {
     console.error('Failed to load model:', error);
     toast.error('Failed to load model: ' + (error instanceof Error ? error.message : String(error)));
-    globalModelLoaded = false;
-    return false;
+    
+    // Enable fallback mode as last resort
+    console.log('Enabling fallback mode after critical error');
+    usingFallbackMode = true;
+    globalModelLoaded = true;
+    toast.warning('Using fallback mode for analysis - results will be simulated');
+    
+    return true; // Return true to allow UI to function in fallback mode
   }
 };
 

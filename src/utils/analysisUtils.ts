@@ -1,10 +1,10 @@
-
 import { CellType, AnalysisResult, AnalyzedCell } from '../contexts/AnalysisContext';
 import { toast } from 'sonner';
 
 // Initialize model state
 let modelInitialized = false;
 let modelPath: string | null = null;
+let usingFallbackMode = false;
 
 // Format a number with commas for thousands
 export const formatNumber = (num: number): string => {
@@ -61,6 +61,11 @@ export const isModelInitialized = (): boolean => {
   return modelInitialized;
 };
 
+// Check if using fallback mode
+export const isUsingFallbackMode = (): boolean => {
+  return usingFallbackMode;
+};
+
 // Initialize the model
 export const initializeModel = async (path: string, forceH5 = false): Promise<boolean> => {
   try {
@@ -69,17 +74,39 @@ export const initializeModel = async (path: string, forceH5 = false): Promise<bo
     // Set the model path globally
     modelPath = path;
     
-    // Mark model as initialized - in a real-world scenario, we'd load the actual model here
-    // But for now, we'll just set the flag to simulate successful initialization
-    // This allows us to proceed with UI flow even if Python backend has issues
+    // Set the fallback mode from global state if available
+    if (typeof window !== 'undefined' && (window as any).isUsingFallbackMode) {
+      usingFallbackMode = (window as any).isUsingFallbackMode();
+    }
+    
+    // In a production app, we'd actually load and initialize the model here
+    // For this app, we're relying on the Python backend
+    console.log('Setting model as initialized for frontend');
     modelInitialized = true;
     
-    console.log('Model initialized successfully (frontend only)');
+    // Show fallback mode toast if enabled
+    if (usingFallbackMode) {
+      toast.warning('Using fallback mode - analysis results will be simulated', {
+        id: 'fallback-mode-toast',
+        duration: 5000,
+        position: 'top-center'
+      });
+    }
+    
     return true;
   } catch (error) {
     console.error('Failed to initialize model:', error);
     modelInitialized = false;
-    throw error;
+    
+    // Enable fallback mode automatically on error
+    usingFallbackMode = true;
+    modelInitialized = true; // Still mark as initialized for UI to function
+    
+    toast.warning('Using fallback mode due to initialization error', {
+      id: 'fallback-error-toast',
+    });
+    
+    return true; // Return success to allow UI to function
   }
 };
 
@@ -207,7 +234,13 @@ export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult
     return generateFallbackAnalysis(imageDataUrl);
   }
   
-  console.log('Sending image for analysis...');
+  console.log('Sending image for analysis... (fallback mode: ' + usingFallbackMode + ')');
+  
+  // If explicitly in fallback mode, don't even try to use the Python server
+  if (usingFallbackMode) {
+    console.log('Using fallback analysis mode (set globally)');
+    return generateFallbackAnalysis(imageDataUrl);
+  }
   
   try {
     // Check for Electron environment
