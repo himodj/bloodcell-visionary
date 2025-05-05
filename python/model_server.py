@@ -117,64 +117,90 @@ def load_model(model_path=None):
             return False
             
         logger.info(f"Default model file found: {model_path}")
+
+        # Multiple loading methods to try, in order of preference
+        loading_methods = [
+            # Method 1: Try to load with standalone keras package first
+            {
+                'name': 'standalone_keras',
+                'load_func': lambda: load_with_standalone_keras(model_path)
+            },
+            # Method 2: Try the TF-keras approach
+            {
+                'name': 'tf_keras',
+                'load_func': lambda: load_with_tf_keras(model_path)
+            },
+            # Method 3: Use a more direct legacy approach
+            {
+                'name': 'legacy_keras',
+                'load_func': lambda: load_with_legacy_keras(model_path)
+            }
+        ]
         
-        # Multiple attempts with different approaches to load the model
-        # First try standalone keras
-        try:
-            logger.info("Attempting to load model with standalone Keras...")
-            import keras
-            from keras.models import load_model
-            default_model = load_model(model_path, compile=False)
-            logger.info("Successfully loaded model with standalone keras")
-            default_model_path = model_path
-            default_model_loaded = True
-            return True
-        except Exception as ke:
-            logger.error(f"Error loading with standalone keras: {ke}")
-            
-        # Try TF import directly for older TF versions
-        try:
-            logger.info("Attempting to load model with direct TF import...")
-            import tensorflow as tf
-            # Check the version info if possible
-            tf_version = getattr(tf, '__version__', 'Unknown')
-            logger.info(f"TensorFlow version: {tf_version}")
-            
-            # For TF 2.x that has separate keras package
-            if hasattr(tf, 'keras'):
-                logger.info("Using tf.keras for model loading")
-                default_model = tf.keras.models.load_model(model_path, compile=False)
-            else:
-                logger.info("No tf.keras found, trying to import keras separately")
-                import keras
-                default_model = keras.models.load_model(model_path, compile=False)
-                
-            logger.info("Successfully loaded model")
-            default_model_path = model_path
-            default_model_loaded = True
-            return True
-        except Exception as ke2:
-            logger.error(f"Error loading with direct TF: {ke2}")
-            
-        # Last resort - try with specific imports
-        try:
-            logger.info("Attempting alternative loading method...")
-            from keras.models import load_model
-            default_model = load_model(model_path, compile=False)
-            logger.info("Successfully loaded model with alternative method")
-            default_model_path = model_path
-            default_model_loaded = True
-            return True
-        except Exception as ke3:
-            logger.error(f"Error loading with alternative method: {ke3}")
+        for method in loading_methods:
+            try:
+                logger.info(f"Attempting to load model using {method['name']} method...")
+                success = method['load_func']()
+                if success:
+                    logger.info(f"Successfully loaded model using {method['name']} method")
+                    default_model_path = model_path
+                    default_model_loaded = True
+                    return True
+            except Exception as e:
+                logger.error(f"Error loading with {method['name']}: {e}")
         
-        # If all approaches failed
+        # If all methods fail
         logger.error("All attempts to load the model failed")
         return False
             
     except Exception as e:
         logger.error(f"Error loading model: {e}")
         logger.error(f"Detailed traceback: {traceback.format_exc()}")
+        return False
+
+def load_with_standalone_keras(model_path):
+    global default_model
+    try:
+        import keras
+        # Try to get the version information
+        keras_version = getattr(keras, '__version__', 'Unknown')
+        logger.info(f"Using standalone Keras version: {keras_version}")
+        # Load model with standalone keras
+        default_model = keras.models.load_model(model_path, compile=False)
+        return True
+    except ImportError:
+        logger.info("Standalone Keras not available")
+        return False
+
+def load_with_tf_keras(model_path):
+    global default_model
+    try:
+        import tensorflow as tf
+        # Check if TensorFlow is imported successfully
+        tf_version = getattr(tf, '__version__', 'Unknown')
+        logger.info(f"TensorFlow successfully imported, version info: {tf_version}")
+        
+        # Check if TensorFlow has keras module
+        if hasattr(tf, 'keras'):
+            logger.info("Attempting to load model with tf.keras...")
+            default_model = tf.keras.models.load_model(model_path, compile=False)
+            return True
+        else:
+            logger.error("module 'tensorflow' has no attribute 'keras'")
+            return False
+    except ImportError:
+        logger.info("TensorFlow not available")
+        return False
+
+def load_with_legacy_keras(model_path):
+    global default_model
+    try:
+        # Try importing keras directly for older versions
+        from keras.models import load_model
+        default_model = load_model(model_path, compile=False)
+        return True
+    except ImportError:
+        logger.error("Legacy Keras not available")
         return False
 
 @app.route('/model/status', methods=['GET'])

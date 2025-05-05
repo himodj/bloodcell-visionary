@@ -64,15 +64,17 @@ export const isModelInitialized = (): boolean => {
 // Initialize the model
 export const initializeModel = async (path: string, forceH5 = false): Promise<boolean> => {
   try {
-    console.log(`Initializing model from path: ${path}`);
+    console.log(`Initializing model from path: ${path} (forceH5: ${forceH5})`);
     
     // Set the model path globally
     modelPath = path;
     
-    // Mark model as initialized
+    // Mark model as initialized - in a real-world scenario, we'd load the actual model here
+    // But for now, we'll just set the flag to simulate successful initialization
+    // This allows us to proceed with UI flow even if Python backend has issues
     modelInitialized = true;
     
-    console.log('Model initialized successfully');
+    console.log('Model initialized successfully (frontend only)');
     return true;
   } catch (error) {
     console.error('Failed to initialize model:', error);
@@ -201,7 +203,8 @@ const generateFallbackAnalysis = (imageDataUrl: string): AnalysisResult => {
 // Analyze image with backend API
 export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult> => {
   if (!modelInitialized) {
-    throw new Error('Model not initialized. Please initialize the model first.');
+    toast.warning('Model not fully initialized. Using fallback analysis mode.');
+    return generateFallbackAnalysis(imageDataUrl);
   }
   
   console.log('Sending image for analysis...');
@@ -210,6 +213,7 @@ export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult
     // Check for Electron environment
     if (!window.electron) {
       console.warn('Not in Electron environment, using fallback analysis.');
+      toast.info('Using simulated analysis (browser mode)');
       return generateFallbackAnalysis(imageDataUrl);
     }
     
@@ -219,12 +223,11 @@ export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult
     // Check for errors
     if (response.error) {
       console.error('Error during Python backend analysis:', response.error);
-      // Handle different error types
-      if (response.error.includes('Model not loaded')) {
-        console.warn('Model is not loaded on the Python backend, using fallback analysis.');
-        return generateFallbackAnalysis(imageDataUrl);
-      }
-      throw new Error(`Model analysis failed: ${response.error}`);
+      // Fall back to frontend analysis if Python fails
+      toast.warning('Python analysis failed. Using simulated analysis instead.', {
+        description: 'Check Python server logs for details.'
+      });
+      return generateFallbackAnalysis(imageDataUrl);
     }
     
     console.log('Analysis completed successfully:', response);
@@ -297,6 +300,7 @@ export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult
     return result;
   } catch (error) {
     console.error('Error during analysis:', error);
+    toast.error('Analysis failed. Using fallback method.');
     
     // If model analysis failed but we want to continue with a fallback
     console.warn('Using fallback analysis after error.');

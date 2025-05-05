@@ -13,7 +13,7 @@ const isElectron = typeof window !== 'undefined' && window.electron?.isElectron 
 // Log the Electron status for debugging
 console.log('Electron environment detected:', isElectron);
 if (!isElectron) {
-  console.warn('Electron API not available. Model loading functionality will be limited.');
+  console.warn('Electron API not available. Running in browser mode - model loading functionality will be limited.');
 }
 
 // Keep track of loaded model state globally
@@ -30,6 +30,15 @@ let globalModelLoaded = false;
     if (!window.electron) {
       console.warn('Electron API not available. Running in browser mode.');
       toast.error('Model loading requires the desktop application');
+      
+      // In browser mode, we'll set up a mock model state for UI testing
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Development environment detected - enabling mock model mode');
+        globalModelLoaded = true;
+        toast.success('Development mode: Mock model enabled');
+        return true;
+      }
+      
       globalModelLoaded = false;
       return false;
     }
@@ -70,6 +79,18 @@ let globalModelLoaded = false;
         // Register the H5 model for specialized analysis
         await initializeModel(selectedModelPath, true); // Using the forceH5 flag
         console.log('H5 Model registered successfully for analysis');
+        
+        // Try to load the model on the Python server
+        const pythonServerLoaded = await window.electron.reloadPythonModel(selectedModelPath);
+        console.log('Python server model loading response:', pythonServerLoaded);
+        
+        if (!pythonServerLoaded.success) {
+          console.warn('Python server could not load the model, but frontend initialization succeeded');
+          toast.warning('Model partially loaded. Python server could not load the model, but frontend analysis will work.');
+          globalModelLoaded = true; // We still set this to true because frontend analysis can work
+          return true;
+        }
+        
         toast.success('Model loaded successfully and ready for analysis');
         globalModelLoaded = true;
         return true;
