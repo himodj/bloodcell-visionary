@@ -9,6 +9,7 @@ interface ElectronAPI {
   checkFileExists: (filePath: string) => Promise<boolean>;
   browseForModel: () => Promise<string | null>;
   isElectron: boolean;
+  isPythonServerRunning: () => Promise<boolean>;
   reloadPythonModel: (modelPath: string) => Promise<{
     success?: boolean;
     loaded?: boolean;
@@ -16,6 +17,7 @@ interface ElectronAPI {
     error?: string;
     stack?: string;
     details?: string;
+    usedFallback?: boolean;
   }>;
   getPythonEnvironmentInfo: () => Promise<{
     python_version?: string;
@@ -28,6 +30,7 @@ interface ElectronAPI {
     error?: string;
     stack?: string;
     details?: string;
+    usedFallback?: boolean;
   }>;
   analyzeWithH5Model: (modelPath: string, imageDataUrl: string) => Promise<{
     cell_type?: string;
@@ -49,6 +52,7 @@ interface ElectronAPI {
     error?: string;
     stack?: string;
     details?: string;
+    usedFallback?: boolean;
   }>;
 }
 

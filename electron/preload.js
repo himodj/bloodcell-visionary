@@ -38,7 +38,8 @@ try {
       return {
         error: 'Python backend communication is not available. Could not load axios module.',
         stack: 'Module not found: axios',
-        details: 'This error typically occurs when the application cannot find the axios library. Please make sure axios is installed properly.'
+        details: 'This error typically occurs when the application cannot find the axios library. Please make sure axios is installed properly.',
+        usedFallback: true
       };
     },
     
@@ -48,7 +49,8 @@ try {
       return {
         error: 'Python backend communication is not available. Could not load axios module.',
         stack: 'Module not found: axios',
-        details: 'This error typically occurs when the application cannot find the axios library. Please make sure axios is installed properly.'
+        details: 'This error typically occurs when the application cannot find the axios library. Please make sure axios is installed properly.',
+        usedFallback: true
       };
     },
     
@@ -58,8 +60,15 @@ try {
       return {
         error: 'Python backend communication is not available. Could not load axios module.',
         stack: 'Module not found: axios',
-        details: 'This error typically occurs when the application cannot find the axios library. Please make sure axios is installed properly.'
+        details: 'This error typically occurs when the application cannot find the axios library. Please make sure axios is installed properly.',
+        usedFallback: true
       };
+    },
+
+    // Check if Python server is running
+    isPythonServerRunning: async () => {
+      console.log('Using fallback isPythonServerRunning implementation');
+      return false;
     }
   };
 
@@ -83,20 +92,50 @@ try {
   if (axios) {
     console.log('Axios is available, setting up API methods with actual implementation');
     
-    // Configure axios without the Access-Control-Allow-Origin header
+    // Configure axios with a reduced timeout that won't freeze the UI for too long
     const axiosConfig = {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      // Increase timeout to allow for model loading/processing
-      timeout: 60000 
+      // Reduce timeout to avoid UI freezing for too long
+      timeout: 10000 // Reduced from 60000ms to 10000ms (10 seconds)
+    };
+
+    // Add isPythonServerRunning implementation
+    electronAPI.isPythonServerRunning = async () => {
+      try {
+        console.log('Checking if Python server is running...');
+        const response = await axios.get('http://localhost:5000/health', {
+          ...axiosConfig,
+          timeout: 2000 // Even shorter timeout for quick health check
+        });
+        return response.data && response.data.status === 'ok';
+      } catch (error) {
+        console.error('Python server health check failed:', error.message);
+        return false;
+      }
     };
     
     // Add getPythonEnvironmentInfo implementation
     electronAPI.getPythonEnvironmentInfo = async () => {
       try {
         console.log('Getting Python environment info...');
+        const serverRunning = await electronAPI.isPythonServerRunning();
+        
+        if (!serverRunning) {
+          return {
+            error: 'Python server is not running',
+            usedFallback: true,
+            modules: {
+              tensorflow: { installed: false },
+              keras: { installed: false },
+              h5py: { installed: false },
+              numpy: { installed: false }
+            }
+          };
+        }
+        
         const response = await axios.get('http://localhost:5000/environment', axiosConfig);
         console.log('Environment info response:', response.status);
         return response.data;
@@ -106,6 +145,8 @@ try {
         let details = '';
         if (error.code === 'ECONNREFUSED') {
           details = 'The Python backend server is not running or is not accessible.';
+        } else if (error.code === 'ECONNABORTED') {
+          details = 'Connection to Python server timed out. The server may be overloaded or not responding.';
         } else if (error.response) {
           details = `Server responded with status code ${error.response.status}. ${error.response.data?.error || ''}`;
         } else {
@@ -115,7 +156,8 @@ try {
         return {
           error: `Failed to get environment info: ${error.message}`,
           stack: error.stack,
-          details
+          details,
+          usedFallback: true
         };
       }
     };
@@ -125,28 +167,16 @@ try {
       try {
         console.log('Attempting to reload Python model at path:', modelPath);
         
-        // First check the Python server status
-        try {
-          const statusResponse = await axios.get('http://localhost:5000/model/status', axiosConfig);
-          console.log('Python server status check:', statusResponse.status, statusResponse.data);
-        } catch (statusError) {
-          console.warn('Error checking Python server status:', statusError);
-          
-          // Try to get environment info for better diagnostics
-          try {
-            const envInfo = await axios.get('http://localhost:5000/environment', axiosConfig);
-            console.log('Python environment info:', envInfo.data);
-          } catch (envError) {
-            console.warn('Failed to get environment info:', envError);
-          }
-          
-          if (statusError.code === 'ECONNREFUSED') {
-            return {
-              error: 'Python backend server is not running',
-              details: 'The Python Flask server is not accessible. This could be due to the server not starting properly.',
-              stack: statusError.stack
-            };
-          }
+        // First check if Python server is running
+        const serverRunning = await electronAPI.isPythonServerRunning();
+        
+        if (!serverRunning) {
+          console.warn('Python server is not running or not accessible');
+          return {
+            error: 'Python server is not running',
+            details: 'The Python Flask server is not accessible. Please check if the server is running.',
+            usedFallback: true
+          };
         }
         
         // Now try to load the model
@@ -172,6 +202,8 @@ try {
         let details = '';
         if (error.code === 'ECONNREFUSED') {
           details = 'The Python backend server is not running or is not accessible.';
+        } else if (error.code === 'ECONNABORTED') {
+          details = 'Connection to Python server timed out. The server may be overloaded or not responding.';
         } else if (error.response) {
           details = `Server responded with status code ${error.response.status}. ${error.response.data?.error || ''}`;
         } else {
@@ -181,7 +213,8 @@ try {
         return {
           error: `Failed to reload model: ${error.message}`,
           stack: error.stack,
-          details
+          details,
+          usedFallback: true
         };
       }
     };
@@ -191,30 +224,19 @@ try {
       try {
         console.log('Sending image to Python backend for analysis with model path:', modelPath);
         
-        // First make sure the model is loaded by checking status
-        try {
-          const statusResponse = await axios.get('http://localhost:5000/model/status', axiosConfig);
-          console.log('Model status:', statusResponse.data);
-          
-          // If model isn't loaded, try to load it
-          if (!statusResponse.data.loaded) {
-            console.log('Model not loaded, attempting to load it...');
-            const loadResponse = await axios.post('http://localhost:5000/load_model', {
-              model_path: modelPath
-            }, axiosConfig);
-            
-            console.log('Model load response:', loadResponse.data);
-            
-            if (!loadResponse.data.success) {
-              throw new Error(`Failed to load model: ${loadResponse.data.error || 'Unknown error'}`);
-            }
-          }
-        } catch (statusError) {
-          console.warn('Error checking model status:', statusError);
-          // Continue anyway, the predict endpoint will return an appropriate error
+        // First check if Python server is running
+        const serverRunning = await electronAPI.isPythonServerRunning();
+        
+        if (!serverRunning) {
+          console.warn('Python server is not running or not accessible');
+          return {
+            error: 'Python server is not running',
+            details: 'The Python Flask server is not accessible. Switching to fallback mode.',
+            usedFallback: true
+          };
         }
         
-        // Now send the image to the Python server
+        // Send the image to the Python server
         const response = await axios.post('http://localhost:5000/predict', {
           image: imageDataUrl
         }, axiosConfig);
@@ -235,6 +257,10 @@ try {
           errorMessage = 'Python server is not running or not accessible';
           errorDetails = 'Make sure the Python server is running on port 5000';
           details = 'The application couldn\'t connect to the Python backend server. This could be because the server failed to start or there\'s a network issue.';
+        } else if (error.code === 'ECONNABORTED') {
+          errorMessage = 'Connection to Python server timed out';
+          errorDetails = 'The server may be overloaded or not responding';
+          details = 'The Python server took too long to respond. This could be due to the model size or server load.';
         } else if (error.code === 'ERR_NETWORK') {
           errorMessage = 'Network error communicating with Python server';
           errorDetails = 'Check that the server is running and port 5000 is not blocked';
@@ -256,7 +282,8 @@ try {
         return {
           error: `${errorMessage}: ${errorDetails}`,
           stack: error.stack,
-          details
+          details,
+          usedFallback: true
         };
       }
     };
@@ -283,9 +310,10 @@ try {
       readModelDir: () => Promise.resolve([]),
       browseForModel: () => Promise.resolve(null),
       checkFileExists: () => Promise.resolve(false),
-      analyzeWithH5Model: () => Promise.resolve({ error: 'Not in Electron environment' }),
-      reloadPythonModel: () => Promise.resolve({ error: 'Not in Electron environment' }),
-      getPythonEnvironmentInfo: () => Promise.resolve({ error: 'Not in Electron environment' })
+      analyzeWithH5Model: () => Promise.resolve({ error: 'Not in Electron environment', usedFallback: true }),
+      reloadPythonModel: () => Promise.resolve({ error: 'Not in Electron environment', usedFallback: true }),
+      getPythonEnvironmentInfo: () => Promise.resolve({ error: 'Not in Electron environment', usedFallback: true }),
+      isPythonServerRunning: () => Promise.resolve(false)
     };
     console.log('Created browser fallback for electron API');
   } catch (fallbackError) {

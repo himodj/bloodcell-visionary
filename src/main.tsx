@@ -30,6 +30,17 @@ let usingFallbackMode = false;
   return usingFallbackMode;
 };
 
+// Define a global function to check Python server status
+(window as any).isPythonServerRunning = async () => {
+  if (!window.electron) return false;
+  try {
+    return await window.electron.isPythonServerRunning();
+  } catch (err) {
+    console.error('Error checking Python server:', err);
+    return false;
+  }
+};
+
 // Define a global function to load model that can be called from UI
 (window as any).loadModel = async (modelPath?: string) => {
   try {
@@ -48,6 +59,22 @@ let usingFallbackMode = false;
       
       globalModelLoaded = false;
       return false;
+    }
+    
+    // Check if Python server is running
+    let pythonServerRunning = false;
+    try {
+      pythonServerRunning = await window.electron.isPythonServerRunning();
+      console.log('Python server running:', pythonServerRunning);
+    } catch (err) {
+      console.error('Error checking Python server status:', err);
+    }
+    
+    // If Python server is not running, set fallback mode immediately
+    if (!pythonServerRunning) {
+      console.log('Python server not running, enabling fallback mode');
+      usingFallbackMode = true;
+      toast.warning('Python server not running. Using fallback mode - results will be simulated');
     }
     
     let selectedModelPath = modelPath;
@@ -85,45 +112,67 @@ let usingFallbackMode = false;
         
         // Register the H5 model for specialized analysis
         await initializeModel(selectedModelPath, true); // Using the forceH5 flag
-        console.log('H5 Model registered successfully for analysis');
+        console.log('H5 Model registered successfully for frontend analysis');
         
-        // Try to load the model on the Python server
-        const pythonServerLoaded = await window.electron.reloadPythonModel(selectedModelPath);
-        console.log('Python server model loading response:', pythonServerLoaded);
-        
-        if (!pythonServerLoaded.success) {
-          console.warn('Python server could not load the model, but frontend initialization succeeded');
-          toast.warning('Model partially loaded. Python server could not load the model, but frontend analysis will work in fallback mode.');
-          
-          // Set fallback mode but still consider model loaded for UI
+        // Try to load the model on the Python server if it's running
+        if (pythonServerRunning) {
+          console.log('Trying to load model on Python server...');
+          try {
+            const pythonServerLoaded = await window.electron.reloadPythonModel(selectedModelPath);
+            console.log('Python server model loading response:', pythonServerLoaded);
+            
+            if (!pythonServerLoaded.success) {
+              console.warn('Python server could not load the model, but frontend initialization succeeded');
+              toast.warning('Model partially loaded. Python server could not load the model, but frontend analysis will work in fallback mode.');
+              
+              // Set fallback mode but still consider model loaded for UI
+              usingFallbackMode = true;
+              globalModelLoaded = true;
+              
+              // Try to get environment info to help diagnose
+              try {
+                const envInfo = await window.electron.getPythonEnvironmentInfo();
+                console.log('Python environment info:', envInfo);
+                
+                // Check specifically for common issues
+                if (envInfo.modules) {
+                  if (!envInfo.modules.keras.installed) {
+                    toast.error('Keras module not detected. Please install it using: pip install keras==2.10.0');
+                  }
+                  if (!envInfo.modules.tensorflow.installed) {
+                    toast.error('TensorFlow module not detected. Please install it using: pip install tensorflow==2.10.0');
+                  }
+                }
+              } catch (envError) {
+                console.error('Failed to get environment info:', envError);
+              }
+              
+              return true;
+            }
+            
+            toast.success('Model loaded successfully and ready for analysis');
+            globalModelLoaded = true;
+            usingFallbackMode = false;
+            return true;
+          } catch (error) {
+            console.error('Error communicating with Python server:', error);
+            
+            // Set fallback mode but still consider model loaded for UI
+            usingFallbackMode = true;
+            globalModelLoaded = true;
+            toast.warning('Using fallback mode - Python server communication failed');
+            
+            return true;
+          }
+        } else {
+          // Python server not running, use fallback mode
+          console.log('Python server not available, using fallback mode');
           usingFallbackMode = true;
           globalModelLoaded = true;
-          
-          // Try to get environment info to help diagnose
-          try {
-            const envInfo = await window.electron.getPythonEnvironmentInfo();
-            console.log('Python environment info:', envInfo);
-            
-            // Check specifically for common issues
-            if (envInfo.modules) {
-              if (!envInfo.modules.keras.installed) {
-                toast.error('Keras module not detected. Please install it using: pip install keras==2.10.0');
-              }
-              if (!envInfo.modules.tensorflow.installed) {
-                toast.error('TensorFlow module not detected. Please install it using: pip install tensorflow==2.10.0');
-              }
-            }
-          } catch (envError) {
-            console.error('Failed to get environment info:', envError);
-          }
+          toast.warning('Using fallback mode - Python server not available');
           
           return true;
         }
-        
-        toast.success('Model loaded successfully and ready for analysis');
-        globalModelLoaded = true;
-        usingFallbackMode = false;
-        return true;
       } catch (error) {
         console.error('Error registering H5 model:', error);
         toast.error('Error loading H5 model: ' + (error instanceof Error ? error.message : String(error)));
