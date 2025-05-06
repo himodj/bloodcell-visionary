@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -559,7 +558,7 @@ const ModelLoader: React.FC = () => {
       </div>
 
       {modelCheckStatus === 'fallback' && pythonServerRunning === false && (
-        <Alert variant="warning" className="mb-6 bg-amber-50 border-amber-200">
+        <Alert className="mb-6 bg-amber-50 border-amber-200">
           <AlertTriangle className="h-4 w-4 text-amber-700" />
           <AlertTitle className="text-amber-700">Python Server Not Running</AlertTitle>
           <AlertDescription>

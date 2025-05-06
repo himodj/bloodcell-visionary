@@ -1,4 +1,3 @@
-
 import logging
 import os
 import numpy as np
@@ -36,6 +35,16 @@ CORS(app)
 default_model = None
 default_model_path = None
 default_model_loaded = False
+
+# Add a health check endpoint
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Return health status of the server"""
+    return jsonify({
+        'status': 'ok',
+        'model_loaded': default_model_loaded,
+        'model_path': default_model_path
+    })
 
 def get_package_version(package_name):
     try:
