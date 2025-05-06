@@ -85,9 +85,9 @@ async function main() {
     
     console.log('Starting Electron app in development mode...');
     
-    // Use the npx command to ensure we're using the locally installed version of Vite
+    // Use npm run dev to ensure we use the correct Vite command from package.json
     console.log('Starting Vite development server...');
-    const viteProcess = exec('npx vite --port 8080', { 
+    const viteProcess = exec('npm run dev -- --port 8080', { 
       cwd: __dirname,
       env: process.env
     });
