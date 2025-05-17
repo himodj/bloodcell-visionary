@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -649,7 +648,7 @@ const ModelLoader: React.FC = () => {
       </div>
 
       {requirementsStatus && !requirementsStatus.all_ok && (
-        <Alert variant="warning" className="mb-6">
+        <Alert variant="destructive" className="mb-6">
           <AlertTitle className="flex items-center">
             <PackageOpen size={16} className="mr-2" />
             Package Requirements Issue Detected

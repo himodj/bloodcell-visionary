@@ -1,4 +1,3 @@
-
 interface ElectronAPI {
   selectModel: () => Promise<string | null>;
   getDefaultModelPath: () => Promise<string | null>;
@@ -31,6 +30,11 @@ interface ElectronAPI {
     stack?: string;
     details?: string;
     usedFallback?: boolean;
+    requirements_check?: {
+      all_ok: boolean;
+      missing_packages: string[];
+      incorrect_versions: string[];
+    };
   }>;
   analyzeWithH5Model: (modelPath: string, imageDataUrl: string) => Promise<{
     cell_type?: string;
