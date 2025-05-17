@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -42,24 +43,32 @@ const ModelLoader: React.FC = () => {
         }, 1000);
       }
 
-      // Set up a periodic check for model state
+      // Set up a periodic check for model state and server status
       const interval = setInterval(async () => {
+        // Check if model is initialized
         const modelInitialized = isModelInitialized();
         console.log('Model initialized check:', modelInitialized);
         setIsModelLoaded(modelInitialized);
         
-        // If model is initialized and more than 10 seconds have passed since last check, check server status
+        // If more than 10 seconds have passed since last check, check server status
         const now = Date.now();
-        if (modelInitialized && window.electron && now - lastCheckTime > 10000) {
+        if (window.electron && now - lastCheckTime > 10000) {
           setLastCheckTime(now); // Update last check time
           try {
+            // Check if the Python server is running
             const serverRunning = await window.electron.isPythonServerRunning();
             setPythonServerRunning(serverRunning);
             
             if (!serverRunning) {
               setModelCheckStatus('error');
               console.log('Python server not running');
-            } else {
+              if (isModelLoaded) {
+                // If model was previously loaded but server is now down
+                setIsModelLoaded(false);
+                toast.error('Python server is no longer running. Analysis will not work.');
+              }
+            } else if (modelInitialized) {
+              // If server is running and model is initialized, check the model status
               const status = await checkPythonModelStatus();
               if (!status.loaded) {
                 setModelCheckStatus('error');
@@ -123,13 +132,13 @@ const ModelLoader: React.FC = () => {
         const result = await window.electron.reloadPythonModel(path);
         console.log("Python model status result:", result);
         
-        if (result.loaded) {
+        if (result.success) {
           setModelCheckStatus('success');
+          return { loaded: true };
         } else {
           setModelCheckStatus('error');
+          return { loaded: false, error: result.error || 'Unknown error' };
         }
-        
-        return result;
       }
       
       setModelCheckStatus('error');
@@ -180,6 +189,18 @@ const ModelLoader: React.FC = () => {
         toast.error(`Could not retrieve environment info: ${envInfo.error}`);
       } else {
         toast.success('Environment diagnostics retrieved successfully');
+        
+        // Check for issues that would prevent model loading
+        if (envInfo.modules) {
+          const kerasIssue = !envInfo.modules.keras?.installed;
+          const tensorflowIssue = !envInfo.modules.tensorflow?.installed;
+          const h5pyIssue = !envInfo.modules.h5py?.installed;
+          
+          if (kerasIssue || tensorflowIssue || h5pyIssue) {
+            setShowAdvancedHelp(true);
+            toast.error('Missing required dependencies. Please check the environment details below.');
+          }
+        }
       }
     } catch (error) {
       console.error('Error checking environment:', error);
@@ -256,6 +277,9 @@ const ModelLoader: React.FC = () => {
               if (envInfo.modules.tensorflow && envInfo.modules.keras) {
                 setLoadError((prevError) => `${prevError}\n\nTensorFlow version: ${envInfo.modules.tensorflow.version || 'unknown'}\nKeras version: ${envInfo.modules.keras.version || 'unknown'}`);
               }
+              
+              // Show advanced help if we detect issues
+              setShowAdvancedHelp(true);
             }
           } catch (envError) {
             console.error('Failed to get environment info:', envError);
@@ -264,7 +288,7 @@ const ModelLoader: React.FC = () => {
           return;
         }
         
-        if (pythonReloadResult.loaded) {
+        if (pythonReloadResult.success) {
           setIsModelLoaded(true);
           toast.success(`Model loaded successfully from: ${modelPath}`);
           setModelCheckStatus('success');
@@ -273,6 +297,7 @@ const ModelLoader: React.FC = () => {
           setIsModelLoaded(false);
           toast.error('Failed to load model. Please check Python environment.');
           setModelCheckStatus('error');
+          setShowAdvancedHelp(true);
         }
       } else {
         const errorMsg = 'No model.h5 found. Please place model.h5 in the same folder as the application.';
@@ -289,6 +314,7 @@ const ModelLoader: React.FC = () => {
       toast.error(errorMessage);
       setModelCheckStatus('error');
       setIsModelLoaded(false);
+      setShowAdvancedHelp(true);
     } finally {
       setIsLoading(false);
     }
@@ -349,10 +375,11 @@ const ModelLoader: React.FC = () => {
           setIsModelLoaded(false);
           setModelCheckStatus('error');
           setIsLoading(false);
+          setShowAdvancedHelp(true);
           return;
         }
         
-        if (pythonReloadResult.loaded) {
+        if (pythonReloadResult.success) {
           setIsModelLoaded(true);
           setModelCheckStatus('success');
           toast.success(`Model loaded successfully from: ${selectedPath}`);
@@ -360,6 +387,7 @@ const ModelLoader: React.FC = () => {
           setIsModelLoaded(false);
           setModelCheckStatus('error');
           toast.error('Failed to load model.');
+          setShowAdvancedHelp(true);
         }
       } else {
         // User cancelled the selection
@@ -373,6 +401,7 @@ const ModelLoader: React.FC = () => {
       toast.error(errorMessage);
       setModelCheckStatus('error');
       setIsModelLoaded(false);
+      setShowAdvancedHelp(true);
     } finally {
       setIsLoading(false);
     }
@@ -390,6 +419,15 @@ const ModelLoader: React.FC = () => {
       const serverRunning = await window.electron.isPythonServerRunning();
       setPythonServerRunning(serverRunning);
       
+      if (!serverRunning) {
+        setLoadError('Python server is not running. Please restart the application.');
+        setIsModelLoaded(false);
+        setModelCheckStatus('error');
+        toast.error('Python server not running. Please restart the application.');
+        setIsLoading(false);
+        return;
+      }
+      
       // Always reinitialize in frontend
       await initializeModel(modelPath);
       
@@ -403,7 +441,7 @@ const ModelLoader: React.FC = () => {
           setLoadError(`Error from Python server: ${pythonReloadResult.error}`);
           setIsModelLoaded(false);
           setModelCheckStatus('error');
-        } else if (pythonReloadResult.loaded) {
+        } else if (pythonReloadResult.success) {
           setIsModelLoaded(true);
           toast.success('Model reloaded successfully in both frontend and Python backend');
           setModelCheckStatus('success');
@@ -522,6 +560,13 @@ const ModelLoader: React.FC = () => {
             </a>
           </div>
         )}
+        
+        {pythonServerRunning === false && (
+          <div className="text-sm flex items-center p-2 bg-red-50 rounded border border-red-200">
+            <AlertTriangle size={16} className="text-red-600 mr-2" />
+            <span className="text-red-600">Python server not running</span>
+          </div>
+        )}
       </div>
 
       {Object.keys(environmentInfo).length > 0 && (
@@ -565,7 +610,10 @@ const ModelLoader: React.FC = () => {
 
       {loadError && !isModelLoaded && (
         <Alert variant="destructive" className="mb-6">
-          <AlertTitle>Error Loading Model</AlertTitle>
+          <AlertTitle className="flex items-center">
+            <AlertTriangle size={16} className="mr-2" />
+            Error Loading Model
+          </AlertTitle>
           <AlertDescription>
             <div className="whitespace-pre-line">{loadError}</div>
             <div className="mt-2">
@@ -580,13 +628,12 @@ const ModelLoader: React.FC = () => {
                 <p className="font-bold mb-2">Advanced Troubleshooting:</p>
                 <ol className="list-decimal list-inside">
                   <li>Verify you have Python 3.8-3.10 installed</li>
-                  <li>Try reinstalling TensorFlow and Keras with specific versions:</li>
+                  <li>Check if the model.h5 file is valid and in the correct location</li>
+                  <li>Try reinstalling dependencies with specific versions:</li>
                   <code className="block bg-black text-white p-2 mt-1 mb-2">
-                    pip install tensorflow==2.10.0 keras==2.10.0 h5py==3.1.0
+                    pip install tensorflow==2.10.0 keras==2.10.0 h5py==3.7.0 pillow==9.2.0
                   </code>
-                  <li>Make sure your model.h5 file is a valid TensorFlow/Keras model</li>
                   <li>Restart the application after making changes</li>
-                  <li>Run the Environment diagnostics to check your Python setup</li>
                 </ol>
                 <Button 
                   onClick={checkEnvironment} 

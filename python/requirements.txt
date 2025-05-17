@@ -4,5 +4,5 @@ flask-cors==3.0.10
 tensorflow==2.10.0
 keras==2.10.0
 numpy==1.23.5
-pillow>=8.0.0
-h5py==3.1.0
+pillow==9.2.0
+h5py==3.7.0

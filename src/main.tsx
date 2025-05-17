@@ -98,52 +98,44 @@ let globalModelLoaded = false;
         await initializeModel(selectedModelPath);
         console.log('H5 Model registered successfully for frontend analysis');
         
-        // Try to load the model on the Python server if it's running
-        if (pythonServerRunning) {
-          console.log('Trying to load model on Python server...');
-          try {
-            const pythonServerLoaded = await window.electron.reloadPythonModel(selectedModelPath);
-            console.log('Python server model loading response:', pythonServerLoaded);
+        // Try to load the model on the Python server
+        console.log('Loading model on Python server...');
+        try {
+          const pythonServerLoaded = await window.electron.reloadPythonModel(selectedModelPath);
+          console.log('Python server model loading response:', pythonServerLoaded);
+          
+          if (!pythonServerLoaded.success) {
+            console.warn('Python server could not load the model');
+            toast.error('Failed to load model on Python server. Please check your Python environment.');
             
-            if (!pythonServerLoaded.success) {
-              console.warn('Python server could not load the model');
-              toast.error('Failed to load model on Python server. Please check your Python environment.');
+            // Try to get environment info to help diagnose
+            try {
+              const envInfo = await window.electron.getPythonEnvironmentInfo();
+              console.log('Python environment info:', envInfo);
               
-              // Try to get environment info to help diagnose
-              try {
-                const envInfo = await window.electron.getPythonEnvironmentInfo();
-                console.log('Python environment info:', envInfo);
-                
-                // Check specifically for common issues
-                if (envInfo.modules) {
-                  if (!envInfo.modules.keras.installed) {
-                    toast.error('Keras module not detected. Please install it using: pip install keras==2.10.0');
-                  }
-                  if (!envInfo.modules.tensorflow.installed) {
-                    toast.error('TensorFlow module not detected. Please install it using: pip install tensorflow==2.10.0');
-                  }
+              // Check specifically for common issues
+              if (envInfo.modules) {
+                if (!envInfo.modules.keras.installed) {
+                  toast.error('Keras module not detected. Please install it using: pip install keras==2.10.0');
                 }
-              } catch (envError) {
-                console.error('Failed to get environment info:', envError);
+                if (!envInfo.modules.tensorflow.installed) {
+                  toast.error('TensorFlow module not detected. Please install it using: pip install tensorflow==2.10.0');
+                }
               }
-              
-              globalModelLoaded = false;
-              return false;
+            } catch (envError) {
+              console.error('Failed to get environment info:', envError);
             }
             
-            toast.success('Model loaded successfully and ready for analysis');
-            globalModelLoaded = true;
-            return true;
-          } catch (error) {
-            console.error('Error communicating with Python server:', error);
-            toast.error('Failed to communicate with Python server');
             globalModelLoaded = false;
             return false;
           }
-        } else {
-          // Python server not running
-          console.log('Python server not available');
-          toast.error('Python server not available. Please restart the application.');
+          
+          toast.success('Model loaded successfully and ready for analysis');
+          globalModelLoaded = true;
+          return true;
+        } catch (error) {
+          console.error('Error communicating with Python server:', error);
+          toast.error('Failed to communicate with Python server. Please restart the application.');
           globalModelLoaded = false;
           return false;
         }
@@ -153,17 +145,9 @@ let globalModelLoaded = false;
         globalModelLoaded = false;
         return false;
       }
-    }
-    
-    // Regular TensorFlow.js models (non-H5)
-    try {
-      await initializeModel(selectedModelPath);
-      console.log('Model initialized successfully');
-      globalModelLoaded = true;
-      return true;
-    } catch (error) {
-      console.error('Failed to load model:', error);
-      toast.error('Failed to load model: ' + (error instanceof Error ? error.message : String(error)));
+    } else {
+      // Handle non-H5 models (if needed in the future)
+      toast.error('Only H5 model files are supported');
       globalModelLoaded = false;
       return false;
     }

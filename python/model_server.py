@@ -13,7 +13,6 @@ import importlib
 import platform
 import subprocess
 import h5py
-import random
 
 # Configure logger
 logging.basicConfig(
@@ -22,7 +21,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Update class labels to match the specified order (no RBC)
+# Update class labels to match the specified order
 class_labels = [
     'IG Immature White Cell', 'Basophil', 'Eosinophil', 'Erythroblast',  
     'Lymphocyte', 'Monocyte', 'Neutrophil', 'Platelet'
@@ -102,35 +101,29 @@ def predict():
                 predictions = default_model.predict(image)
                 predicted_class_index = np.argmax(predictions[0])
                 confidence = float(predictions[0][predicted_class_index])
-            else:
-                # We're using the raw model file directly or have a custom prediction function
-                if hasattr(default_model, 'custom_predict') and callable(default_model.custom_predict):
-                    result = default_model.custom_predict(image)
-                    predicted_class_index = result['class_index']
-                    confidence = result['confidence']
-                    predictions = [result['probabilities']]
+                
+                # Get the predicted class
+                if predicted_class_index < len(class_labels):
+                    predicted_class = class_labels[predicted_class_index]
                 else:
-                    # If no prediction method available, return error
-                    logger.error("Model doesn't have a valid prediction method")
-                    return jsonify({'error': 'Model prediction method unavailable'}), 500
-            
-            # Get the predicted class
-            if predicted_class_index < len(class_labels):
-                predicted_class = class_labels[predicted_class_index]
+                    predicted_class = f"Unknown Class {predicted_class_index}"
+                    logger.error(f"Predicted class index {predicted_class_index} is out of bounds for class_labels of length {len(class_labels)}")
+                
+                # Create a response with the top prediction
+                response = {
+                    'cell_type': predicted_class,
+                    'confidence': confidence,
+                    'all_probabilities': predictions[0].tolist() if hasattr(predictions[0], 'tolist') else predictions[0],
+                    'class_labels': class_labels
+                }
+                
+                logger.info(f"Prediction successful: {predicted_class} with confidence {confidence}")
+                return jsonify(response), 200
             else:
-                predicted_class = f"Unknown Class {predicted_class_index}"
-                logger.error(f"Predicted class index {predicted_class_index} is out of bounds for class_labels of length {len(class_labels)}")
-            
-            # Create a response with the top prediction
-            response = {
-                'cell_type': predicted_class,
-                'confidence': confidence,
-                'all_probabilities': predictions[0].tolist() if hasattr(predictions[0], 'tolist') else predictions[0],
-                'class_labels': class_labels
-            }
-            
-            logger.info(f"Prediction successful: {predicted_class} with confidence {confidence}")
-            return jsonify(response), 200
+                # If no prediction method available, return error
+                logger.error("Model doesn't have a valid prediction method")
+                return jsonify({'error': 'Model prediction method unavailable'}), 500
+                
         except Exception as img_error:
             logger.error(f"Error processing image: {img_error}")
             return jsonify({'error': f'Error processing image: {str(img_error)}'}), 500
@@ -138,40 +131,6 @@ def predict():
     except Exception as e:
         logger.error(f"Error during prediction: {e}")
         return jsonify({'error': str(e)}), 500
-
-class CustomModelWrapper:
-    """Wrapper class for H5 files when no Keras/TF model can be loaded"""
-    
-    def __init__(self, model_path):
-        self.model_path = model_path
-        self.h5file = h5py.File(model_path, 'r')
-        self.class_count = len(class_labels)
-        logger.info(f"Created custom model wrapper for {model_path} with {self.class_count} classes")
-        
-    def custom_predict(self, input_image):
-        """Make a deterministic prediction based on image content"""
-        # Use the image data to generate a deterministic but realistic prediction
-        # This will produce consistent predictions for the same images
-        
-        # Extract features from the image that will inform our prediction
-        img_mean = np.mean(input_image)
-        img_std = np.std(input_image)
-        
-        # Use image statistics to generate a hash value for consistent predictions
-        hash_val = int((img_mean * 1000 + img_std * 2000) % self.class_count)
-        
-        # Create probabilities with a clear winner
-        probabilities = [0.05] * self.class_count
-        probabilities[hash_val] = 0.6  # Make the selected class the winner
-        
-        # Normalize to sum to 1
-        probabilities = np.array(probabilities) / sum(probabilities)
-        
-        return {
-            'class_index': hash_val,
-            'confidence': float(probabilities[hash_val]),
-            'probabilities': probabilities
-        }
 
 def load_model(model_path=None):
     global default_model, default_model_path, default_model_loaded
@@ -229,10 +188,10 @@ def load_model(model_path=None):
                 'name': 'legacy_keras',
                 'load_func': lambda: load_with_legacy_keras(model_path)
             },
-            # Method 4: Use direct H5 file access if all else fails
+            # Method 4: Try direct import from keras
             {
-                'name': 'direct_h5',
-                'load_func': lambda: load_with_direct_h5(model_path)
+                'name': 'direct_keras_import',
+                'load_func': lambda: load_with_direct_keras_import(model_path)
             }
         ])
         
@@ -249,18 +208,10 @@ def load_model(model_path=None):
                 logger.error(f"Error loading with {method['name']}: {e}")
                 logger.error(traceback.format_exc())
         
-        # If all methods fail, use the CustomModelWrapper as a last resort
-        logger.warning("All standard loading methods failed, using CustomModelWrapper")
-        try:
-            default_model = CustomModelWrapper(model_path)
-            default_model_path = model_path
-            default_model_loaded = True
-            logger.info("Successfully created CustomModelWrapper for model")
-            return True
-        except Exception as e:
-            logger.error(f"Error creating CustomModelWrapper: {e}")
-            logger.error(traceback.format_exc())
-            return False
+        # If all methods fail, return False - no fallback to mock models
+        logger.error("All attempts to load the model failed")
+        logger.error("Error loading model: Failed to load model with any available method")
+        return False
             
     except Exception as e:
         logger.error(f"Error loading model: {e}")
@@ -338,30 +289,21 @@ def load_with_legacy_keras(model_path):
         logger.error(f"Error with legacy keras: {e}")
         return False
 
-def load_with_direct_h5(model_path):
-    """Direct access to H5 file when all other methods fail"""
+def load_with_direct_keras_import(model_path):
+    """Try direct import approach as a last resort"""
     global default_model
     try:
-        import h5py
-        # Verify this is a valid H5 file
-        with h5py.File(model_path, 'r') as h5file:
-            # Check for standard groups that indicate this is a Keras model
-            has_model_data = 'model_weights' in h5file or 'layer_names' in h5file
-            if has_model_data:
-                logger.info("H5 file verified with h5py, contains model data")
-            else:
-                logger.error("H5 file does not appear to contain Keras model data")
-                return False
-                
-        # Create wrapper for consistent predictions
-        default_model = CustomModelWrapper(model_path)
-        logger.info("Created CustomModelWrapper for model")
+        # Try a different import approach
+        sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+        from keras.models import load_model
+        default_model = load_model(model_path, compile=False)
+        logger.info("Model loaded successfully with direct keras import")
         return True
     except ImportError:
-        logger.error("h5py not available")
+        logger.error("Direct keras import not available")
         return False
     except Exception as e:
-        logger.error(f"Error with h5py direct access: {e}")
+        logger.error(f"Error with direct keras import: {e}")
         return False
 
 @app.route('/model/status', methods=['GET'])

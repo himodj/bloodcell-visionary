@@ -154,6 +154,12 @@ export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult
       throw new Error('Electron environment is required for analysis.');
     }
     
+    // Check if Python server is running before attempting analysis
+    const serverRunning = await window.electron.isPythonServerRunning();
+    if (!serverRunning) {
+      throw new Error('Python server is not running. Please restart the application.');
+    }
+    
     // Call the electron method to analyze the image
     const response = await window.electron.analyzeWithH5Model(modelPath, imageDataUrl) as PythonServerResponse;
     

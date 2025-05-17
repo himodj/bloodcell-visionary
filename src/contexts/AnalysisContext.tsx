@@ -93,22 +93,34 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
         return;
       }
       
+      // Check if Python server is running
+      const serverRunning = await window.electron.isPythonServerRunning();
+      if (!serverRunning) {
+        toast.error('Python server is not running. Please restart the application.');
+        setIsAnalyzing(false);
+        return;
+      }
+      
       // Check model status before analysis
       try {
-        const modelStatus = await window.electron.reloadPythonModel(
-          await window.electron.getDefaultModelPath()
-        );
+        const modelPath = await window.electron.getDefaultModelPath();
+        if (!modelPath) {
+          toast.error('No model file found. Please place model.h5 in the application directory.');
+          setIsAnalyzing(false);
+          return;
+        }
         
+        const modelStatus = await window.electron.reloadPythonModel(modelPath);
         console.log('Model status check result:', modelStatus);
         
-        if (!modelStatus.loaded) {
-          toast.error('Model is not loaded properly. Please try reloading the model first.');
+        if (!modelStatus.success) {
+          toast.error('Model is not loaded properly. Please check the Python environment and model file.');
           setIsAnalyzing(false);
           return;
         }
       } catch (statusError) {
         console.error('Error checking model status:', statusError);
-        toast.error('Failed to check model status. Please reload the model.');
+        toast.error('Failed to check model status. Please ensure the Python server is running.');
         setIsAnalyzing(false);
         return;
       }
