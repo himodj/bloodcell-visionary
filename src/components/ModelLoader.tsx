@@ -2,10 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Database, Check, RefreshCw, Download, FileWarning, Activity, AlertTriangle } from 'lucide-react';
+import { Database, Check, RefreshCw, Download, FileWarning, Activity, AlertTriangle, PackageOpen } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { isModelInitialized, initializeModel } from "../utils/analysisUtils";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
 
 const ModelLoader: React.FC = () => {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
@@ -21,6 +22,12 @@ const ModelLoader: React.FC = () => {
   const [modelCheckStatus, setModelCheckStatus] = useState<'unchecked' | 'checking' | 'success' | 'error'>('unchecked');
   const [pythonServerRunning, setPythonServerRunning] = useState<boolean | null>(null);
   const [lastCheckTime, setLastCheckTime] = useState(0);
+  const [isInstallingRequirements, setIsInstallingRequirements] = useState(false);
+  const [requirementsStatus, setRequirementsStatus] = useState<{
+    all_ok: boolean;
+    missing_packages: string[];
+    incorrect_versions: string[];
+  } | null>(null);
   
   // Check if we're in Electron on component mount and periodically check model state
   useEffect(() => {
@@ -185,6 +192,11 @@ const ModelLoader: React.FC = () => {
       console.log("Environment info received:", envInfo);
       setEnvironmentInfo(envInfo);
       
+      // Update requirements status if available
+      if (envInfo.requirements_check) {
+        setRequirementsStatus(envInfo.requirements_check);
+      }
+      
       if (envInfo.error) {
         toast.error(`Could not retrieve environment info: ${envInfo.error}`);
       } else {
@@ -207,6 +219,54 @@ const ModelLoader: React.FC = () => {
       toast.error('Failed to check environment');
     } finally {
       setIsCheckingEnv(false);
+    }
+  };
+
+  // Function to install required packages
+  const installRequiredPackages = async () => {
+    if (!window.electron) {
+      toast.error('Package installation requires the desktop application');
+      return;
+    }
+    
+    setIsInstallingRequirements(true);
+    
+    try {
+      // First check if Python server is running
+      const serverRunning = await window.electron.isPythonServerRunning();
+      
+      if (!serverRunning) {
+        toast.error('Python server is not running. Cannot install packages.');
+        setIsInstallingRequirements(false);
+        return;
+      }
+      
+      // Make a POST request to install packages
+      const response = await fetch('http://localhost:5000/install_requirements', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      const result = await response.json();
+      console.log("Installation result:", result);
+      
+      if (result.message) {
+        toast.success(result.message);
+        toast.info('Please restart the application after installation for changes to take effect.');
+      } else {
+        toast.error('Failed to install packages');
+      }
+      
+      // Re-check environment after installation
+      await checkEnvironment();
+      
+    } catch (error) {
+      console.error('Error installing packages:', error);
+      toast.error('Failed to install packages');
+    } finally {
+      setIsInstallingRequirements(false);
     }
   };
 
@@ -280,6 +340,11 @@ const ModelLoader: React.FC = () => {
               
               // Show advanced help if we detect issues
               setShowAdvancedHelp(true);
+              
+              // Update requirements status if available
+              if (envInfo.requirements_check) {
+                setRequirementsStatus(envInfo.requirements_check);
+              }
             }
           } catch (envError) {
             console.error('Failed to get environment info:', envError);
@@ -543,6 +608,20 @@ const ModelLoader: React.FC = () => {
           Environment
         </Button>
         
+        {requirementsStatus && !requirementsStatus.all_ok && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-10"
+            onClick={installRequiredPackages}
+            disabled={isInstallingRequirements || !electronAvailable || !pythonServerRunning}
+            title="Install required packages"
+          >
+            <PackageOpen size={16} className={isInstallingRequirements ? "animate-pulse mr-2" : "mr-2"} />
+            Install Requirements
+          </Button>
+        )}
+        
         {renderStatusBadge()}
         
         {!electronAvailable && (
@@ -568,6 +647,45 @@ const ModelLoader: React.FC = () => {
           </div>
         )}
       </div>
+
+      {requirementsStatus && !requirementsStatus.all_ok && (
+        <Alert variant="warning" className="mb-6">
+          <AlertTitle className="flex items-center">
+            <PackageOpen size={16} className="mr-2" />
+            Package Requirements Issue Detected
+          </AlertTitle>
+          <AlertDescription>
+            <div className="mt-2">
+              {requirementsStatus.missing_packages.length > 0 && (
+                <div className="mb-2">
+                  <span className="font-semibold">Missing Packages:</span>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {requirementsStatus.missing_packages.map(pkg => (
+                      <Badge key={pkg} variant="outline" className="bg-red-50">{pkg}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {requirementsStatus.incorrect_versions.length > 0 && (
+                <div>
+                  <span className="font-semibold">Incorrect Versions:</span>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {requirementsStatus.incorrect_versions.map(pkg => (
+                      <Badge key={pkg} variant="outline" className="bg-amber-50">{pkg}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <div className="mt-3">
+                <p>Click "Install Requirements" to automatically install the correct package versions.</p>
+                <p className="text-xs mt-1">Note: The application may need to be restarted after installation.</p>
+              </div>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {Object.keys(environmentInfo).length > 0 && (
         <Accordion type="single" collapsible className="mb-6">
@@ -631,20 +749,33 @@ const ModelLoader: React.FC = () => {
                   <li>Check if the model.h5 file is valid and in the correct location</li>
                   <li>Try reinstalling dependencies with specific versions:</li>
                   <code className="block bg-black text-white p-2 mt-1 mb-2">
-                    pip install tensorflow==2.10.0 keras==2.10.0 h5py==3.7.0 pillow==9.2.0
+                    pip install tensorflow==2.10.0 keras==2.10.0 h5py==3.7.0 pillow==9.2.0 numpy==1.23.5
                   </code>
                   <li>Restart the application after making changes</li>
                 </ol>
-                <Button 
-                  onClick={checkEnvironment} 
-                  variant="outline" 
-                  size="sm" 
-                  className="mt-2" 
-                  disabled={isCheckingEnv || !electronAvailable}
-                >
-                  <Activity size={14} className="mr-1" /> 
-                  Run Environment Diagnostics
-                </Button>
+                <div className="flex gap-2 mt-2">
+                  <Button 
+                    onClick={checkEnvironment} 
+                    variant="outline" 
+                    size="sm" 
+                    disabled={isCheckingEnv || !electronAvailable}
+                  >
+                    <Activity size={14} className="mr-1" /> 
+                    Environment Diagnostics
+                  </Button>
+                  
+                  {requirementsStatus && !requirementsStatus.all_ok && (
+                    <Button 
+                      onClick={installRequiredPackages} 
+                      variant="outline" 
+                      size="sm" 
+                      disabled={isInstallingRequirements || !electronAvailable || !pythonServerRunning}
+                    >
+                      <PackageOpen size={14} className="mr-1" /> 
+                      Install Requirements
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
           </AlertDescription>

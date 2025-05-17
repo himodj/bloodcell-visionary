@@ -50,6 +50,16 @@ try {
     // Check if Python server is running
     isPythonServerRunning: async () => {
       throw new Error('Python backend communication is not available.');
+    },
+    
+    // Check requirements
+    checkRequirements: async () => {
+      throw new Error('Python backend communication is not available.');
+    },
+    
+    // Install requirements
+    installRequirements: async () => {
+      throw new Error('Python backend communication is not available.');
     }
   };
 
@@ -136,6 +146,84 @@ try {
         return {
           error: `Failed to get environment info: ${error.message}`,
           stack: error.stack,
+          details
+        };
+      }
+    };
+    
+    // Add checkRequirements implementation
+    electronAPI.checkRequirements = async () => {
+      try {
+        console.log('Checking Python requirements...');
+        const serverRunning = await electronAPI.isPythonServerRunning();
+        
+        if (!serverRunning) {
+          return {
+            error: 'Python server is not running',
+            all_ok: false,
+            missing_packages: [],
+            incorrect_versions: []
+          };
+        }
+        
+        const response = await axios.get('http://localhost:5000/requirements', axiosConfig);
+        console.log('Requirements check response:', response.status);
+        return response.data;
+      } catch (error) {
+        console.error('Error checking requirements:', error);
+        
+        let details = '';
+        if (error.code === 'ECONNREFUSED') {
+          details = 'The Python backend server is not running or is not accessible.';
+        } else if (error.code === 'ECONNABORTED') {
+          details = 'Connection to Python server timed out.';
+        } else if (error.response) {
+          details = `Server responded with status code ${error.response.status}.`;
+        } else {
+          details = 'This may be a network issue or a problem with the Python server.';
+        }
+        
+        return {
+          error: `Failed to check requirements: ${error.message}`,
+          all_ok: false,
+          details
+        };
+      }
+    };
+    
+    // Add installRequirements implementation
+    electronAPI.installRequirements = async () => {
+      try {
+        console.log('Installing Python requirements...');
+        const serverRunning = await electronAPI.isPythonServerRunning();
+        
+        if (!serverRunning) {
+          return {
+            error: 'Python server is not running',
+            success: false
+          };
+        }
+        
+        const response = await axios.post('http://localhost:5000/install_requirements', {}, axiosConfig);
+        console.log('Install requirements response:', response.status);
+        return response.data;
+      } catch (error) {
+        console.error('Error installing requirements:', error);
+        
+        let details = '';
+        if (error.code === 'ECONNREFUSED') {
+          details = 'The Python backend server is not running or is not accessible.';
+        } else if (error.code === 'ECONNABORTED') {
+          details = 'Connection to Python server timed out.';
+        } else if (error.response) {
+          details = `Server responded with status code ${error.response.status}.`;
+        } else {
+          details = 'This may be a network issue or a problem with the Python server.';
+        }
+        
+        return {
+          error: `Failed to install requirements: ${error.message}`,
+          success: false,
           details
         };
       }
@@ -288,7 +376,9 @@ try {
       analyzeWithH5Model: () => Promise.resolve({ error: 'Not in Electron environment' }),
       reloadPythonModel: () => Promise.resolve({ error: 'Not in Electron environment' }),
       getPythonEnvironmentInfo: () => Promise.resolve({ error: 'Not in Electron environment' }),
-      isPythonServerRunning: () => Promise.resolve(false)
+      isPythonServerRunning: () => Promise.resolve(false),
+      checkRequirements: () => Promise.resolve({ error: 'Not in Electron environment', all_ok: false }),
+      installRequirements: () => Promise.resolve({ error: 'Not in Electron environment', success: false })
     };
     console.log('Created browser fallback for electron API');
   } catch (fallbackError) {
