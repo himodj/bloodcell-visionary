@@ -17,7 +17,7 @@ const ModelLoader: React.FC = () => {
   const [showAdvancedHelp, setShowAdvancedHelp] = useState(false);
   const [environmentInfo, setEnvironmentInfo] = useState<Record<string, any>>({});
   const [isCheckingEnv, setIsCheckingEnv] = useState(false);
-  const [modelCheckStatus, setModelCheckStatus] = useState<'unchecked' | 'checking' | 'success' | 'error' | 'fallback'>('unchecked');
+  const [modelCheckStatus, setModelCheckStatus] = useState<'unchecked' | 'checking' | 'success' | 'error'>('unchecked');
   const [pythonServerRunning, setPythonServerRunning] = useState<boolean | null>(null);
   const [lastCheckTime, setLastCheckTime] = useState(0);
   
@@ -57,13 +57,11 @@ const ModelLoader: React.FC = () => {
             setPythonServerRunning(serverRunning);
             
             if (!serverRunning) {
-              setModelCheckStatus('fallback');
-              console.log('Python server not running, using fallback mode');
+              setModelCheckStatus('error');
+              console.log('Python server not running');
             } else {
               const status = await checkPythonModelStatus();
-              if (!status.loaded && status.usedFallback) {
-                setModelCheckStatus('fallback');
-              } else if (!status.loaded) {
+              if (!status.loaded) {
                 setModelCheckStatus('error');
               } else {
                 setModelCheckStatus('success');
@@ -72,7 +70,7 @@ const ModelLoader: React.FC = () => {
           } catch (err) {
             console.error('Error checking Python server status:', err);
             setPythonServerRunning(false);
-            setModelCheckStatus('fallback');
+            setModelCheckStatus('error');
           }
         }
       }, 2000);
@@ -104,7 +102,7 @@ const ModelLoader: React.FC = () => {
   // Function to check Python model status
   const checkPythonModelStatus = async () => {
     if (!window.electron) {
-      return { loaded: false, error: 'Electron not available', usedFallback: true };
+      return { loaded: false, error: 'Electron not available' };
     }
     
     setModelCheckStatus('checking');
@@ -117,17 +115,15 @@ const ModelLoader: React.FC = () => {
         const serverRunning = await window.electron.isPythonServerRunning();
         
         if (!serverRunning) {
-          setModelCheckStatus('fallback');
-          return { loaded: false, error: 'Python server not running', usedFallback: true };
+          setModelCheckStatus('error');
+          return { loaded: false, error: 'Python server not running' };
         }
         
         console.log("Checking Python model status for path:", path);
         const result = await window.electron.reloadPythonModel(path);
         console.log("Python model status result:", result);
         
-        if (result.usedFallback) {
-          setModelCheckStatus('fallback');
-        } else if (result.loaded) {
+        if (result.loaded) {
           setModelCheckStatus('success');
         } else {
           setModelCheckStatus('error');
@@ -137,11 +133,11 @@ const ModelLoader: React.FC = () => {
       }
       
       setModelCheckStatus('error');
-      return { loaded: false, error: 'No model path', usedFallback: false };
+      return { loaded: false, error: 'No model path' };
     } catch (err) {
       console.error('Error checking Python model status:', err);
-      setModelCheckStatus('fallback');
-      return { loaded: false, error: String(err), usedFallback: true };
+      setModelCheckStatus('error');
+      return { loaded: false, error: String(err) };
     }
   };
 
@@ -218,66 +214,65 @@ const ModelLoader: React.FC = () => {
         const serverRunning = await window.electron.isPythonServerRunning();
         setPythonServerRunning(serverRunning);
         
-        // Always initialize the model in our front-end
+        if (!serverRunning) {
+          setLoadError('Python server is not running. Please restart the application.');
+          setIsModelLoaded(false);
+          setModelCheckStatus('error');
+          toast.error('Python server not running. Please restart the application.');
+          return;
+        }
+        
+        // Initialize the model in our front-end
         const frontendInitSuccess = await initializeModel(modelPath);
         
         if (!frontendInitSuccess) {
           setLoadError('Failed to initialize model in frontend.');
+          setIsModelLoaded(false);
+          setModelCheckStatus('error');
           return;
         }
         
-        // Now try to load in Python backend if server is running
-        if (serverRunning) {
-          console.log('Python server is running, loading model...');
-          const pythonReloadResult = await window.electron.reloadPythonModel(modelPath);
-          console.log('Python model reload result:', pythonReloadResult);
+        // Now try to load in Python backend
+        console.log('Loading model in Python backend...');
+        const pythonReloadResult = await window.electron.reloadPythonModel(modelPath);
+        console.log('Python model reload result:', pythonReloadResult);
+        
+        if (pythonReloadResult.error) {
+          console.error('Error from Python model reload:', pythonReloadResult.error);
           
-          if (pythonReloadResult.error) {
-            console.error('Error from Python model reload:', pythonReloadResult.error);
+          // Show more detailed error message
+          let errorMsg = `Error loading model: ${pythonReloadResult.error}`;
+          setLoadError(errorMsg);
+          setIsModelLoaded(false);
+          setModelCheckStatus('error');
+          
+          // Based on environment info, try to provide more guidance
+          try {
+            const envInfo = await window.electron.getPythonEnvironmentInfo();
+            setEnvironmentInfo(envInfo);
             
-            // Show more detailed error message
-            let errorMsg = `Error loading model: ${pythonReloadResult.error}`;
-            setLoadError(errorMsg);
-            
-            // Still mark as loaded but in fallback mode
-            setIsModelLoaded(true);
-            toast.warning('Model loaded in fallback mode. Some features will be simulated.');
-            setModelCheckStatus('fallback');
-            
-            // Based on environment info, try to provide more guidance
-            try {
-              const envInfo = await window.electron.getPythonEnvironmentInfo();
-              setEnvironmentInfo(envInfo);
-              
-              if (envInfo && envInfo.modules) {
-                // Provide version compatibility information if available
-                if (envInfo.modules.tensorflow && envInfo.modules.keras) {
-                  setLoadError((prevError) => `${prevError}\n\nTensorFlow version: ${envInfo.modules.tensorflow.version || 'unknown'}\nKeras version: ${envInfo.modules.keras.version || 'unknown'}`);
-                }
+            if (envInfo && envInfo.modules) {
+              // Provide version compatibility information if available
+              if (envInfo.modules.tensorflow && envInfo.modules.keras) {
+                setLoadError((prevError) => `${prevError}\n\nTensorFlow version: ${envInfo.modules.tensorflow.version || 'unknown'}\nKeras version: ${envInfo.modules.keras.version || 'unknown'}`);
               }
-            } catch (envError) {
-              console.error('Failed to get environment info:', envError);
             }
-            
-            return;
+          } catch (envError) {
+            console.error('Failed to get environment info:', envError);
           }
           
-          if (pythonReloadResult.loaded) {
-            setIsModelLoaded(true);
-            toast.success(`Model loaded successfully from: ${modelPath}`);
-            setModelCheckStatus('success');
-          } else {
-            // Mark as loaded in fallback mode
-            setIsModelLoaded(true);
-            toast.warning('Model loaded in fallback mode. Some features will be simulated.');
-            setModelCheckStatus('fallback');
-          }
-        } else {
-          // Python server not running, using fallback mode
-          console.log('Python server not running, using fallback mode');
+          return;
+        }
+        
+        if (pythonReloadResult.loaded) {
           setIsModelLoaded(true);
-          toast.warning('Python server not running. Model loaded in fallback mode.');
-          setModelCheckStatus('fallback');
+          toast.success(`Model loaded successfully from: ${modelPath}`);
+          setModelCheckStatus('success');
+        } else {
+          // Error loading model
+          setIsModelLoaded(false);
+          toast.error('Failed to load model. Please check Python environment.');
+          setModelCheckStatus('error');
         }
       } else {
         const errorMsg = 'No model.h5 found. Please place model.h5 in the same folder as the application.';
@@ -285,17 +280,15 @@ const ModelLoader: React.FC = () => {
         setLoadError(errorMsg);
         toast.warning(errorMsg);
         setModelCheckStatus('error');
+        setIsModelLoaded(false);
       }
     } catch (error) {
       console.error('Error loading default model:', error);
       const errorMessage = typeof error === 'string' ? error : error instanceof Error ? error.message : 'Failed to load default model';
       setLoadError(errorMessage);
       toast.error(errorMessage);
-      
-      // Set fallback mode
-      setIsModelLoaded(true);
-      toast.warning('Using fallback mode due to error.');
-      setModelCheckStatus('fallback');
+      setModelCheckStatus('error');
+      setIsModelLoaded(false);
     } finally {
       setIsLoading(false);
     }
@@ -318,6 +311,15 @@ const ModelLoader: React.FC = () => {
       const serverRunning = await window.electron.isPythonServerRunning();
       setPythonServerRunning(serverRunning);
       
+      if (!serverRunning) {
+        setLoadError('Python server is not running. Please restart the application.');
+        setIsModelLoaded(false);
+        setModelCheckStatus('error');
+        toast.error('Python server not running. Please restart the application.');
+        setIsLoading(false);
+        return;
+      }
+      
       // Try first to use browseForModel to let user pick the file
       console.log('Opening file dialog to browse for model...');
       const selectedPath = await window.electron.browseForModel();
@@ -331,59 +333,46 @@ const ModelLoader: React.FC = () => {
         
         if (!frontendInitSuccess) {
           setLoadError('Failed to initialize model in frontend.');
+          setIsModelLoaded(false);
+          setModelCheckStatus('error');
+          setIsLoading(false);
           return;
         }
         
-        // Now try to load in Python backend if server is running
-        if (serverRunning) {
-          console.log('Loading model in Python backend...');
-          const pythonReloadResult = await window.electron.reloadPythonModel(selectedPath);
-          
-          if (pythonReloadResult.error) {
-            console.error('Error from Python model reload:', pythonReloadResult.error);
-            
-            // Show more detailed error message
-            const errorMsg = `Error loading model: ${pythonReloadResult.error}`;
-            setLoadError(errorMsg);
-            
-            // Still mark as loaded but in fallback mode
-            setIsModelLoaded(true);
-            toast.warning('Model loaded in fallback mode. Some features will be simulated.');
-            setModelCheckStatus('fallback');
-            return;
-          }
-          
-          if (pythonReloadResult.loaded) {
-            setIsModelLoaded(true);
-            toast.success(`Model loaded successfully from: ${selectedPath}`);
-            setModelCheckStatus('success');
-          } else {
-            // Mark as loaded in fallback mode
-            setIsModelLoaded(true);
-            toast.warning('Model loaded in fallback mode. Some features will be simulated.');
-            setModelCheckStatus('fallback');
-          }
-        } else {
-          // Python server not running, using fallback mode
-          console.log('Python server not running, using fallback mode');
+        // Now try to load in Python backend
+        console.log('Loading model in Python backend...');
+        const pythonReloadResult = await window.electron.reloadPythonModel(selectedPath);
+        
+        if (pythonReloadResult.error) {
+          console.error('Error from Python model reload:', pythonReloadResult.error);
+          setLoadError(`Error loading model: ${pythonReloadResult.error}`);
+          setIsModelLoaded(false);
+          setModelCheckStatus('error');
+          setIsLoading(false);
+          return;
+        }
+        
+        if (pythonReloadResult.loaded) {
           setIsModelLoaded(true);
-          toast.warning('Python server not running. Model loaded in fallback mode.');
-          setModelCheckStatus('fallback');
+          setModelCheckStatus('success');
+          toast.success(`Model loaded successfully from: ${selectedPath}`);
+        } else {
+          setIsModelLoaded(false);
+          setModelCheckStatus('error');
+          toast.error('Failed to load model.');
         }
       } else {
-        // Fall back to auto-detection
-        await loadDefaultModel();
+        // User cancelled the selection
+        console.log('User cancelled model selection');
+        // Keep previous state
       }
     } catch (error) {
-      console.error('Error loading model:', error);
-      const errorMessage = typeof error === 'string' ? error : error instanceof Error ? error.message : 'Failed to load model';
+      console.error('Error during custom model loading:', error);
+      const errorMessage = typeof error === 'string' ? error : error instanceof Error ? error.message : 'Unknown error during model loading';
       setLoadError(errorMessage);
       toast.error(errorMessage);
-      
-      // Set fallback mode
-      setIsModelLoaded(true);
-      toast.warning('Using fallback mode due to error.');
-      setModelCheckStatus('fallback');
+      setModelCheckStatus('error');
+      setIsModelLoaded(false);
     } finally {
       setIsLoading(false);
     }
@@ -402,7 +391,7 @@ const ModelLoader: React.FC = () => {
       setPythonServerRunning(serverRunning);
       
       // Always reinitialize in frontend
-      await initializeModel(modelPath, true);
+      await initializeModel(modelPath);
       
       // Then reload in Python backend if server is running
       if (serverRunning) {
@@ -412,36 +401,29 @@ const ModelLoader: React.FC = () => {
         if (pythonReloadResult.error) {
           console.error('Error from Python model reload:', pythonReloadResult.error);
           setLoadError(`Error from Python server: ${pythonReloadResult.error}`);
-          
-          // Still mark as loaded but in fallback mode
-          setIsModelLoaded(true);
-          toast.warning('Model loaded in fallback mode. Some features will be simulated.');
-          setModelCheckStatus('fallback');
+          setIsModelLoaded(false);
+          setModelCheckStatus('error');
         } else if (pythonReloadResult.loaded) {
           setIsModelLoaded(true);
           toast.success('Model reloaded successfully in both frontend and Python backend');
           setModelCheckStatus('success');
         } else {
-          // Mark as loaded in fallback mode
-          setIsModelLoaded(true);
-          toast.warning('Model loaded in fallback mode. Some features will be simulated.');
-          setModelCheckStatus('fallback');
+          setIsModelLoaded(false);
+          toast.error('Failed to reload model on Python server.');
+          setModelCheckStatus('error');
         }
       } else {
-        // Python server not running, using fallback mode
-        console.log('Python server not running, using fallback mode');
-        setIsModelLoaded(true);
-        toast.warning('Python server not running. Model loaded in fallback mode.');
-        setModelCheckStatus('fallback');
+        // Python server not running
+        console.log('Python server not running');
+        toast.error('Python server is not running. Please restart the application.');
+        setIsModelLoaded(false);
+        setModelCheckStatus('error');
       }
     } catch (error) {
       console.error('Error reloading model:', error);
       toast.error('Failed to reload model');
-      
-      // Set fallback mode
-      setIsModelLoaded(true);
-      toast.warning('Using fallback mode due to error.');
-      setModelCheckStatus('fallback');
+      setIsModelLoaded(false);
+      setModelCheckStatus('error');
     } finally {
       setIsLoading(false);
     }
@@ -457,21 +439,6 @@ const ModelLoader: React.FC = () => {
             <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
             <span className="text-sm text-green-600 flex items-center">
               Model loaded successfully
-              {modelPath && (
-                <span className="text-xs text-gray-500 ml-2 truncate max-w-[200px]" title={modelPath}>
-                  ({modelPath})
-                </span>
-              )}
-            </span>
-          </div>
-        );
-      case 'fallback':
-        return (
-          <div className="flex items-center">
-            <div className="w-2 h-2 rounded-full bg-amber-500 mr-2"></div>
-            <span className="text-sm text-amber-600 flex items-center">
-              <AlertTriangle size={14} className="mr-1" />
-              Fallback mode (simulated results)
               {modelPath && (
                 <span className="text-xs text-gray-500 ml-2 truncate max-w-[200px]" title={modelPath}>
                   ({modelPath})
@@ -498,7 +465,7 @@ const ModelLoader: React.FC = () => {
         <Button 
           onClick={handleLoadModel}
           disabled={isLoading || !electronAvailable}
-          className={`${isModelLoaded ? (modelCheckStatus === 'success' ? 'bg-green-500' : 'bg-amber-500') : 'bg-medical-blue'} text-white hover:opacity-90 transition-all`}
+          className={`${isModelLoaded ? 'bg-green-500' : 'bg-medical-blue'} text-white hover:opacity-90 transition-all`}
         >
           {isLoading ? (
             <>
@@ -508,7 +475,7 @@ const ModelLoader: React.FC = () => {
           ) : (
             <>
               {isModelLoaded ? <Check size={16} className="mr-2" /> : <Database size={16} className="mr-2" />}
-              {isModelLoaded ? (modelCheckStatus === 'fallback' ? 'Model Loaded (Fallback)' : 'Model Loaded') : 'Load Model'}
+              {isModelLoaded ? 'Model Loaded' : 'Load Model'}
             </>
           )}
         </Button>
@@ -556,21 +523,6 @@ const ModelLoader: React.FC = () => {
           </div>
         )}
       </div>
-
-      {modelCheckStatus === 'fallback' && pythonServerRunning === false && (
-        <Alert className="mb-6 bg-amber-50 border-amber-200">
-          <AlertTriangle className="h-4 w-4 text-amber-700" />
-          <AlertTitle className="text-amber-700">Python Server Not Running</AlertTitle>
-          <AlertDescription>
-            <p>The Python backend server is not responding. Analysis will use simulated results.</p>
-            <ul className="list-disc pl-6 mt-2 text-sm">
-              <li>Check that the server is running in your terminal/console</li>
-              <li>Ensure that port 5000 is not blocked by a firewall</li>
-              <li>Try restarting the application</li>
-            </ul>
-          </AlertDescription>
-        </Alert>
-      )}
 
       {Object.keys(environmentInfo).length > 0 && (
         <Accordion type="single" collapsible className="mb-6">

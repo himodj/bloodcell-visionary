@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
@@ -18,16 +17,10 @@ if (!isElectron) {
 
 // Keep track of loaded model state globally
 let globalModelLoaded = false;
-let usingFallbackMode = false;
 
 // Define a global function to check if model is loaded
 (window as any).isModelLoaded = () => {
   return globalModelLoaded;
-};
-
-// Define flag for fallback mode
-(window as any).isUsingFallbackMode = () => {
-  return usingFallbackMode;
 };
 
 // Define a global function to check Python server status
@@ -47,16 +40,6 @@ let usingFallbackMode = false;
     if (!window.electron) {
       console.warn('Electron API not available. Running in browser mode.');
       toast.error('Model loading requires the desktop application');
-      
-      // In browser mode, we'll set up a mock model state for UI testing
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Development environment detected - enabling mock model mode');
-        globalModelLoaded = true;
-        usingFallbackMode = true;
-        toast.success('Development mode: Mock model enabled');
-        return true;
-      }
-      
       globalModelLoaded = false;
       return false;
     }
@@ -70,11 +53,12 @@ let usingFallbackMode = false;
       console.error('Error checking Python server status:', err);
     }
     
-    // If Python server is not running, set fallback mode immediately
+    // If Python server is not running, alert the user
     if (!pythonServerRunning) {
-      console.log('Python server not running, enabling fallback mode');
-      usingFallbackMode = true;
-      toast.warning('Python server not running. Using fallback mode - results will be simulated');
+      console.log('Python server not running');
+      toast.error('Python server is not running. Please restart the application.');
+      globalModelLoaded = false;
+      return false;
     }
     
     let selectedModelPath = modelPath;
@@ -111,7 +95,7 @@ let usingFallbackMode = false;
         }
         
         // Register the H5 model for specialized analysis
-        await initializeModel(selectedModelPath, true); // Using the forceH5 flag
+        await initializeModel(selectedModelPath);
         console.log('H5 Model registered successfully for frontend analysis');
         
         // Try to load the model on the Python server if it's running
@@ -122,12 +106,8 @@ let usingFallbackMode = false;
             console.log('Python server model loading response:', pythonServerLoaded);
             
             if (!pythonServerLoaded.success) {
-              console.warn('Python server could not load the model, but frontend initialization succeeded');
-              toast.warning('Model partially loaded. Python server could not load the model, but frontend analysis will work in fallback mode.');
-              
-              // Set fallback mode but still consider model loaded for UI
-              usingFallbackMode = true;
-              globalModelLoaded = true;
+              console.warn('Python server could not load the model');
+              toast.error('Failed to load model on Python server. Please check your Python environment.');
               
               // Try to get environment info to help diagnose
               try {
@@ -147,43 +127,31 @@ let usingFallbackMode = false;
                 console.error('Failed to get environment info:', envError);
               }
               
-              return true;
+              globalModelLoaded = false;
+              return false;
             }
             
             toast.success('Model loaded successfully and ready for analysis');
             globalModelLoaded = true;
-            usingFallbackMode = false;
             return true;
           } catch (error) {
             console.error('Error communicating with Python server:', error);
-            
-            // Set fallback mode but still consider model loaded for UI
-            usingFallbackMode = true;
-            globalModelLoaded = true;
-            toast.warning('Using fallback mode - Python server communication failed');
-            
-            return true;
+            toast.error('Failed to communicate with Python server');
+            globalModelLoaded = false;
+            return false;
           }
         } else {
-          // Python server not running, use fallback mode
-          console.log('Python server not available, using fallback mode');
-          usingFallbackMode = true;
-          globalModelLoaded = true;
-          toast.warning('Using fallback mode - Python server not available');
-          
-          return true;
+          // Python server not running
+          console.log('Python server not available');
+          toast.error('Python server not available. Please restart the application.');
+          globalModelLoaded = false;
+          return false;
         }
       } catch (error) {
         console.error('Error registering H5 model:', error);
         toast.error('Error loading H5 model: ' + (error instanceof Error ? error.message : String(error)));
-        
-        // Set fallback mode to allow UI to function
-        console.log('Enabling fallback mode after error');
-        usingFallbackMode = true;
-        globalModelLoaded = true;
-        toast.warning('Using fallback mode for analysis - results will be simulated');
-        
-        return true; // Return true to allow UI to function in fallback mode
+        globalModelLoaded = false;
+        return false;
       }
     }
     
@@ -192,31 +160,18 @@ let usingFallbackMode = false;
       await initializeModel(selectedModelPath);
       console.log('Model initialized successfully');
       globalModelLoaded = true;
-      usingFallbackMode = false;
       return true;
     } catch (error) {
       console.error('Failed to load model:', error);
       toast.error('Failed to load model: ' + (error instanceof Error ? error.message : String(error)));
-      
-      // Enable fallback mode
-      console.log('Enabling fallback mode after frontend model initialization error');
-      usingFallbackMode = true;
-      globalModelLoaded = true;
-      toast.warning('Using fallback mode for analysis - results will be simulated');
-      
-      return true; // Return true to allow UI to function in fallback mode
+      globalModelLoaded = false;
+      return false;
     }
   } catch (error) {
     console.error('Failed to load model:', error);
     toast.error('Failed to load model: ' + (error instanceof Error ? error.message : String(error)));
-    
-    // Enable fallback mode as last resort
-    console.log('Enabling fallback mode after critical error');
-    usingFallbackMode = true;
-    globalModelLoaded = true;
-    toast.warning('Using fallback mode for analysis - results will be simulated');
-    
-    return true; // Return true to allow UI to function in fallback mode
+    globalModelLoaded = false;
+    return false;
   }
 };
 

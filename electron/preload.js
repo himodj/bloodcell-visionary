@@ -32,43 +32,24 @@ try {
     // New: Check if a file exists
     checkFileExists: (filePath) => ipcRenderer.invoke('check-file-exists', filePath),
     
-    // Default implementation that will be replaced if axios loads
-    analyzeWithH5Model: async (modelPath, imageDataUrl) => {
-      console.log('Using fallback analyzeWithH5Model implementation - axios not loaded');
-      return {
-        error: 'Python backend communication is not available. Could not load axios module.',
-        stack: 'Module not found: axios',
-        details: 'This error typically occurs when the application cannot find the axios library. Please make sure axios is installed properly.',
-        usedFallback: true
-      };
+    // Default implementations that will throw errors if not overridden
+    analyzeWithH5Model: async () => {
+      throw new Error('Python backend communication is not available.');
     },
     
     // Force reload the model on the Python server
-    reloadPythonModel: async (modelPath) => {
-      console.log('Using fallback reloadPythonModel implementation - axios not loaded');
-      return {
-        error: 'Python backend communication is not available. Could not load axios module.',
-        stack: 'Module not found: axios',
-        details: 'This error typically occurs when the application cannot find the axios library. Please make sure axios is installed properly.',
-        usedFallback: true
-      };
+    reloadPythonModel: async () => {
+      throw new Error('Python backend communication is not available.');
     },
     
     // Get environment information from the Python server
     getPythonEnvironmentInfo: async () => {
-      console.log('Using fallback getPythonEnvironmentInfo implementation - axios not loaded');
-      return {
-        error: 'Python backend communication is not available. Could not load axios module.',
-        stack: 'Module not found: axios',
-        details: 'This error typically occurs when the application cannot find the axios library. Please make sure axios is installed properly.',
-        usedFallback: true
-      };
+      throw new Error('Python backend communication is not available.');
     },
 
     // Check if Python server is running
     isPythonServerRunning: async () => {
-      console.log('Using fallback isPythonServerRunning implementation');
-      return false;
+      throw new Error('Python backend communication is not available.');
     }
   };
 
@@ -99,7 +80,7 @@ try {
         'Accept': 'application/json'
       },
       // Reduce timeout to avoid UI freezing for too long
-      timeout: 10000 // Reduced from 60000ms to 10000ms (10 seconds)
+      timeout: 10000 // 10 seconds
     };
 
     // Add isPythonServerRunning implementation
@@ -126,7 +107,6 @@ try {
         if (!serverRunning) {
           return {
             error: 'Python server is not running',
-            usedFallback: true,
             modules: {
               tensorflow: { installed: false },
               keras: { installed: false },
@@ -156,8 +136,7 @@ try {
         return {
           error: `Failed to get environment info: ${error.message}`,
           stack: error.stack,
-          details,
-          usedFallback: true
+          details
         };
       }
     };
@@ -174,8 +153,7 @@ try {
           console.warn('Python server is not running or not accessible');
           return {
             error: 'Python server is not running',
-            details: 'The Python Flask server is not accessible. Please check if the server is running.',
-            usedFallback: true
+            details: 'The Python Flask server is not accessible. Please check if the server is running.'
           };
         }
         
@@ -213,13 +191,12 @@ try {
         return {
           error: `Failed to reload model: ${error.message}`,
           stack: error.stack,
-          details,
-          usedFallback: true
+          details
         };
       }
     };
     
-    // Override the default implementation with the actual one
+    // Add the actual implementation
     electronAPI.analyzeWithH5Model = async (modelPath, imageDataUrl) => {
       try {
         console.log('Sending image to Python backend for analysis with model path:', modelPath);
@@ -231,8 +208,7 @@ try {
           console.warn('Python server is not running or not accessible');
           return {
             error: 'Python server is not running',
-            details: 'The Python Flask server is not accessible. Switching to fallback mode.',
-            usedFallback: true
+            details: 'The Python Flask server is not accessible. Please restart the application.'
           };
         }
         
@@ -282,8 +258,7 @@ try {
         return {
           error: `${errorMessage}: ${errorDetails}`,
           stack: error.stack,
-          details,
-          usedFallback: true
+          details
         };
       }
     };
@@ -310,9 +285,9 @@ try {
       readModelDir: () => Promise.resolve([]),
       browseForModel: () => Promise.resolve(null),
       checkFileExists: () => Promise.resolve(false),
-      analyzeWithH5Model: () => Promise.resolve({ error: 'Not in Electron environment', usedFallback: true }),
-      reloadPythonModel: () => Promise.resolve({ error: 'Not in Electron environment', usedFallback: true }),
-      getPythonEnvironmentInfo: () => Promise.resolve({ error: 'Not in Electron environment', usedFallback: true }),
+      analyzeWithH5Model: () => Promise.resolve({ error: 'Not in Electron environment' }),
+      reloadPythonModel: () => Promise.resolve({ error: 'Not in Electron environment' }),
+      getPythonEnvironmentInfo: () => Promise.resolve({ error: 'Not in Electron environment' }),
       isPythonServerRunning: () => Promise.resolve(false)
     };
     console.log('Created browser fallback for electron API');

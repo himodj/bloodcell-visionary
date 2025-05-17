@@ -1,3 +1,4 @@
+
 import logging
 import os
 import numpy as np
@@ -179,11 +180,6 @@ def load_model(model_path=None):
                 'name': 'legacy_keras',
                 'load_func': lambda: load_with_legacy_keras(model_path)
             },
-            # Method 4: Last resort with direct h5py inspection
-            {
-                'name': 'h5py_direct',
-                'load_func': lambda: load_with_h5py(model_path)
-            }
         ])
         
         for method in loading_methods:
@@ -199,9 +195,9 @@ def load_model(model_path=None):
                 logger.error(f"Error loading with {method['name']}: {e}")
                 logger.error(traceback.format_exc())
         
-        # If all methods fail
+        # If all methods fail, raise an error - we don't use fallback mode
         logger.error("All attempts to load the model failed")
-        return False
+        raise Exception("Failed to load model with any available method")
             
     except Exception as e:
         logger.error(f"Error loading model: {e}")
@@ -277,43 +273,6 @@ def load_with_legacy_keras(model_path):
         return False
     except Exception as e:
         logger.error(f"Error with legacy keras: {e}")
-        return False
-
-def load_with_h5py(model_path):
-    """
-    This is a fallback method that doesn't actually load the model for predictions,
-    but allows the server to continue running in a limited capacity.
-    """
-    global default_model
-    try:
-        import h5py
-        with h5py.File(model_path, 'r') as f:
-            # Just verify the file is valid H5 and has expected structure
-            if 'model_weights' in f or 'layer_names' in f:
-                logger.info("H5 file verified with h5py, contains model data")
-                
-                # Create a simple mock model object for demonstration purposes
-                # This won't make real predictions but allows the server to run
-                class MockModel:
-                    def predict(self, x):
-                        # Return random probabilities for demonstration
-                        import numpy as np
-                        probs = np.random.rand(1, len(class_labels))
-                        # Normalize to sum to 1
-                        probs = probs / np.sum(probs)
-                        return probs
-                
-                default_model = MockModel()
-                logger.warning("⚠️ Using MOCK MODEL - predictions will be RANDOM!")
-                return True
-            else:
-                logger.error("H5 file doesn't appear to be a valid Keras model")
-                return False
-    except ImportError:
-        logger.error("H5py not available")
-        return False
-    except Exception as e:
-        logger.error(f"Error with h5py inspection: {e}")
         return False
 
 @app.route('/model/status', methods=['GET'])

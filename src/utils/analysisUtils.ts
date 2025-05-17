@@ -1,10 +1,10 @@
+
 import { CellType, AnalysisResult, AnalyzedCell } from '../contexts/AnalysisContext';
 import { toast } from 'sonner';
 
 // Initialize model state
 let modelInitialized = false;
 let modelPath: string | null = null;
-let usingFallbackMode = false;
 
 // Format a number with commas for thousands
 export const formatNumber = (num: number): string => {
@@ -61,52 +61,24 @@ export const isModelInitialized = (): boolean => {
   return modelInitialized;
 };
 
-// Check if using fallback mode
-export const isUsingFallbackMode = (): boolean => {
-  return usingFallbackMode;
-};
-
 // Initialize the model
-export const initializeModel = async (path: string, forceH5 = false): Promise<boolean> => {
+export const initializeModel = async (path: string): Promise<boolean> => {
   try {
-    console.log(`Initializing model from path: ${path} (forceH5: ${forceH5})`);
+    console.log(`Initializing model from path: ${path}`);
     
     // Set the model path globally
     modelPath = path;
-    
-    // Set the fallback mode from global state if available
-    if (typeof window !== 'undefined' && (window as any).isUsingFallbackMode) {
-      usingFallbackMode = (window as any).isUsingFallbackMode();
-    }
     
     // In a production app, we'd actually load and initialize the model here
     // For this app, we're relying on the Python backend
     console.log('Setting model as initialized for frontend');
     modelInitialized = true;
     
-    // Show fallback mode toast if enabled
-    if (usingFallbackMode) {
-      toast.warning('Using fallback mode - analysis results will be simulated', {
-        id: 'fallback-mode-toast',
-        duration: 5000,
-        position: 'top-center'
-      });
-    }
-    
     return true;
   } catch (error) {
     console.error('Failed to initialize model:', error);
     modelInitialized = false;
-    
-    // Enable fallback mode automatically on error
-    usingFallbackMode = true;
-    modelInitialized = true; // Still mark as initialized for UI to function
-    
-    toast.warning('Using fallback mode due to initialization error', {
-      id: 'fallback-error-toast',
-    });
-    
-    return true; // Return success to allow UI to function
+    return false;
   }
 };
 
@@ -168,86 +140,18 @@ interface PythonServerResponse {
   timestamp?: string;
 }
 
-// Generate fallback data for demo purposes
-const generateFallbackAnalysis = (imageDataUrl: string): AnalysisResult => {
-  // Generate a random cell type for the fallback
-  const cellTypes: CellType[] = [
-    'Lymphocyte', 'Neutrophil', 'Monocyte', 'Platelet'
-  ];
-  
-  const cellType: CellType = cellTypes[Math.floor(Math.random() * cellTypes.length)];
-  const confidence = 0.5 + Math.random() * 0.4; // Random confidence between 0.5 and 0.9
-  
-  // Create a cell
-  const analyzedCell: AnalyzedCell = {
-    type: cellType,
-    confidence,
-    coordinates: {
-      x: 0,
-      y: 0,
-      width: 224,
-      height: 224
-    }
-  };
-  
-  // Initialize cell counts
-  const cellCounts: Record<CellType, number> = {
-    'IG Immature White Cell': 0,
-    'Basophil': 0,
-    'Eosinophil': 0,
-    'Erythroblast': 0,
-    'Lymphocyte': 0,
-    'Monocyte': 0,
-    'Neutrophil': 0,
-    'Platelet': 0
-  };
-  
-  // Set count for the detected cell type
-  cellCounts[cellType] = 1;
-  
-  // Determine if the cell is abnormal based on its type
-  const isAbnormal = ['IG Immature White Cell', 'Basophil', 'Eosinophil'].includes(cellType);
-  
-  // Create fallback analysis result
-  return {
-    image: imageDataUrl,
-    analysisDate: new Date(),
-    cellCounts: {
-      totalCells: 1,
-      normalCells: isAbnormal ? 0 : 1,
-      abnormalCells: isAbnormal ? 1 : 0,
-      detectedCells: cellCounts
-    },
-    detectedCells: [analyzedCell],
-    abnormalityRate: isAbnormal ? 1.0 : 0.0,
-    recommendations: generateRecommendations(cellType),
-    possibleConditions: generatePossibleConditions(cellType),
-    notes: 'This analysis was generated in fallback mode. For accurate results, please configure the model properly.',
-    usedFallback: true
-  };
-};
-
 // Analyze image with backend API
 export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult> => {
   if (!modelInitialized) {
-    toast.warning('Model not fully initialized. Using fallback analysis mode.');
-    return generateFallbackAnalysis(imageDataUrl);
+    throw new Error('Model not initialized. Please initialize the model before analysis.');
   }
   
-  console.log('Sending image for analysis... (fallback mode: ' + usingFallbackMode + ')');
-  
-  // If explicitly in fallback mode, don't even try to use the Python server
-  if (usingFallbackMode) {
-    console.log('Using fallback analysis mode (set globally)');
-    return generateFallbackAnalysis(imageDataUrl);
-  }
+  console.log('Sending image for analysis...');
   
   try {
     // Check for Electron environment
     if (!window.electron) {
-      console.warn('Not in Electron environment, using fallback analysis.');
-      toast.info('Using simulated analysis (browser mode)');
-      return generateFallbackAnalysis(imageDataUrl);
+      throw new Error('Electron environment is required for analysis.');
     }
     
     // Call the electron method to analyze the image
@@ -255,12 +159,7 @@ export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult
     
     // Check for errors
     if (response.error) {
-      console.error('Error during Python backend analysis:', response.error);
-      // Fall back to frontend analysis if Python fails
-      toast.warning('Python analysis failed. Using simulated analysis instead.', {
-        description: 'Check Python server logs for details.'
-      });
-      return generateFallbackAnalysis(imageDataUrl);
+      throw new Error(`Error during Python backend analysis: ${response.error}`);
     }
     
     console.log('Analysis completed successfully:', response);
@@ -280,8 +179,7 @@ export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult
       confidence = cell.confidence;
     } else {
       // This is an error case - the model should always return a cell type
-      console.warn('No cell type detected in model response, using fallback.');
-      return generateFallbackAnalysis(imageDataUrl);
+      throw new Error('No cell type detected in model response');
     }
     
     // Create a cell object
@@ -333,11 +231,7 @@ export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult
     return result;
   } catch (error) {
     console.error('Error during analysis:', error);
-    toast.error('Analysis failed. Using fallback method.');
-    
-    // If model analysis failed but we want to continue with a fallback
-    console.warn('Using fallback analysis after error.');
-    return generateFallbackAnalysis(imageDataUrl);
+    throw error;
   }
 };
 

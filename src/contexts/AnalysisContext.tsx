@@ -44,8 +44,7 @@ export interface AnalysisResult {
   abnormalityRate: number;
   recommendations: string[];
   possibleConditions: string[];
-  notes?: string; 
-  usedFallback?: boolean; // Flag to indicate if fallback was used
+  notes?: string;
 }
 
 // Define the context interface
@@ -60,8 +59,6 @@ interface AnalysisContextType {
   updatePossibleConditions: (conditions: string[]) => void;
   updateProcessedImage: (imageUrl: string) => void;
   setOriginalImage: (imageUrl: string | null) => void;
-  allowFallbackMode: boolean;
-  setAllowFallbackMode: (allow: boolean) => void;
 }
 
 // Create the context
@@ -77,8 +74,6 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
-  // Add state for fallback mode
-  const [allowFallbackMode, setAllowFallbackMode] = useState(true);
 
   // Analysis workflow functions
   const startAnalysis = async () => {
@@ -106,21 +101,16 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
         
         console.log('Model status check result:', modelStatus);
         
-        if (!modelStatus.loaded && !allowFallbackMode) {
+        if (!modelStatus.loaded) {
           toast.error('Model is not loaded properly. Please try reloading the model first.');
           setIsAnalyzing(false);
           return;
         }
       } catch (statusError) {
         console.error('Error checking model status:', statusError);
-        
-        if (!allowFallbackMode) {
-          toast.error('Failed to check model status. Please reload the model.');
-          setIsAnalyzing(false);
-          return;
-        }
-        
-        toast.warning('Model status check failed, attempting to continue with limited functionality');
+        toast.error('Failed to check model status. Please reload the model.');
+        setIsAnalyzing(false);
+        return;
       }
       
       // Perform the analysis
@@ -129,11 +119,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
       // Update state with the results
       finishAnalysis(result);
       
-      if (result.usedFallback) {
-        toast.warning('Analysis completed in fallback mode. Results may be less accurate.');
-      } else {
-        toast.success('Analysis completed successfully');
-      }
+      toast.success('Analysis completed successfully');
     } catch (error) {
       console.error('Error during analysis:', error);
       setIsAnalyzing(false);
@@ -191,8 +177,6 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
         updatePossibleConditions,
         updateProcessedImage,
         setOriginalImage,
-        allowFallbackMode,
-        setAllowFallbackMode,
       }}
     >
       {children}
