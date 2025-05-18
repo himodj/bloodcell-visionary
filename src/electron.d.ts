@@ -1,3 +1,4 @@
+
 interface ElectronAPI {
   selectModel: () => Promise<string | null>;
   getDefaultModelPath: () => Promise<string | null>;
@@ -21,6 +22,8 @@ interface ElectronAPI {
   getPythonEnvironmentInfo: () => Promise<{
     python_version?: string;
     platform?: string;
+    default_model_loaded?: boolean;
+    default_model_path?: string;
     modules?: Record<string, {
       installed: boolean;
       version?: string;
@@ -57,6 +60,19 @@ interface ElectronAPI {
     stack?: string;
     details?: string;
     usedFallback?: boolean;
+  }>;
+  checkRequirements: () => Promise<{
+    all_ok: boolean;
+    missing_packages: string[];
+    incorrect_versions: string[];
+    error?: string;
+    details?: string;
+  }>;
+  installRequirements: () => Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+    details?: string;
   }>;
 }
 

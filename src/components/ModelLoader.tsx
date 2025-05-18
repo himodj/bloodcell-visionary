@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -27,7 +28,8 @@ const ModelLoader: React.FC = () => {
     missing_packages: string[];
     incorrect_versions: string[];
   } | null>(null);
-  
+  const [backendModelLoaded, setBackendModelLoaded] = useState(false);
+
   // Check if we're in Electron on component mount and periodically check model state
   useEffect(() => {
     try {
@@ -54,7 +56,7 @@ const ModelLoader: React.FC = () => {
         // Check if model is initialized
         const modelInitialized = isModelInitialized();
         console.log('Model initialized check:', modelInitialized);
-        setIsModelLoaded(modelInitialized);
+        setIsModelLoaded(modelInitialized && backendModelLoaded);
         
         // If more than 10 seconds have passed since last check, check server status
         const now = Date.now();
@@ -67,19 +69,33 @@ const ModelLoader: React.FC = () => {
             
             if (!serverRunning) {
               setModelCheckStatus('error');
+              setBackendModelLoaded(false);
               console.log('Python server not running');
               if (isModelLoaded) {
                 // If model was previously loaded but server is now down
                 setIsModelLoaded(false);
                 toast.error('Python server is no longer running. Analysis will not work.');
               }
-            } else if (modelInitialized) {
-              // If server is running and model is initialized, check the model status
-              const status = await checkPythonModelStatus();
-              if (!status.loaded) {
+            } else if (serverRunning) {
+              // If server is running, check if it has the model loaded
+              // This uses the enhanced /health endpoint we added
+              try {
+                const response = await fetch('http://localhost:5000/health');
+                const data = await response.json();
+                
+                if (response.status === 200 && data.model_loaded) {
+                  setBackendModelLoaded(true);
+                  if (modelInitialized) {
+                    setModelCheckStatus('success');
+                  }
+                } else {
+                  setBackendModelLoaded(false);
+                  setModelCheckStatus('error');
+                }
+              } catch (err) {
+                console.error('Error checking model status:', err);
+                setBackendModelLoaded(false);
                 setModelCheckStatus('error');
-              } else {
-                setModelCheckStatus('success');
               }
             }
           } catch (err) {
@@ -94,7 +110,7 @@ const ModelLoader: React.FC = () => {
     } catch (err) {
       console.error('Error in ModelLoader useEffect:', err);
     }
-  }, [lastCheckTime]);
+  }, [lastCheckTime, backendModelLoaded]);
 
   // Check if Python server is running
   const checkPythonServerStatus = async () => {
@@ -131,6 +147,7 @@ const ModelLoader: React.FC = () => {
         
         if (!serverRunning) {
           setModelCheckStatus('error');
+          setBackendModelLoaded(false);
           return { loaded: false, error: 'Python server not running' };
         }
         
@@ -140,18 +157,22 @@ const ModelLoader: React.FC = () => {
         
         if (result.success) {
           setModelCheckStatus('success');
+          setBackendModelLoaded(true);
           return { loaded: true };
         } else {
           setModelCheckStatus('error');
+          setBackendModelLoaded(false);
           return { loaded: false, error: result.error || 'Unknown error' };
         }
       }
       
       setModelCheckStatus('error');
+      setBackendModelLoaded(false);
       return { loaded: false, error: 'No model path' };
     } catch (err) {
       console.error('Error checking Python model status:', err);
       setModelCheckStatus('error');
+      setBackendModelLoaded(false);
       return { loaded: false, error: String(err) };
     }
   };
@@ -212,6 +233,9 @@ const ModelLoader: React.FC = () => {
             toast.error('Missing required dependencies. Please check the environment details below.');
           }
         }
+        
+        // Check if the model is loaded in the backend
+        setBackendModelLoaded(envInfo.default_model_loaded === true);
       }
     } catch (error) {
       console.error('Error checking environment:', error);
@@ -245,6 +269,7 @@ const ModelLoader: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
       });
       
@@ -297,6 +322,7 @@ const ModelLoader: React.FC = () => {
         if (!serverRunning) {
           setLoadError('Python server is not running. Please restart the application.');
           setIsModelLoaded(false);
+          setBackendModelLoaded(false);
           setModelCheckStatus('error');
           toast.error('Python server not running. Please restart the application.');
           return;
@@ -308,6 +334,7 @@ const ModelLoader: React.FC = () => {
         if (!frontendInitSuccess) {
           setLoadError('Failed to initialize model in frontend.');
           setIsModelLoaded(false);
+          setBackendModelLoaded(false);
           setModelCheckStatus('error');
           return;
         }
@@ -323,7 +350,8 @@ const ModelLoader: React.FC = () => {
           // Show more detailed error message
           let errorMsg = `Error loading model: ${pythonReloadResult.error}`;
           setLoadError(errorMsg);
-          setIsModelLoaded(false);
+          setIsModelLoaded(frontendInitSuccess); // Frontend might be ok but backend is not
+          setBackendModelLoaded(false);
           setModelCheckStatus('error');
           
           // Based on environment info, try to provide more guidance
@@ -349,17 +377,22 @@ const ModelLoader: React.FC = () => {
             console.error('Failed to get environment info:', envError);
           }
           
+          // Very important: let the user know they can't use analysis features
+          toast.error('Backend model loading failed. Analysis features will not be available.');
+          
           return;
         }
         
         if (pythonReloadResult.success) {
-          setIsModelLoaded(true);
+          setIsModelLoaded(frontendInitSuccess);
+          setBackendModelLoaded(true);
           toast.success(`Model loaded successfully from: ${modelPath}`);
           setModelCheckStatus('success');
         } else {
           // Error loading model
-          setIsModelLoaded(false);
-          toast.error('Failed to load model. Please check Python environment.');
+          setIsModelLoaded(frontendInitSuccess);
+          setBackendModelLoaded(false);
+          toast.error('Failed to load model on Python server. Analysis features will not be available.');
           setModelCheckStatus('error');
           setShowAdvancedHelp(true);
         }
@@ -370,6 +403,7 @@ const ModelLoader: React.FC = () => {
         toast.warning(errorMsg);
         setModelCheckStatus('error');
         setIsModelLoaded(false);
+        setBackendModelLoaded(false);
       }
     } catch (error) {
       console.error('Error loading default model:', error);
@@ -378,6 +412,7 @@ const ModelLoader: React.FC = () => {
       toast.error(errorMessage);
       setModelCheckStatus('error');
       setIsModelLoaded(false);
+      setBackendModelLoaded(false);
       setShowAdvancedHelp(true);
     } finally {
       setIsLoading(false);
@@ -404,6 +439,7 @@ const ModelLoader: React.FC = () => {
       if (!serverRunning) {
         setLoadError('Python server is not running. Please restart the application.');
         setIsModelLoaded(false);
+        setBackendModelLoaded(false);
         setModelCheckStatus('error');
         toast.error('Python server not running. Please restart the application.');
         setIsLoading(false);
@@ -424,6 +460,7 @@ const ModelLoader: React.FC = () => {
         if (!frontendInitSuccess) {
           setLoadError('Failed to initialize model in frontend.');
           setIsModelLoaded(false);
+          setBackendModelLoaded(false);
           setModelCheckStatus('error');
           setIsLoading(false);
           return;
@@ -436,21 +473,25 @@ const ModelLoader: React.FC = () => {
         if (pythonReloadResult.error) {
           console.error('Error from Python model reload:', pythonReloadResult.error);
           setLoadError(`Error loading model: ${pythonReloadResult.error}`);
-          setIsModelLoaded(false);
+          setIsModelLoaded(frontendInitSuccess);
+          setBackendModelLoaded(false);
           setModelCheckStatus('error');
           setIsLoading(false);
           setShowAdvancedHelp(true);
+          toast.error('Backend model loading failed. Analysis features will not be available.');
           return;
         }
         
         if (pythonReloadResult.success) {
-          setIsModelLoaded(true);
+          setIsModelLoaded(frontendInitSuccess);
+          setBackendModelLoaded(true);
           setModelCheckStatus('success');
           toast.success(`Model loaded successfully from: ${selectedPath}`);
         } else {
-          setIsModelLoaded(false);
+          setIsModelLoaded(frontendInitSuccess);
+          setBackendModelLoaded(false);
           setModelCheckStatus('error');
-          toast.error('Failed to load model.');
+          toast.error('Failed to load model on Python server. Analysis features will not be available.');
           setShowAdvancedHelp(true);
         }
       } else {
@@ -465,6 +506,7 @@ const ModelLoader: React.FC = () => {
       toast.error(errorMessage);
       setModelCheckStatus('error');
       setIsModelLoaded(false);
+      setBackendModelLoaded(false);
       setShowAdvancedHelp(true);
     } finally {
       setIsLoading(false);
@@ -486,6 +528,7 @@ const ModelLoader: React.FC = () => {
       if (!serverRunning) {
         setLoadError('Python server is not running. Please restart the application.');
         setIsModelLoaded(false);
+        setBackendModelLoaded(false);
         setModelCheckStatus('error');
         toast.error('Python server not running. Please restart the application.');
         setIsLoading(false);
@@ -493,7 +536,7 @@ const ModelLoader: React.FC = () => {
       }
       
       // Always reinitialize in frontend
-      await initializeModel(modelPath);
+      const frontendInitSuccess = await initializeModel(modelPath);
       
       // Then reload in Python backend if server is running
       if (serverRunning) {
@@ -503,28 +546,33 @@ const ModelLoader: React.FC = () => {
         if (pythonReloadResult.error) {
           console.error('Error from Python model reload:', pythonReloadResult.error);
           setLoadError(`Error from Python server: ${pythonReloadResult.error}`);
-          setIsModelLoaded(false);
+          setIsModelLoaded(frontendInitSuccess);
+          setBackendModelLoaded(false);
           setModelCheckStatus('error');
         } else if (pythonReloadResult.success) {
-          setIsModelLoaded(true);
+          setIsModelLoaded(frontendInitSuccess);
+          setBackendModelLoaded(true);
           toast.success('Model reloaded successfully in both frontend and Python backend');
           setModelCheckStatus('success');
         } else {
-          setIsModelLoaded(false);
-          toast.error('Failed to reload model on Python server.');
+          setIsModelLoaded(frontendInitSuccess);
+          setBackendModelLoaded(false);
+          toast.error('Failed to reload model on Python server. Analysis features will not be available.');
           setModelCheckStatus('error');
         }
       } else {
         // Python server not running
         console.log('Python server not running');
         toast.error('Python server is not running. Please restart the application.');
-        setIsModelLoaded(false);
+        setIsModelLoaded(frontendInitSuccess);
+        setBackendModelLoaded(false);
         setModelCheckStatus('error');
       }
     } catch (error) {
       console.error('Error reloading model:', error);
       toast.error('Failed to reload model');
       setIsModelLoaded(false);
+      setBackendModelLoaded(false);
       setModelCheckStatus('error');
     } finally {
       setIsLoading(false);
@@ -534,30 +582,34 @@ const ModelLoader: React.FC = () => {
   const renderStatusBadge = () => {
     if (!isModelLoaded) return null;
     
-    switch (modelCheckStatus) {
-      case 'success':
-        return (
-          <div className="flex items-center">
-            <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-            <span className="text-sm text-green-600 flex items-center">
-              Model loaded successfully
-              {modelPath && (
-                <span className="text-xs text-gray-500 ml-2 truncate max-w-[200px]" title={modelPath}>
-                  ({modelPath})
-                </span>
-              )}
-            </span>
-          </div>
-        );
-      case 'error':
-        return (
-          <div className="flex items-center">
-            <div className="w-2 h-2 rounded-full bg-red-500 mr-2"></div>
-            <span className="text-sm text-red-600">Model load failed</span>
-          </div>
-        );
-      default:
-        return null;
+    if (backendModelLoaded && modelCheckStatus === 'success') {
+      return (
+        <div className="flex items-center">
+          <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+          <span className="text-sm text-green-600 flex items-center">
+            Model loaded successfully
+            {modelPath && (
+              <span className="text-xs text-gray-500 ml-2 truncate max-w-[200px]" title={modelPath}>
+                ({modelPath})
+              </span>
+            )}
+          </span>
+        </div>
+      );
+    } else if (isModelLoaded && !backendModelLoaded) {
+      return (
+        <div className="flex items-center">
+          <div className="w-2 h-2 rounded-full bg-amber-500 mr-2"></div>
+          <span className="text-sm text-amber-600">Model partially loaded (frontend only, analysis unavailable)</span>
+        </div>
+      );
+    } else {
+      return (
+        <div className="flex items-center">
+          <div className="w-2 h-2 rounded-full bg-red-500 mr-2"></div>
+          <span className="text-sm text-red-600">Model load failed</span>
+        </div>
+      );
     }
   };
 
@@ -567,7 +619,7 @@ const ModelLoader: React.FC = () => {
         <Button 
           onClick={handleLoadModel}
           disabled={isLoading || !electronAvailable}
-          className={`${isModelLoaded ? 'bg-green-500' : 'bg-medical-blue'} text-white hover:opacity-90 transition-all`}
+          className={`${isModelLoaded && backendModelLoaded ? 'bg-green-500' : 'bg-medical-blue'} text-white hover:opacity-90 transition-all`}
         >
           {isLoading ? (
             <>
@@ -576,8 +628,8 @@ const ModelLoader: React.FC = () => {
             </>
           ) : (
             <>
-              {isModelLoaded ? <Check size={16} className="mr-2" /> : <Database size={16} className="mr-2" />}
-              {isModelLoaded ? 'Model Loaded' : 'Load Model'}
+              {isModelLoaded && backendModelLoaded ? <Check size={16} className="mr-2" /> : <Database size={16} className="mr-2" />}
+              {isModelLoaded && backendModelLoaded ? 'Model Loaded' : 'Load Model'}
             </>
           )}
         </Button>
@@ -645,6 +697,13 @@ const ModelLoader: React.FC = () => {
             <span className="text-red-600">Python server not running</span>
           </div>
         )}
+        
+        {isModelLoaded && !backendModelLoaded && (
+          <div className="text-sm flex items-center p-2 bg-amber-50 rounded border border-amber-200">
+            <AlertTriangle size={16} className="text-amber-600 mr-2" />
+            <span className="text-amber-600">Analysis features unavailable - backend model not loaded</span>
+          </div>
+        )}
       </div>
 
       {requirementsStatus && !requirementsStatus.all_ok && (
@@ -703,6 +762,13 @@ const ModelLoader: React.FC = () => {
                     </div>
                     <div className="mb-2">
                       <span className="font-semibold">Platform:</span> {environmentInfo.platform || 'Unknown'}
+                    </div>
+                    <div className="mb-2">
+                      <span className="font-semibold">Model Loading State:</span> {
+                        environmentInfo.default_model_loaded ? 
+                          <span className="text-green-600">Loaded successfully</span> : 
+                          <span className="text-red-600">Not loaded</span>
+                      }
                     </div>
                     <div className="mb-2">
                       <span className="font-semibold">Modules:</span>
@@ -788,6 +854,18 @@ const ModelLoader: React.FC = () => {
             <p>To use this application, you need to load a compatible model.h5 file.</p>
             <p className="mt-2">
               Click "Load Model" above to either browse for a model file or load one from the default location.
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {isModelLoaded && !backendModelLoaded && (
+        <Alert variant="warning" className="mb-6 bg-amber-50 border-amber-200">
+          <AlertTitle className="text-amber-800">Limited Functionality</AlertTitle>
+          <AlertDescription className="text-amber-700">
+            <p>The model has been loaded in the frontend but failed to load in the Python backend.</p>
+            <p className="mt-2">
+              Some features may work, but analysis of images will not be available. Try reloading the model or check the environment diagnostics.
             </p>
           </AlertDescription>
         </Alert>
