@@ -31,29 +31,24 @@ def load_model(model_path=None):
         # Multiple loading methods to try, in order of preference based on detected versions
         loading_methods = []
 
-        # Change the order to try CustomModelWrapper first as it's most reliable
+        # Standard loading methods only, no custom wrapper
         loading_methods.extend([
-            # Method 1: Use CustomModelWrapper as our most reliable option
-            {
-                'name': 'custom_model_wrapper',
-                'load_func': lambda: load_with_custom_wrapper(model_path)
-            },
-            # Method 2: Try to load with standalone keras package
+            # Method 1: Try to load with standalone keras package
             {
                 'name': 'standalone_keras',
                 'load_func': lambda: load_with_standalone_keras(model_path)
             },
-            # Method 3: Try the TF-keras approach
+            # Method 2: Try the TF-keras approach
             {
                 'name': 'tf_keras',
                 'load_func': lambda: load_with_tf_keras(model_path)
             },
-            # Method 4: Use a more direct legacy approach
+            # Method 3: Use a more direct legacy approach
             {
                 'name': 'legacy_keras',
                 'load_func': lambda: load_with_legacy_keras(model_path)
             },
-            # Method 5: Try direct import from keras
+            # Method 4: Try direct import from keras
             {
                 'name': 'direct_keras_import',
                 'load_func': lambda: load_with_direct_keras_import(model_path)
