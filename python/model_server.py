@@ -1,4 +1,3 @@
-
 # Wrap the entire script in a try-except to catch any initialization errors
 try:
     import os
