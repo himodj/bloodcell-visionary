@@ -131,6 +131,7 @@ try:
             logger.info(f"Using standalone Keras version: {keras.__version__}")
             
             # Avoid using safe_mode parameter which isn't supported in older keras versions
+            global default_model
             default_model = keras.models.load_model(model_path, compile=False)
             return True
         except Exception as e:
@@ -147,6 +148,7 @@ try:
             logger.info("Attempting to load model with tf.keras...")
             
             try:
+                global default_model
                 default_model = tf.keras.models.load_model(model_path, compile=False)
                 return True
             except Exception as e:
@@ -180,6 +182,7 @@ try:
             import keras
             
             try:
+                global default_model
                 default_model = keras.models.load_model(model_path, compile=False)
                 return True
             except Exception as e:

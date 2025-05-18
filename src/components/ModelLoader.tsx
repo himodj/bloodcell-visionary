@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -860,7 +859,7 @@ const ModelLoader: React.FC = () => {
       )}
       
       {isModelLoaded && !backendModelLoaded && (
-        <Alert variant="warning" className="mb-6 bg-amber-50 border-amber-200">
+        <Alert variant="destructive" className="mb-6 bg-amber-50 border-amber-200">
           <AlertTitle className="text-amber-800">Limited Functionality</AlertTitle>
           <AlertDescription className="text-amber-700">
             <p>The model has been loaded in the frontend but failed to load in the Python backend.</p>
