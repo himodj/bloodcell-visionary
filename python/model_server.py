@@ -141,13 +141,13 @@ try:
     
     def load_with_tf_keras(model_path):
         """Load model using tf.keras."""
+        global default_model
         try:
             import tensorflow as tf
             logger.info(f"TensorFlow successfully imported, version info: {tf.__version__}")
             logger.info("Attempting to load model with tf.keras...")
             
             try:
-                global default_model
                 default_model = tf.keras.models.load_model(model_path, compile=False)
                 return True
             except Exception as e:
@@ -155,7 +155,6 @@ try:
                     logger.warning("Encountered batch_shape error in tf.keras, trying to load weights only")
                     # Try a fallback approach - create a model and load weights
                     try:
-                        global default_model
                         # This requires knowing the model architecture in advance
                         model = tf.keras.Sequential([
                             tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)),
@@ -177,11 +176,11 @@ try:
     
     def load_with_legacy_keras(model_path):
         """Load model using legacy Keras methods."""
+        global default_model
         try:
             import keras
             
             try:
-                global default_model
                 default_model = keras.models.load_model(model_path, compile=False)
                 return True
             except Exception as e:
@@ -189,7 +188,6 @@ try:
                     logger.warning("Encountered batch_shape error in legacy keras, trying custom loading")
                     # Try a legacy fallback approach
                     try:
-                        global default_model
                         from keras.models import Sequential
                         from keras.layers import Dense, Conv2D, MaxPooling2D, Flatten
                         
@@ -213,11 +211,11 @@ try:
     
     def load_with_direct_keras_import(model_path):
         """Load model using direct keras import approach."""
+        global default_model
         try:
             from keras.models import load_model
             
             try:
-                global default_model
                 default_model = load_model(model_path, compile=False)
                 return True
             except Exception as e:
