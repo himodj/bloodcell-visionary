@@ -126,11 +126,11 @@ try:
     def load_with_standalone_keras(model_path):
         """Load model using standalone keras package."""
         try:
+            global default_model
             import keras
             logger.info(f"Using standalone Keras version: {keras.__version__}")
             
             # Avoid using safe_mode parameter which isn't supported in older keras versions
-            global default_model
             default_model = keras.models.load_model(model_path, compile=False)
             return True
         except Exception as e:
@@ -155,6 +155,7 @@ try:
                     logger.warning("Encountered batch_shape error in tf.keras, trying to load weights only")
                     # Try a fallback approach - create a model and load weights
                     try:
+                        global default_model
                         # This requires knowing the model architecture in advance
                         model = tf.keras.Sequential([
                             tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)),
@@ -163,7 +164,6 @@ try:
                             tf.keras.layers.Dense(len(class_labels), activation='softmax')
                         ])
                         model.load_weights(model_path)
-                        global default_model
                         default_model = model
                         return True
                     except Exception as weight_err:
@@ -189,6 +189,7 @@ try:
                     logger.warning("Encountered batch_shape error in legacy keras, trying custom loading")
                     # Try a legacy fallback approach
                     try:
+                        global default_model
                         from keras.models import Sequential
                         from keras.layers import Dense, Conv2D, MaxPooling2D, Flatten
                         
@@ -199,7 +200,6 @@ try:
                             Dense(len(class_labels), activation='softmax')
                         ])
                         model.load_weights(model_path)
-                        global default_model
                         default_model = model
                         return True
                     except Exception as custom_err:
