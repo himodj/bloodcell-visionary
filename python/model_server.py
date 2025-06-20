@@ -130,9 +130,53 @@ try:
             import keras
             logger.info(f"Using standalone Keras version: {keras.__version__}")
             
-            # Avoid using safe_mode parameter which isn't supported in older keras versions
-            default_model = keras.models.load_model(model_path, compile=False)
-            return True
+            # Try loading with custom objects to handle batch_shape issues
+            custom_objects = {'batch_shape': None}
+            try:
+                default_model = keras.models.load_model(model_path, compile=False, custom_objects=custom_objects)
+                return True
+            except Exception as custom_err:
+                logger.warning(f"Custom objects approach failed: {custom_err}")
+                # Try loading without compile and ignoring batch_shape
+                try:
+                    import h5py
+                    with h5py.File(model_path, 'r') as f:
+                        # Load model architecture from JSON if available
+                        if 'model_config' in f.attrs:
+                            model_config = f.attrs['model_config']
+                            if isinstance(model_config, bytes):
+                                model_config = model_config.decode('utf-8')
+                            
+                            import json
+                            config = json.loads(model_config)
+                            
+                            # Remove batch_shape from config
+                            def remove_batch_shape(obj):
+                                if isinstance(obj, dict):
+                                    if 'batch_shape' in obj:
+                                        del obj['batch_shape']
+                                    if 'batch_input_shape' in obj:
+                                        if 'input_shape' not in obj:
+                                            obj['input_shape'] = obj['batch_input_shape'][1:]
+                                        del obj['batch_input_shape']
+                                    for value in obj.values():
+                                        remove_batch_shape(value)
+                                elif isinstance(obj, list):
+                                    for item in obj:
+                                        remove_batch_shape(item)
+                            
+                            remove_batch_shape(config)
+                            
+                            # Create model from cleaned config
+                            default_model = keras.models.model_from_json(json.dumps(config))
+                            default_model.load_weights(model_path)
+                            return True
+                except Exception as h5_err:
+                    logger.error(f"H5 manual loading failed: {h5_err}")
+                    
+                # Fallback to basic loading
+                default_model = keras.models.load_model(model_path, compile=False)
+                return True
         except Exception as e:
             if 'batch_shape' in str(e):
                 logger.warning("Encountered batch_shape error in standalone keras")
