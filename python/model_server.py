@@ -289,22 +289,40 @@ try:
     def create_flexible_architecture(layer_names, keras):
         """Create a flexible model architecture based on detected layers."""
         try:
-            # Simple CNN architecture that should work with most blood cell models
-            model = keras.Sequential([
-                keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)),
-                keras.layers.MaxPooling2D(2, 2),
-                keras.layers.Conv2D(64, (3, 3), activation='relu'),
-                keras.layers.MaxPooling2D(2, 2),
-                keras.layers.Conv2D(128, (3, 3), activation='relu'),
-                keras.layers.MaxPooling2D(2, 2),
-                keras.layers.Flatten(),
-                keras.layers.Dropout(0.5),
-                keras.layers.Dense(128, activation='relu'),
-                keras.layers.Dense(len(class_labels), activation='softmax')
-            ])
+            # Try different common input shapes for blood cell models
+            common_input_shapes = [
+                (224, 224, 3),  # Common for medical imaging
+                (150, 150, 3),  # Another common size
+                (128, 128, 3),  # Original guess
+                (64, 64, 3),    # Smaller size
+                (256, 256, 3)   # Larger size
+            ]
             
-            logger.info("Created flexible CNN architecture")
-            return model
+            for input_shape in common_input_shapes:
+                try:
+                    logger.info(f"Trying input shape: {input_shape}")
+                    model = keras.Sequential([
+                        keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=input_shape),
+                        keras.layers.MaxPooling2D(2, 2),
+                        keras.layers.Conv2D(64, (3, 3), activation='relu'),
+                        keras.layers.MaxPooling2D(2, 2),
+                        keras.layers.Conv2D(128, (3, 3), activation='relu'),
+                        keras.layers.MaxPooling2D(2, 2),
+                        keras.layers.Flatten(),
+                        keras.layers.Dropout(0.5),
+                        keras.layers.Dense(128, activation='relu'),
+                        keras.layers.Dense(len(class_labels), activation='softmax')
+                    ])
+                    
+                    logger.info(f"Created flexible CNN architecture with input shape: {input_shape}")
+                    return model
+                    
+                except Exception as shape_err:
+                    logger.warning(f"Failed with input shape {input_shape}: {shape_err}")
+                    continue
+            
+            logger.error("All input shapes failed")
+            return None
             
         except Exception as e:
             logger.error(f"Failed to create flexible architecture: {e}")
@@ -415,14 +433,31 @@ try:
     
                 image = Image.open(BytesIO(base64.b64decode(image_data)))
                 
-                # Resize to expected input size
-                image = image.resize((128, 128))
+                # Get model's expected input shape
+                expected_shape = default_model.input_shape[1:3]  # Exclude batch dimension and channels
+                logger.info(f"Model expects input shape: {default_model.input_shape}")
+                logger.info(f"Resizing image to: {expected_shape}")
+                
+                # Resize to model's expected input size
+                image = image.resize(expected_shape)
+                
+                # Convert to RGB if needed
+                if image.mode != 'RGB':
+                    image = image.convert('RGB')
                 
                 # Convert to numpy array and normalize
                 img_array = np.array(image) / 255.0
                 
+                # Ensure the array has the right shape
+                if len(img_array.shape) == 2:  # Grayscale
+                    img_array = np.stack([img_array] * 3, axis=-1)  # Convert to RGB
+                elif img_array.shape[-1] == 4:  # RGBA
+                    img_array = img_array[:, :, :3]  # Remove alpha channel
+                
                 # Expand dimensions to create batch
                 img_batch = np.expand_dims(img_array, axis=0)
+                
+                logger.info(f"Final image batch shape: {img_batch.shape}")
                 
                 # Make prediction
                 predictions = default_model.predict(img_batch)
