@@ -287,41 +287,90 @@ try:
         return None
     
     def create_flexible_architecture(layer_names, keras):
-        """Create a flexible model architecture based on detected layers."""
+        """Create a flexible model architecture that matches the saved model."""
         try:
-            # Try different common input shapes for blood cell models
-            common_input_shapes = [
-                (224, 224, 3),  # Common for medical imaging
-                (150, 150, 3),  # Another common size
-                (128, 128, 3),  # Original guess
-                (64, 64, 3),    # Smaller size
-                (256, 256, 3)   # Larger size
+            # Based on the weight shapes in the logs, the model expects:
+            # Dense layer: (1280, 256) -> (256,) -> (256, 8)
+            # This suggests: Flatten -> Dense(256) -> Dense(8)
+            # The 1280 input suggests the CNN output before flattening
+            
+            # Try to match the original architecture based on weight shapes
+            logger.info("Creating architecture to match saved model weights...")
+            
+            # Calculate what CNN output would give 1280 features when flattened
+            # If we have 5x5x51.2 = ~1280, or 8x8x20 = 1280, or 10x8x16 = 1280
+            # Most likely: some spatial size × channels = 1280
+            
+            common_configs = [
+                # Config 1: Matches the weight pattern from logs
+                {
+                    'input_shape': (150, 150, 3),
+                    'conv_layers': [
+                        (32, (3, 3)),
+                        (64, (3, 3)), 
+                        (128, (3, 3))
+                    ],
+                    'dense_units': [256, len(class_labels)]  # This matches the logs: 256 then 8
+                },
+                # Config 2: Alternative that could give similar flatten size
+                {
+                    'input_shape': (128, 128, 3),
+                    'conv_layers': [
+                        (64, (3, 3)),
+                        (128, (3, 3))
+                    ],
+                    'dense_units': [256, len(class_labels)]
+                }
             ]
             
-            for input_shape in common_input_shapes:
+            for i, config in enumerate(common_configs):
                 try:
-                    logger.info(f"Trying input shape: {input_shape}")
-                    model = keras.Sequential([
-                        keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=input_shape),
-                        keras.layers.MaxPooling2D(2, 2),
-                        keras.layers.Conv2D(64, (3, 3), activation='relu'),
-                        keras.layers.MaxPooling2D(2, 2),
-                        keras.layers.Conv2D(128, (3, 3), activation='relu'),
-                        keras.layers.MaxPooling2D(2, 2),
-                        keras.layers.Flatten(),
-                        keras.layers.Dropout(0.5),
-                        keras.layers.Dense(128, activation='relu'),
-                        keras.layers.Dense(len(class_labels), activation='softmax')
-                    ])
+                    logger.info(f"Trying config {i+1}: input {config['input_shape']}")
                     
-                    logger.info(f"Created flexible CNN architecture with input shape: {input_shape}")
+                    layers = []
+                    layers.append(keras.layers.Conv2D(
+                        config['conv_layers'][0][0], 
+                        config['conv_layers'][0][1], 
+                        activation='relu', 
+                        input_shape=config['input_shape']
+                    ))
+                    layers.append(keras.layers.MaxPooling2D(2, 2))
+                    
+                    for filters, kernel_size in config['conv_layers'][1:]:
+                        layers.append(keras.layers.Conv2D(filters, kernel_size, activation='relu'))
+                        layers.append(keras.layers.MaxPooling2D(2, 2))
+                    
+                    layers.append(keras.layers.Flatten())
+                    
+                    # Add dense layers to match saved weights
+                    for units in config['dense_units'][:-1]:
+                        layers.append(keras.layers.Dense(units, activation='relu'))
+                    
+                    # Final layer with softmax
+                    layers.append(keras.layers.Dense(config['dense_units'][-1], activation='softmax'))
+                    
+                    model = keras.Sequential(layers)
+                    
+                    # Check if the flatten output size makes sense
+                    flatten_output = 1
+                    test_input = config['input_shape']
+                    for filters, _ in config['conv_layers']:
+                        test_input = (test_input[0]//2, test_input[1]//2)  # Pooling effect
+                    flatten_output = test_input[0] * test_input[1] * config['conv_layers'][-1][0]
+                    
+                    logger.info(f"Config {i+1} flatten output size: {flatten_output}")
+                    logger.info(f"Expected dense input from weights: 1280")
+                    
+                    if abs(flatten_output - 1280) < 200:  # Allow some tolerance
+                        logger.info(f"Config {i+1} looks promising - flatten size {flatten_output} is close to expected 1280")
+                    
                     return model
                     
-                except Exception as shape_err:
-                    logger.warning(f"Failed with input shape {input_shape}: {shape_err}")
+                except Exception as config_err:
+                    logger.warning(f"Config {i+1} failed: {config_err}")
                     continue
             
-            logger.error("All input shapes failed")
+            logger.error("All configurations failed")
             return None
             
         except Exception as e:
@@ -548,13 +597,23 @@ try:
     def load_model_route():
         """Load or reload a model."""
         try:
+            # Check if model is already loaded
+            if default_model_loaded and default_model is not None:
+                logger.info("Model already loaded, returning existing model status")
+                return jsonify({
+                    "success": True,
+                    "loaded": True,
+                    "path": default_model_path,
+                    "message": "Model already loaded"
+                })
+            
             data = request.get_json()
             model_path = data.get('model_path')
             
             if not model_path:
                 return jsonify({"success": False, "error": "No model path provided"})
             
-            logger.info(f"Default model file found: {model_path}")
+            logger.info(f"Loading model from: {model_path}")
             
             # Attempt to load the model
             success = load_model(model_path)

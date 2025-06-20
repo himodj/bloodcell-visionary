@@ -98,7 +98,7 @@ let globalModelLoaded = false;
         await initializeModel(selectedModelPath);
         console.log('H5 Model registered successfully for frontend analysis');
         
-        // Try to load the model on the Python server
+        // Try to load the model on the Python server (only if not already loaded)
         console.log('Loading model on Python server...');
         try {
           const pythonServerLoaded = await window.electron.reloadPythonModel(selectedModelPath);
@@ -106,28 +106,38 @@ let globalModelLoaded = false;
           
           if (!pythonServerLoaded.success) {
             console.warn('Python server could not load the model');
-            toast.error('Failed to load model on Python server. Please check your Python environment.');
             
-            // Try to get environment info to help diagnose
-            try {
-              const envInfo = await window.electron.getPythonEnvironmentInfo();
-              console.log('Python environment info:', envInfo);
+            // Only show error if it's not already loaded
+            if (!pythonServerLoaded.message?.includes('already loaded')) {
+              toast.error('Failed to load model on Python server. Please check your Python environment.');
               
-              // Check specifically for common issues
-              if (envInfo.modules) {
-                if (!envInfo.modules.keras.installed) {
-                  toast.error('Keras module not detected. Please install it using: pip install keras==2.10.0');
+              // Try to get environment info to help diagnose
+              try {
+                const envInfo = await window.electron.getPythonEnvironmentInfo();
+                console.log('Python environment info:', envInfo);
+                
+                // Check specifically for common issues
+                if (envInfo.modules) {
+                  if (!envInfo.modules.keras.installed) {
+                    toast.error('Keras module not detected. Please install it using: pip install keras==2.10.0');
+                  }
+                  if (!envInfo.modules.tensorflow.installed) {
+                    toast.error('TensorFlow module not detected. Please install it using: pip install tensorflow==2.10.0');
+                  }
                 }
-                if (!envInfo.modules.tensorflow.installed) {
-                  toast.error('TensorFlow module not detected. Please install it using: pip install tensorflow==2.10.0');
-                }
+              } catch (envError) {
+                console.error('Failed to get environment info:', envError);
               }
-            } catch (envError) {
-              console.error('Failed to get environment info:', envError);
+              
+              globalModelLoaded = false;
+              return false;
+            } else {
+              // Model already loaded, that's fine
+              console.log('Model already loaded on Python server');
+              toast.success('Model ready for analysis');
+              globalModelLoaded = true;
+              return true;
             }
-            
-            globalModelLoaded = false;
-            return false;
           }
           
           toast.success('Model loaded successfully and ready for analysis');

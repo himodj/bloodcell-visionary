@@ -18,6 +18,7 @@ interface ElectronAPI {
     stack?: string;
     details?: string;
     usedFallback?: boolean;
+    message?: string;
   }>;
   getPythonEnvironmentInfo: () => Promise<{
     python_version?: string;
