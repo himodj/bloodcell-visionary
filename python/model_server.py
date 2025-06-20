@@ -130,16 +130,51 @@ try:
             import keras
             logger.info(f"Using standalone Keras version: {keras.__version__}")
             
-            # Try loading with custom objects to handle batch_shape issues
-            custom_objects = {'batch_shape': None}
+            # Create a dummy DTypePolicy class for compatibility
+            class DummyDTypePolicy:
+                def __init__(self, *args, **kwargs):
+                    pass
+                    
+                def __call__(self, *args, **kwargs):
+                    return self
+                    
+                @property
+                def name(self):
+                    return 'float32'
+            
+            # Comprehensive custom objects for compatibility
+            custom_objects = {
+                'batch_shape': None,
+                'DTypePolicy': DummyDTypePolicy,
+                'mixed_float16': DummyDTypePolicy(),
+                'float32': DummyDTypePolicy(),
+                'float16': DummyDTypePolicy(),
+            }
+            
             try:
+                logger.info("Attempting to load with comprehensive custom objects...")
                 default_model = keras.models.load_model(model_path, compile=False, custom_objects=custom_objects)
+                logger.info("Successfully loaded model with custom objects")
                 return True
             except Exception as custom_err:
                 logger.warning(f"Custom objects approach failed: {custom_err}")
-                # Try loading without compile and ignoring batch_shape
+                
+                # Try tf.keras approach with custom objects
+                try:
+                    import tensorflow as tf
+                    logger.info("Trying tf.keras with custom objects...")
+                    default_model = tf.keras.models.load_model(model_path, compile=False, custom_objects=custom_objects)
+                    logger.info("Successfully loaded model with tf.keras and custom objects")
+                    return True
+                except Exception as tf_err:
+                    logger.warning(f"tf.keras with custom objects failed: {tf_err}")
+                
+                # Manual H5 loading approach
                 try:
                     import h5py
+                    import json
+                    logger.info("Attempting manual H5 loading...")
+                    
                     with h5py.File(model_path, 'r') as f:
                         # Load model architecture from JSON if available
                         if 'model_config' in f.attrs:
@@ -147,36 +182,54 @@ try:
                             if isinstance(model_config, bytes):
                                 model_config = model_config.decode('utf-8')
                             
-                            import json
                             config = json.loads(model_config)
                             
-                            # Remove batch_shape from config
-                            def remove_batch_shape(obj):
+                            # Remove problematic fields from config
+                            def clean_config(obj):
                                 if isinstance(obj, dict):
-                                    if 'batch_shape' in obj:
-                                        del obj['batch_shape']
+                                    # Remove batch_shape and dtype_policy related fields
+                                    problematic_keys = ['batch_shape', 'dtype_policy', 'mixed_precision_policy']
+                                    for key in list(obj.keys()):
+                                        if key in problematic_keys:
+                                            del obj[key]
+                                    
+                                    # Handle batch_input_shape
                                     if 'batch_input_shape' in obj:
-                                        if 'input_shape' not in obj:
+                                        if 'input_shape' not in obj and obj['batch_input_shape']:
                                             obj['input_shape'] = obj['batch_input_shape'][1:]
                                         del obj['batch_input_shape']
+                                    
+                                    # Recursively clean nested objects
                                     for value in obj.values():
-                                        remove_batch_shape(value)
+                                        clean_config(value)
                                 elif isinstance(obj, list):
                                     for item in obj:
-                                        remove_batch_shape(item)
+                                        clean_config(item)
                             
-                            remove_batch_shape(config)
+                            clean_config(config)
                             
                             # Create model from cleaned config
+                            logger.info("Creating model from cleaned config...")
                             default_model = keras.models.model_from_json(json.dumps(config))
+                            
+                            # Load weights
+                            logger.info("Loading weights...")
                             default_model.load_weights(model_path)
+                            logger.info("Successfully loaded model manually")
                             return True
+                            
                 except Exception as h5_err:
-                    logger.error(f"H5 manual loading failed: {h5_err}")
+                    logger.error(f"Manual H5 loading failed: {h5_err}")
                     
-                # Fallback to basic loading
-                default_model = keras.models.load_model(model_path, compile=False)
-                return True
+                # Final fallback to basic loading
+                try:
+                    logger.info("Attempting basic model loading as final fallback...")
+                    default_model = keras.models.load_model(model_path, compile=False)
+                    logger.info("Successfully loaded model with basic method")
+                    return True
+                except Exception as basic_err:
+                    logger.error(f"Basic loading also failed: {basic_err}")
+                    return False
         except Exception as e:
             if 'batch_shape' in str(e):
                 logger.warning("Encountered batch_shape error in standalone keras")
