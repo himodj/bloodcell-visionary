@@ -1,3 +1,4 @@
+
 # Wrap the entire script in a try-except to catch any initialization errors
 try:
     import os
@@ -13,6 +14,9 @@ try:
     from flask import Flask, request, jsonify
     from flask_cors import CORS
     import time
+
+    # Suppress TensorFlow warnings at the very beginning
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
     # Set up logging configuration
     logging.basicConfig(
@@ -46,8 +50,42 @@ try:
         except ImportError:
             return None
     
+    def clean_model_config(config):
+        """Clean model configuration to remove incompatible arguments."""
+        if isinstance(config, dict):
+            # Remove problematic keys that cause loading issues
+            problematic_keys = ['batch_shape', 'synchronized']
+            for key in list(config.keys()):
+                if key in problematic_keys:
+                    logger.info(f"Removing incompatible config key: {key}")
+                    del config[key]
+                    
+            # Handle batch_input_shape properly
+            if 'batch_input_shape' in config and 'input_shape' not in config:
+                batch_shape = config['batch_input_shape']
+                if batch_shape and len(batch_shape) > 1:
+                    config['input_shape'] = batch_shape[1:]
+                    logger.info(f"Converted batch_input_shape to input_shape: {config['input_shape']}")
+                del config['batch_input_shape']
+            
+            # Recursively clean nested configurations
+            for key, value in config.items():
+                if isinstance(value, (dict, list)):
+                    clean_model_config(value)
+                    
+        elif isinstance(config, list):
+            for item in config:
+                if isinstance(item, (dict, list)):
+                    clean_model_config(item)
+    
     def load_model(model_path=None):
         global default_model, default_model_path, default_model_loaded
+        
+        # Check if model is already loaded
+        if default_model_loaded and default_model is not None:
+            logger.info("Model already loaded, skipping reload")
+            return True
+            
         default_model_loaded = False  # Reset flag
         
         try:
@@ -66,56 +104,54 @@ try:
                 logger.error(f"Model file not found at: {model_path}")
                 return False
                 
-            logger.info(f"Default model file found: {model_path}")
-    
-            # Detect installed packages and versions first
-            tf_version = get_package_version("tensorflow")
-            keras_version = get_package_version("keras")
+            logger.info(f"Loading model from: {model_path}")
+
+            # Import TensorFlow and Keras
+            import tensorflow as tf
+            import keras
             
-            logger.info(f"Detected TensorFlow version: {tf_version}")
-            logger.info(f"Detected Keras version: {keras_version}")
-    
-            # Standard loading methods only
-            loading_methods = [
-                # Method 1: Try to load with standalone keras package
-                {
-                    'name': 'standalone_keras',
-                    'load_func': lambda: load_with_standalone_keras(model_path)
-                },
-                # Method 2: Try the TF-keras approach
-                {
-                    'name': 'tf_keras',
-                    'load_func': lambda: load_with_tf_keras(model_path)
-                },
-                # Method 3: Use a more direct legacy approach
-                {
-                    'name': 'legacy_keras',
-                    'load_func': lambda: load_with_legacy_keras(model_path)
-                },
-                # Method 4: Try direct import from keras
-                {
-                    'name': 'direct_keras_import',
-                    'load_func': lambda: load_with_direct_keras_import(model_path)
-                }
+            logger.info(f"TensorFlow version: {tf.__version__}")
+            logger.info(f"Keras version: {keras.__version__}")
+
+            # Create comprehensive custom objects for compatibility
+            custom_objects = {
+                'synchronized': None,  # Handle synchronized argument
+                'batch_shape': None,   # Handle batch_shape argument
+            }
+
+            # Try multiple loading approaches in order of preference
+            loading_attempts = [
+                ("Direct tf.keras.models.load_model with custom objects", 
+                 lambda: tf.keras.models.load_model(model_path, compile=False, custom_objects=custom_objects)),
+                
+                ("Direct keras.models.load_model with custom objects", 
+                 lambda: keras.models.load_model(model_path, compile=False, custom_objects=custom_objects)),
+                
+                ("Manual H5 config reconstruction", 
+                 lambda: load_model_with_config_cleaning(model_path, tf, keras, custom_objects)),
             ]
             
-            for method in loading_methods:
+            for attempt_name, load_func in loading_attempts:
                 try:
-                    logger.info(f"Attempting to load model using {method['name']} method...")
-                    success = method['load_func']()
-                    if success:
-                        logger.info(f"Successfully loaded model using {method['name']} method")
+                    logger.info(f"Attempting: {attempt_name}")
+                    model = load_func()
+                    if model:
+                        default_model = model
                         default_model_path = model_path
                         default_model_loaded = True
+                        
+                        # Log model summary for verification
+                        logger.info("Model loaded successfully!")
+                        logger.info(f"Model input shape: {model.input_shape}")
+                        logger.info(f"Model output shape: {model.output_shape}")
+                        logger.info(f"Number of layers: {len(model.layers)}")
+                        
                         return True
                 except Exception as e:
-                    logger.error(f"Error loading with {method['name']}: {e}")
-                    logger.error(traceback.format_exc())
+                    logger.warning(f"{attempt_name} failed: {str(e)}")
+                    continue
             
-            # If all methods fail, log a critical error
-            logger.critical("ALL ATTEMPTS TO LOAD MODEL FAILED - APPLICATION MAY NOT FUNCTION CORRECTLY")
-            logger.error("All attempts to load the model failed")
-            logger.error("Error loading model: Failed to load model with any available method")
+            logger.error("All loading attempts failed")
             return False
                 
         except Exception as e:
@@ -123,348 +159,39 @@ try:
             logger.error(f"Detailed traceback: {traceback.format_exc()}")
             return False
     
-    def load_with_standalone_keras(model_path):
-        """Load model using standalone keras package with enhanced compatibility."""
-        try:
-            global default_model
-            import keras
-            import tensorflow as tf
-            import h5py
-            import json
-            logger.info(f"Using standalone Keras version: {keras.__version__}")
-            
-            # Enhanced DTypePolicy class for compatibility
-            class DTypePolicy:
-                def __init__(self, name='float32'):
-                    self._name = name
-                    
-                def __call__(self, *args, **kwargs):
-                    return self
-                    
-                @property
-                def name(self):
-                    return self._name
-                    
-                def __str__(self):
-                    return self._name
-                    
-                def __repr__(self):
-                    return f"DTypePolicy('{self._name}')"
-            
-            # Comprehensive custom objects for compatibility
-            custom_objects = {
-                'batch_shape': None,
-                'DTypePolicy': DTypePolicy,
-                'mixed_float16': DTypePolicy('mixed_float16'),
-                'float32': DTypePolicy('float32'),
-                'float16': DTypePolicy('float16'),
-                'policy': DTypePolicy('float32'),
-            }
-            
-            # Try different loading approaches in order of preference
-            loading_attempts = [
-                ("Direct H5 architecture reconstruction", lambda: load_h5_with_reconstruction(model_path, keras, custom_objects)),
-                ("Keras with enhanced custom objects", lambda: keras.models.load_model(model_path, compile=False, custom_objects=custom_objects)),
-                ("TF Keras with custom objects", lambda: tf.keras.models.load_model(model_path, compile=False, custom_objects=custom_objects)),
-                ("Weight-only loading with predefined architecture", lambda: load_weights_only_approach(model_path, keras)),
-            ]
-            
-            for attempt_name, load_func in loading_attempts:
-                try:
-                    logger.info(f"Attempting: {attempt_name}")
-                    result = load_func()
-                    if result:
-                        default_model = result
-                        logger.info(f"Successfully loaded model using: {attempt_name}")
-                        return True
-                except Exception as e:
-                    logger.warning(f"{attempt_name} failed: {e}")
-                    
-            return False
-            
-        except Exception as e:
-            logger.error(f"Error with standalone keras: {e}")
-            return False
-    
-    def load_h5_with_reconstruction(model_path, keras, custom_objects):
-        """Advanced H5 loading with full config reconstruction."""
-        import h5py
-        import json
-        
-        with h5py.File(model_path, 'r') as f:
-            # Load model architecture from JSON if available
-            if 'model_config' in f.attrs:
-                model_config = f.attrs['model_config']
-                if isinstance(model_config, bytes):
-                    model_config = model_config.decode('utf-8')
-                
-                config = json.loads(model_config)
-                
-                # Enhanced config cleaning
-                def clean_config_advanced(obj):
-                    if isinstance(obj, dict):
-                        # Remove all problematic fields
-                        problematic_keys = [
-                            'batch_shape', 'dtype_policy', 'mixed_precision_policy',
-                            'policy', '_dtype_policy', 'dtype'
-                        ]
-                        for key in list(obj.keys()):
-                            if key in problematic_keys:
-                                logger.debug(f"Removing problematic key: {key}")
-                                del obj[key]
-                        
-                        # Handle batch_input_shape properly
-                        if 'batch_input_shape' in obj:
-                            batch_shape = obj['batch_input_shape']
-                            if batch_shape and len(batch_shape) > 1:
-                                obj['input_shape'] = batch_shape[1:]
-                            del obj['batch_input_shape']
-                        
-                        # Clean nested configurations
-                        for key, value in obj.items():
-                            if isinstance(value, (dict, list)):
-                                clean_config_advanced(value)
-                                
-                    elif isinstance(obj, list):
-                        for item in obj:
-                            if isinstance(item, (dict, list)):
-                                clean_config_advanced(item)
-                
-                clean_config_advanced(config)
-                
-                # Create model from cleaned config
-                logger.info("Creating model from enhanced cleaned config...")
-                model = keras.models.model_from_json(json.dumps(config), custom_objects=custom_objects)
-                
-                # Load weights with error handling
-                logger.info("Loading weights with error handling...")
-                try:
-                    model.load_weights(model_path)
-                    logger.info("Successfully loaded weights")
-                    return model
-                except Exception as weight_err:
-                    logger.error(f"Weight loading failed: {weight_err}")
-                    # Try loading weights by name
-                    try:
-                        model.load_weights(model_path, by_name=True, skip_mismatch=True)
-                        logger.info("Successfully loaded weights by name with skip mismatch")
-                        return model
-                    except Exception as by_name_err:
-                        logger.error(f"Weight loading by name failed: {by_name_err}")
-                        raise
-        
-        return None
-    
-    def load_weights_only_approach(model_path, keras):
-        """Load weights into a predefined architecture."""
+    def load_model_with_config_cleaning(model_path, tf, keras, custom_objects):
+        """Load model with config cleaning for compatibility."""
         import h5py
         
-        # Try to inspect the model file to determine architecture
         try:
             with h5py.File(model_path, 'r') as f:
-                # Look for layer information
-                if 'model_weights' in f:
-                    layer_names = list(f['model_weights'].keys()) if 'model_weights' in f else []
-                else:
-                    layer_names = [key for key in f.keys() if 'layer' in key.lower()]
-                
-                logger.info(f"Found {len(layer_names)} layers in model file")
-                
-                # Create a more flexible architecture based on detected layers
-                model = create_flexible_architecture(layer_names, keras)
-                
-                if model:
-                    try:
-                        model.load_weights(model_path, by_name=True, skip_mismatch=True)
-                        logger.info("Successfully loaded weights into flexible architecture")
-                        return model
-                    except Exception as e:
-                        logger.error(f"Failed to load weights into flexible architecture: {e}")
-                        
-        except Exception as e:
-            logger.error(f"Failed to inspect model file: {e}")
-        
-        return None
-    
-    def create_flexible_architecture(layer_names, keras):
-        """Create a flexible model architecture that matches the saved model."""
-        try:
-            # Based on the weight shapes in the logs, the model expects:
-            # Dense layer: (1280, 256) -> (256,) -> (256, 8)
-            # This suggests: Flatten -> Dense(256) -> Dense(8)
-            # The 1280 input suggests the CNN output before flattening
-            
-            # Try to match the original architecture based on weight shapes
-            logger.info("Creating architecture to match saved model weights...")
-            
-            # Calculate what CNN output would give 1280 features when flattened
-            # If we have 5x5x51.2 = ~1280, or 8x8x20 = 1280, or 10x8x16 = 1280
-            # Most likely: some spatial size × channels = 1280
-            
-            common_configs = [
-                # Config 1: Matches the weight pattern from logs
-                {
-                    'input_shape': (150, 150, 3),
-                    'conv_layers': [
-                        (32, (3, 3)),
-                        (64, (3, 3)), 
-                        (128, (3, 3))
-                    ],
-                    'dense_units': [256, len(class_labels)]  # This matches the logs: 256 then 8
-                },
-                # Config 2: Alternative that could give similar flatten size
-                {
-                    'input_shape': (128, 128, 3),
-                    'conv_layers': [
-                        (64, (3, 3)),
-                        (128, (3, 3))
-                    ],
-                    'dense_units': [256, len(class_labels)]
-                }
-            ]
-            
-            for i, config in enumerate(common_configs):
-                try:
-                    logger.info(f"Trying config {i+1}: input {config['input_shape']}")
+                # Load model architecture from JSON if available
+                if 'model_config' in f.attrs:
+                    model_config = f.attrs['model_config']
+                    if isinstance(model_config, bytes):
+                        model_config = model_config.decode('utf-8')
                     
-                    layers = []
-                    layers.append(keras.layers.Conv2D(
-                        config['conv_layers'][0][0], 
-                        config['conv_layers'][0][1], 
-                        activation='relu', 
-                        input_shape=config['input_shape']
-                    ))
-                    layers.append(keras.layers.MaxPooling2D(2, 2))
+                    config = json.loads(model_config)
+                    logger.info("Cleaning model configuration for compatibility...")
                     
-                    for filters, kernel_size in config['conv_layers'][1:]:
-                        layers.append(keras.layers.Conv2D(filters, kernel_size, activation='relu'))
-                        layers.append(keras.layers.MaxPooling2D(2, 2))
+                    # Clean the configuration
+                    clean_model_config(config)
                     
-                    layers.append(keras.layers.Flatten())
+                    # Create model from cleaned config
+                    model = keras.models.model_from_json(json.dumps(config), custom_objects=custom_objects)
                     
-                    # Add dense layers to match saved weights
-                    for units in config['dense_units'][:-1]:
-                        layers.append(keras.layers.Dense(units, activation='relu'))
-                    
-                    # Final layer with softmax
-                    layers.append(keras.layers.Dense(config['dense_units'][-1], activation='softmax'))
-                    
-                    model = keras.Sequential(layers)
-                    
-                    # Check if the flatten output size makes sense
-                    flatten_output = 1
-                    test_input = config['input_shape']
-                    for filters, _ in config['conv_layers']:
-                        test_input = (test_input[0]//2, test_input[1]//2)  # Pooling effect
-                    flatten_output = test_input[0] * test_input[1] * config['conv_layers'][-1][0]
-                    
-                    logger.info(f"Config {i+1} flatten output size: {flatten_output}")
-                    logger.info(f"Expected dense input from weights: 1280")
-                    
-                    if abs(flatten_output - 1280) < 200:  # Allow some tolerance
-                        logger.info(f"Config {i+1} looks promising - flatten size {flatten_output} is close to expected 1280")
+                    # Load weights
+                    logger.info("Loading weights into model...")
+                    model.load_weights(model_path)
                     
                     return model
+                else:
+                    logger.warning("No model_config found in H5 file")
+                    return None
                     
-                except Exception as config_err:
-                    logger.warning(f"Config {i+1} failed: {config_err}")
-                    continue
-            
-            logger.error("All configurations failed")
-            return None
-            
         except Exception as e:
-            logger.error(f"Failed to create flexible architecture: {e}")
+            logger.error(f"Config cleaning approach failed: {e}")
             return None
-    
-    def load_with_tf_keras(model_path):
-        """Load model using tf.keras."""
-        global default_model
-        try:
-            import tensorflow as tf
-            logger.info(f"TensorFlow successfully imported, version info: {tf.__version__}")
-            logger.info("Attempting to load model with tf.keras...")
-            
-            try:
-                default_model = tf.keras.models.load_model(model_path, compile=False)
-                return True
-            except Exception as e:
-                if 'batch_shape' in str(e):
-                    logger.warning("Encountered batch_shape error in tf.keras, trying to load weights only")
-                    # Try a fallback approach - create a model and load weights
-                    try:
-                        # This requires knowing the model architecture in advance
-                        model = tf.keras.Sequential([
-                            tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)),
-                            tf.keras.layers.MaxPooling2D(2, 2),
-                            tf.keras.layers.Flatten(),
-                            tf.keras.layers.Dense(len(class_labels), activation='softmax')
-                        ])
-                        model.load_weights(model_path)
-                        default_model = model
-                        return True
-                    except Exception as weight_err:
-                        logger.error(f"Error loading weights only: {weight_err}")
-                else:
-                    logger.error(f"Error with tf.keras: {e}")
-                return False
-        except ImportError:
-            logger.error("TensorFlow import failed")
-            return False
-    
-    def load_with_legacy_keras(model_path):
-        """Load model using legacy Keras methods."""
-        global default_model
-        try:
-            import keras
-            
-            try:
-                default_model = keras.models.load_model(model_path, compile=False)
-                return True
-            except Exception as e:
-                if 'batch_shape' in str(e):
-                    logger.warning("Encountered batch_shape error in legacy keras, trying custom loading")
-                    # Try a legacy fallback approach
-                    try:
-                        from keras.models import Sequential
-                        from keras.layers import Dense, Conv2D, MaxPooling2D, Flatten
-                        
-                        model = Sequential([
-                            Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)),
-                            MaxPooling2D(2, 2),
-                            Flatten(),
-                            Dense(len(class_labels), activation='softmax')
-                        ])
-                        model.load_weights(model_path)
-                        default_model = model
-                        return True
-                    except Exception as custom_err:
-                        logger.error(f"Error in custom legacy loading: {custom_err}")
-                else:
-                    logger.error(f"Error with legacy keras: {e}")
-                return False
-        except ImportError:
-            logger.error("Legacy Keras import failed")
-            return False
-    
-    def load_with_direct_keras_import(model_path):
-        """Load model using direct keras import approach."""
-        global default_model
-        try:
-            from keras.models import load_model
-            
-            try:
-                default_model = load_model(model_path, compile=False)
-                return True
-            except Exception as e:
-                if 'batch_shape' in str(e):
-                    logger.warning("Encountered batch_shape error in direct keras import")
-                else:
-                    logger.error(f"Error with direct keras import: {e}")
-                return False
-        except ImportError:
-            logger.error("Direct Keras import failed")
-            return False
     
     def predict_image(image_data):
         """Process an image and make a prediction."""
@@ -473,13 +200,13 @@ try:
             if not default_model_loaded or default_model is None:
                 logger.error("Model not loaded. Cannot make predictions.")
                 raise ValueError("Model not loaded")
-    
+
             # Decode and process the image
             try:
                 # Remove the "data:image..." prefix if present
                 if "base64," in image_data:
                     image_data = image_data.split("base64,")[1]
-    
+
                 image = Image.open(BytesIO(base64.b64decode(image_data)))
                 
                 # Get model's expected input shape
@@ -509,7 +236,7 @@ try:
                 logger.info(f"Final image batch shape: {img_batch.shape}")
                 
                 # Make prediction
-                predictions = default_model.predict(img_batch)
+                predictions = default_model.predict(img_batch, verbose=0)
                 
                 # Find the class with highest probability
                 predicted_class_idx = np.argmax(predictions[0])
@@ -518,6 +245,8 @@ try:
                 
                 # Get all probabilities as a list
                 all_probabilities = [float(p) for p in predictions[0]]
+                
+                logger.info(f"Prediction: {predicted_class} with confidence: {confidence:.4f}")
                 
                 return {
                     "cell_type": predicted_class,
@@ -541,7 +270,6 @@ try:
         if default_model_loaded and default_model is not None:
             return jsonify({"status": "ok", "model_loaded": True})
         else:
-            # Return 503 Service Unavailable if the model isn't loaded
             return jsonify({"status": "degraded", "model_loaded": False}), 503
     
     @app.route('/environment', methods=['GET'])
@@ -599,7 +327,7 @@ try:
         try:
             # Check if model is already loaded
             if default_model_loaded and default_model is not None:
-                logger.info("Model already loaded, returning existing model status")
+                logger.info("Model already loaded")
                 return jsonify({
                     "success": True,
                     "loaded": True,
@@ -608,10 +336,7 @@ try:
                 })
             
             data = request.get_json()
-            model_path = data.get('model_path')
-            
-            if not model_path:
-                return jsonify({"success": False, "error": "No model path provided"})
+            model_path = data.get('model_path') if data else None
             
             logger.info(f"Loading model from: {model_path}")
             
@@ -619,11 +344,16 @@ try:
             success = load_model(model_path)
             
             if success:
-                return jsonify({"success": True, "loaded": True, "path": model_path})
+                return jsonify({
+                    "success": True, 
+                    "loaded": True, 
+                    "path": default_model_path,
+                    "message": "Model loaded successfully"
+                })
             else:
                 return jsonify({
                     "success": False, 
-                    "error": "Failed to load model with any available method",
+                    "error": "Failed to load model",
                     "loaded": False, 
                     "path": model_path
                 })
@@ -732,28 +462,33 @@ try:
                 
             if result.returncode == 0:
                 logger.info("Successfully installed requirements")
-                return jsonify({"message": "Requirements installed successfully", "restart_needed": True})
+                return jsonify({"success": True, "message": "Requirements installed successfully"})
             else:
                 logger.error(f"Error installing requirements: {result.stderr}")
-                return jsonify({"error": "Failed to install requirements", "details": result.stderr}), 500
+                return jsonify({"success": False, "error": "Failed to install requirements", "details": result.stderr}), 500
                 
         except Exception as e:
             logger.error(f"Error during installation: {e}")
             logger.error(traceback.format_exc())
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"success": False, "error": str(e)}), 500
     
     # Initialize server by trying to load default model
     if os.environ.get('MODEL_PATH'):
+        logger.info(f"Attempting to load model from environment: {os.environ.get('MODEL_PATH')}")
         default_model_loaded = load_model(os.environ.get('MODEL_PATH'))
-        logger.info(f"Default model loaded: {default_model_loaded} (success: {default_model_loaded})")
     else:
-        logger.info("No MODEL_PATH environment variable set")
+        # Try to find model.h5 in current directory
+        current_dir_model = os.path.join(os.getcwd(), 'model.h5')
+        if os.path.exists(current_dir_model):
+            logger.info(f"Found model.h5 in current directory: {current_dir_model}")
+            default_model_loaded = load_model(current_dir_model)
+        else:
+            logger.info("No MODEL_PATH environment variable set and no model.h5 found in current directory")
     
-    logger.info(f"Default model path: {default_model_path}")
+    logger.info(f"Initial model loading result: {default_model_loaded}")
+    logger.info(f"Model path: {default_model_path}")
     logger.info(f"Current working directory: {os.getcwd()}")
-    logger.info(f"Class labels: {class_labels}")
     logger.info(f"Python version: {sys.version}")
-    logger.info(f"Python executable: {sys.executable}")
     
     # Log key package versions
     for pkg in ["tensorflow", "keras", "numpy", "h5py"]:
@@ -763,7 +498,7 @@ try:
     # Start the server
     if __name__ == '__main__':
         logger.info("Starting Flask server on port 5000")
-        app.run(host='0.0.0.0', port=5000)
+        app.run(host='0.0.0.0', port=5000, debug=False)
         
 except Exception as startup_error:
     print(f"CRITICAL STARTUP ERROR: {startup_error}")
