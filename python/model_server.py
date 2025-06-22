@@ -53,38 +53,27 @@ try:
         """Get comprehensive custom objects for model loading compatibility."""
         try:
             import tensorflow as tf
-            import keras
             
             custom_objects = {}
             
             # Handle DTypePolicy - this is the main issue
             try:
-                # Try to get DTypePolicy from tf.keras.mixed_precision
-                if hasattr(tf.keras.mixed_precision, 'Policy'):
-                    custom_objects['DTypePolicy'] = tf.keras.mixed_precision.Policy
-                elif hasattr(tf.keras.mixed_precision, 'policy'):
-                    custom_objects['DTypePolicy'] = tf.keras.mixed_precision.policy
-                elif hasattr(tf.keras.mixed_precision, 'DTypePolicy'):
-                    custom_objects['DTypePolicy'] = tf.keras.mixed_precision.DTypePolicy
-                else:
-                    # Create a dummy class as fallback
-                    class DummyDTypePolicy:
-                        def __init__(self, *args, **kwargs):
-                            pass
-                    custom_objects['DTypePolicy'] = DummyDTypePolicy
+                # Create a simple dummy class for DTypePolicy
+                class SimpleDTypePolicy:
+                    def __init__(self, name='float32'):
+                        self.name = name
+                        self._name = name
+                
+                custom_objects['DTypePolicy'] = SimpleDTypePolicy
+                logger.info("Added SimpleDTypePolicy to custom objects")
             except Exception as e:
-                logger.warning(f"Could not resolve DTypePolicy: {e}")
-                # Create a dummy class as fallback
-                class DummyDTypePolicy:
-                    def __init__(self, *args, **kwargs):
-                        pass
-                custom_objects['DTypePolicy'] = DummyDTypePolicy
+                logger.warning(f"Could not create DTypePolicy: {e}")
             
-            # Handle other common compatibility issues
+            # Handle other common compatibility issues with simple dummy functions
             custom_objects.update({
-                'synchronized': lambda *args, **kwargs: None,
-                'batch_shape': lambda *args, **kwargs: None,
-                'batch_input_shape': lambda *args, **kwargs: None,
+                'synchronized': lambda x=None: x if x is not None else True,
+                'batch_shape': lambda x=None: x,
+                'batch_input_shape': lambda x=None: x,
             })
             
             logger.info(f"Created custom objects: {list(custom_objects.keys())}")
@@ -94,27 +83,52 @@ try:
             logger.error(f"Error creating custom objects: {e}")
             return {}
     
-    def clean_model_config(config):
-        """Clean model configuration to remove incompatible arguments."""
-        if isinstance(config, dict):
-            # Remove problematic keys that cause loading issues
-            problematic_keys = ['batch_shape', 'synchronized', 'batch_input_shape']
-            for key in list(config.keys()):
-                if key in problematic_keys:
-                    logger.info(f"Removing incompatible config key: {key}")
-                    del config[key]
+    def load_model_simple_approach(model_path):
+        """Try to load the model with a very simple approach, ignoring most compatibility issues."""
+        try:
+            import tensorflow as tf
+            import keras
             
-            # Recursively clean nested configurations
-            for key, value in config.items():
-                if isinstance(value, (dict, list)):
-                    clean_model_config(value)
-                    
-        elif isinstance(config, list):
-            for item in config:
-                if isinstance(item, (dict, list)):
-                    clean_model_config(item)
+            logger.info("Attempting simple model loading approach...")
+            
+            # Try the most basic loading first
+            try:
+                logger.info("Trying basic tf.keras.models.load_model...")
+                model = tf.keras.models.load_model(model_path, compile=False)
+                logger.info("Basic loading succeeded!")
+                return model
+            except Exception as e:
+                logger.warning(f"Basic loading failed: {e}")
+            
+            # Try with custom objects
+            try:
+                logger.info("Trying with minimal custom objects...")
+                custom_objects = {
+                    'DTypePolicy': type('DTypePolicy', (), {'__init__': lambda self, *args, **kwargs: None})
+                }
+                model = tf.keras.models.load_model(model_path, compile=False, custom_objects=custom_objects)
+                logger.info("Loading with minimal custom objects succeeded!")
+                return model
+            except Exception as e:
+                logger.warning(f"Loading with minimal custom objects failed: {e}")
+            
+            # Try with keras directly
+            try:
+                logger.info("Trying with keras.models.load_model...")
+                model = keras.models.load_model(model_path, compile=False)
+                logger.info("Keras loading succeeded!")
+                return model
+            except Exception as e:
+                logger.warning(f"Keras loading failed: {e}")
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Simple loading approach failed: {e}")
+            return None
     
     def load_model(model_path=None):
+        """Load the model with a simplified approach."""
         global default_model, default_model_path, default_model_loaded
         
         # Check if model is already loaded
@@ -149,85 +163,29 @@ try:
             logger.info(f"TensorFlow version: {tf.__version__}")
             logger.info(f"Keras version: {keras.__version__}")
 
-            # Get comprehensive custom objects
-            custom_objects = get_comprehensive_custom_objects()
-
-            # Try multiple loading approaches in order of preference
-            loading_attempts = [
-                ("Direct tf.keras.models.load_model with comprehensive custom objects", 
-                 lambda: tf.keras.models.load_model(model_path, compile=False, custom_objects=custom_objects)),
-                
-                ("Direct keras.models.load_model with comprehensive custom objects", 
-                 lambda: keras.models.load_model(model_path, compile=False, custom_objects=custom_objects)),
-                
-                ("TensorFlow with safe_mode disabled", 
-                 lambda: tf.keras.models.load_model(model_path, compile=False, custom_objects=custom_objects, safe_mode=False)),
-                
-                ("Manual H5 config reconstruction with custom objects", 
-                 lambda: load_model_with_config_cleaning(model_path, tf, keras, custom_objects)),
-            ]
+            # Try the simple approach first
+            model = load_model_simple_approach(model_path)
             
-            for attempt_name, load_func in loading_attempts:
-                try:
-                    logger.info(f"Attempting: {attempt_name}")
-                    model = load_func()
-                    if model:
-                        default_model = model
-                        default_model_path = model_path
-                        default_model_loaded = True
-                        
-                        # Log model summary for verification
-                        logger.info("Model loaded successfully!")
-                        logger.info(f"Model input shape: {model.input_shape}")
-                        logger.info(f"Model output shape: {model.output_shape}")
-                        logger.info(f"Number of layers: {len(model.layers)}")
-                        
-                        return True
-                except Exception as e:
-                    logger.warning(f"{attempt_name} failed: {str(e)}")
-                    continue
-            
-            logger.error("All loading attempts failed")
-            return False
+            if model is not None:
+                default_model = model
+                default_model_path = model_path
+                default_model_loaded = True
+                
+                # Log model summary for verification
+                logger.info("Model loaded successfully!")
+                logger.info(f"Model input shape: {model.input_shape}")
+                logger.info(f"Model output shape: {model.output_shape}")
+                logger.info(f"Number of layers: {len(model.layers)}")
+                
+                return True
+            else:
+                logger.error("All loading attempts failed")
+                return False
                 
         except Exception as e:
             logger.error(f"Error loading model: {e}")
             logger.error(f"Detailed traceback: {traceback.format_exc()}")
             return False
-    
-    def load_model_with_config_cleaning(model_path, tf, keras, custom_objects):
-        """Load model with config cleaning for compatibility."""
-        import h5py
-        
-        try:
-            with h5py.File(model_path, 'r') as f:
-                # Load model architecture from JSON if available
-                if 'model_config' in f.attrs:
-                    model_config = f.attrs['model_config']
-                    if isinstance(model_config, bytes):
-                        model_config = model_config.decode('utf-8')
-                    
-                    config = json.loads(model_config)
-                    logger.info("Cleaning model configuration for compatibility...")
-                    
-                    # Clean the configuration
-                    clean_model_config(config)
-                    
-                    # Create model from cleaned config
-                    model = keras.models.model_from_json(json.dumps(config), custom_objects=custom_objects)
-                    
-                    # Load weights
-                    logger.info("Loading weights into model...")
-                    model.load_weights(model_path)
-                    
-                    return model
-                else:
-                    logger.warning("No model_config found in H5 file")
-                    return None
-                    
-        except Exception as e:
-            logger.error(f"Config cleaning approach failed: {e}")
-            return None
     
     def predict_image(image_data):
         """Process an image and make a prediction."""
@@ -306,7 +264,7 @@ try:
         if default_model_loaded and default_model is not None:
             return jsonify({"status": "ok", "model_loaded": True})
         else:
-            return jsonify({"status": "degraded", "model_loaded": False}), 503
+            return jsonify({"status": "degraded", "model_loaded": False, "message": "Model not loaded"}), 503
     
     @app.route('/environment', methods=['GET'])
     def get_environment():
