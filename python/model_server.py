@@ -1,3 +1,4 @@
+
 # Wrap the entire script in a try-except to catch any initialization errors
 try:
     import os
@@ -49,86 +50,8 @@ try:
         except ImportError:
             return None
     
-    def get_comprehensive_custom_objects():
-        """Get comprehensive custom objects for model loading compatibility."""
-        try:
-            import tensorflow as tf
-            
-            custom_objects = {}
-            
-            # Handle DTypePolicy - this is the main issue
-            try:
-                # Create a simple dummy class for DTypePolicy
-                class SimpleDTypePolicy:
-                    def __init__(self, name='float32'):
-                        self.name = name
-                        self._name = name
-                
-                custom_objects['DTypePolicy'] = SimpleDTypePolicy
-                logger.info("Added SimpleDTypePolicy to custom objects")
-            except Exception as e:
-                logger.warning(f"Could not create DTypePolicy: {e}")
-            
-            # Handle other common compatibility issues with simple dummy functions
-            custom_objects.update({
-                'synchronized': lambda x=None: x if x is not None else True,
-                'batch_shape': lambda x=None: x,
-                'batch_input_shape': lambda x=None: x,
-            })
-            
-            logger.info(f"Created custom objects: {list(custom_objects.keys())}")
-            return custom_objects
-            
-        except Exception as e:
-            logger.error(f"Error creating custom objects: {e}")
-            return {}
-    
-    def load_model_simple_approach(model_path):
-        """Try to load the model with a very simple approach, ignoring most compatibility issues."""
-        try:
-            import tensorflow as tf
-            import keras
-            
-            logger.info("Attempting simple model loading approach...")
-            
-            # Try the most basic loading first
-            try:
-                logger.info("Trying basic tf.keras.models.load_model...")
-                model = tf.keras.models.load_model(model_path, compile=False)
-                logger.info("Basic loading succeeded!")
-                return model
-            except Exception as e:
-                logger.warning(f"Basic loading failed: {e}")
-            
-            # Try with custom objects
-            try:
-                logger.info("Trying with minimal custom objects...")
-                custom_objects = {
-                    'DTypePolicy': type('DTypePolicy', (), {'__init__': lambda self, *args, **kwargs: None})
-                }
-                model = tf.keras.models.load_model(model_path, compile=False, custom_objects=custom_objects)
-                logger.info("Loading with minimal custom objects succeeded!")
-                return model
-            except Exception as e:
-                logger.warning(f"Loading with minimal custom objects failed: {e}")
-            
-            # Try with keras directly
-            try:
-                logger.info("Trying with keras.models.load_model...")
-                model = keras.models.load_model(model_path, compile=False)
-                logger.info("Keras loading succeeded!")
-                return model
-            except Exception as e:
-                logger.warning(f"Keras loading failed: {e}")
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"Simple loading approach failed: {e}")
-            return None
-    
     def load_model(model_path=None):
-        """Load the model with a simplified approach."""
+        """Load the model with the simplest possible approach."""
         global default_model, default_model_path, default_model_loaded
         
         # Check if model is already loaded
@@ -163,8 +86,46 @@ try:
             logger.info(f"TensorFlow version: {tf.__version__}")
             logger.info(f"Keras version: {keras.__version__}")
 
-            # Try the simple approach first
-            model = load_model_simple_approach(model_path)
+            # Try the absolute simplest loading approaches
+            model = None
+            
+            # Method 1: Basic keras load_model with compile=False
+            try:
+                logger.info("Trying basic keras.models.load_model...")
+                model = keras.models.load_model(model_path, compile=False)
+                logger.info("Basic keras loading succeeded!")
+            except Exception as e:
+                logger.warning(f"Basic keras loading failed: {e}")
+            
+            # Method 2: Basic tf.keras load_model with compile=False
+            if model is None:
+                try:
+                    logger.info("Trying basic tf.keras.models.load_model...")
+                    model = tf.keras.models.load_model(model_path, compile=False)
+                    logger.info("Basic tf.keras loading succeeded!")
+                except Exception as e:
+                    logger.warning(f"Basic tf.keras loading failed: {e}")
+            
+            # Method 3: Load with minimal custom objects (only the essentials)
+            if model is None:
+                try:
+                    logger.info("Trying with minimal custom objects...")
+                    # Only add the most basic custom object that might be needed
+                    custom_objects = {}
+                    
+                    # Try to create a basic DTypePolicy replacement if needed
+                    try:
+                        class BasicDTypePolicy:
+                            def __init__(self, name='float32'):
+                                self.name = name
+                        custom_objects['DTypePolicy'] = BasicDTypePolicy
+                    except:
+                        pass
+                    
+                    model = tf.keras.models.load_model(model_path, compile=False, custom_objects=custom_objects)
+                    logger.info("Loading with minimal custom objects succeeded!")
+                except Exception as e:
+                    logger.warning(f"Loading with minimal custom objects failed: {e}")
             
             if model is not None:
                 default_model = model
@@ -179,7 +140,7 @@ try:
                 
                 return True
             else:
-                logger.error("All loading attempts failed")
+                logger.error("All simple loading attempts failed")
                 return False
                 
         except Exception as e:
@@ -382,89 +343,6 @@ try:
             logger.error(f"Error in predict route: {e}")
             logger.error(traceback.format_exc())
             return jsonify({"error": str(e)}), 500
-    
-    @app.route('/requirements', methods=['GET'])
-    def check_requirements():
-        """Check if all required packages are installed with correct versions."""
-        try:
-            # Required packages and versions
-            required_packages = {
-                "tensorflow": "2.10.0",
-                "keras": "2.10.0",
-                "h5py": "3.7.0",
-                "numpy": "1.23.5",
-                "pillow": "9.2.0"
-            }
-            
-            missing_packages = []
-            incorrect_versions = []
-            
-            for pkg, version in required_packages.items():
-                installed_version = get_package_version(pkg)
-                if not installed_version:
-                    missing_packages.append(pkg)
-                elif installed_version != version:
-                    incorrect_versions.append(f"{pkg}={installed_version} (required: {version})")
-            
-            all_ok = len(missing_packages) == 0 and len(incorrect_versions) == 0
-            
-            return jsonify({
-                "all_ok": all_ok,
-                "missing_packages": missing_packages,
-                "incorrect_versions": incorrect_versions
-            })
-            
-        except Exception as e:
-            logger.error(f"Error checking requirements: {e}")
-            logger.error(traceback.format_exc())
-            return jsonify({
-                "all_ok": False,
-                "error": str(e)
-            }), 500
-    
-    @app.route('/install_requirements', methods=['POST'])
-    def install_requirements():
-        """Install required packages."""
-        try:
-            import subprocess
-            
-            requirements_txt = """
-    tensorflow==2.10.0
-    keras==2.10.0
-    h5py==3.7.0
-    numpy==1.23.5
-    pillow==9.2.0
-    """
-            
-            # Write requirements to a temporary file
-            temp_file = "temp_requirements.txt"
-            with open(temp_file, "w") as f:
-                f.write(requirements_txt.strip())
-                
-            # Install requirements
-            result = subprocess.run(
-                [sys.executable, "-m", "pip", "install", "-r", temp_file],
-                capture_output=True,
-                text=True
-            )
-            
-            # Remove temporary file
-            try:
-                os.remove(temp_file)
-            except:
-                pass
-                
-            if result.returncode == 0:
-                logger.info("Successfully installed requirements")
-                return jsonify({"success": True, "message": "Requirements installed successfully"})
-            else:
-                logger.error(f"Error installing requirements: {result.stderr}")
-                return jsonify({"success": False, "error": "Failed to install requirements", "details": result.stderr}), 500
-                
-        except Exception as e:
-            logger.error(f"Error during installation: {e}")
-            logger.error(traceback.format_exc())
-            return jsonify({"success": False, "error": str(e)}), 500
     
     # Initialize server by trying to load default model
     if os.environ.get('MODEL_PATH'):
