@@ -1,4 +1,3 @@
-
 # Wrap the entire script in a try-except to catch any initialization errors
 try:
     import os
@@ -50,23 +49,60 @@ try:
         except ImportError:
             return None
     
+    def get_comprehensive_custom_objects():
+        """Get comprehensive custom objects for model loading compatibility."""
+        try:
+            import tensorflow as tf
+            import keras
+            
+            custom_objects = {}
+            
+            # Handle DTypePolicy - this is the main issue
+            try:
+                # Try to get DTypePolicy from tf.keras.mixed_precision
+                if hasattr(tf.keras.mixed_precision, 'Policy'):
+                    custom_objects['DTypePolicy'] = tf.keras.mixed_precision.Policy
+                elif hasattr(tf.keras.mixed_precision, 'policy'):
+                    custom_objects['DTypePolicy'] = tf.keras.mixed_precision.policy
+                elif hasattr(tf.keras.mixed_precision, 'DTypePolicy'):
+                    custom_objects['DTypePolicy'] = tf.keras.mixed_precision.DTypePolicy
+                else:
+                    # Create a dummy class as fallback
+                    class DummyDTypePolicy:
+                        def __init__(self, *args, **kwargs):
+                            pass
+                    custom_objects['DTypePolicy'] = DummyDTypePolicy
+            except Exception as e:
+                logger.warning(f"Could not resolve DTypePolicy: {e}")
+                # Create a dummy class as fallback
+                class DummyDTypePolicy:
+                    def __init__(self, *args, **kwargs):
+                        pass
+                custom_objects['DTypePolicy'] = DummyDTypePolicy
+            
+            # Handle other common compatibility issues
+            custom_objects.update({
+                'synchronized': lambda *args, **kwargs: None,
+                'batch_shape': lambda *args, **kwargs: None,
+                'batch_input_shape': lambda *args, **kwargs: None,
+            })
+            
+            logger.info(f"Created custom objects: {list(custom_objects.keys())}")
+            return custom_objects
+            
+        except Exception as e:
+            logger.error(f"Error creating custom objects: {e}")
+            return {}
+    
     def clean_model_config(config):
         """Clean model configuration to remove incompatible arguments."""
         if isinstance(config, dict):
             # Remove problematic keys that cause loading issues
-            problematic_keys = ['batch_shape', 'synchronized']
+            problematic_keys = ['batch_shape', 'synchronized', 'batch_input_shape']
             for key in list(config.keys()):
                 if key in problematic_keys:
                     logger.info(f"Removing incompatible config key: {key}")
                     del config[key]
-                    
-            # Handle batch_input_shape properly
-            if 'batch_input_shape' in config and 'input_shape' not in config:
-                batch_shape = config['batch_input_shape']
-                if batch_shape and len(batch_shape) > 1:
-                    config['input_shape'] = batch_shape[1:]
-                    logger.info(f"Converted batch_input_shape to input_shape: {config['input_shape']}")
-                del config['batch_input_shape']
             
             # Recursively clean nested configurations
             for key, value in config.items():
@@ -113,21 +149,21 @@ try:
             logger.info(f"TensorFlow version: {tf.__version__}")
             logger.info(f"Keras version: {keras.__version__}")
 
-            # Create comprehensive custom objects for compatibility
-            custom_objects = {
-                'synchronized': None,  # Handle synchronized argument
-                'batch_shape': None,   # Handle batch_shape argument
-            }
+            # Get comprehensive custom objects
+            custom_objects = get_comprehensive_custom_objects()
 
             # Try multiple loading approaches in order of preference
             loading_attempts = [
-                ("Direct tf.keras.models.load_model with custom objects", 
+                ("Direct tf.keras.models.load_model with comprehensive custom objects", 
                  lambda: tf.keras.models.load_model(model_path, compile=False, custom_objects=custom_objects)),
                 
-                ("Direct keras.models.load_model with custom objects", 
+                ("Direct keras.models.load_model with comprehensive custom objects", 
                  lambda: keras.models.load_model(model_path, compile=False, custom_objects=custom_objects)),
                 
-                ("Manual H5 config reconstruction", 
+                ("TensorFlow with safe_mode disabled", 
+                 lambda: tf.keras.models.load_model(model_path, compile=False, custom_objects=custom_objects, safe_mode=False)),
+                
+                ("Manual H5 config reconstruction with custom objects", 
                  lambda: load_model_with_config_cleaning(model_path, tf, keras, custom_objects)),
             ]
             
