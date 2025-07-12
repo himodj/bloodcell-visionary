@@ -14,6 +14,9 @@ try:
     from flask import Flask, request, jsonify
     from flask_cors import CORS
     import time
+    import h5py
+    import tempfile
+    import shutil
 
     # Suppress TensorFlow warnings at the very beginning
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -50,8 +53,34 @@ try:
         except ImportError:
             return None
     
+    def clean_h5_model(input_path, output_path):
+        """Clean problematic attributes from H5 model file."""
+        logger.info(f"Cleaning H5 model: {input_path} -> {output_path}")
+        
+        def clean_attributes(name, obj):
+            """Remove problematic attributes from H5 objects."""
+            if hasattr(obj, 'attrs'):
+                # List of problematic attributes to remove
+                problematic_attrs = ['batch_shape', 'synchronized', 'batch_input_shape']
+                
+                for attr in problematic_attrs:
+                    if attr in obj.attrs:
+                        logger.info(f"Removing attribute '{attr}' from {name}")
+                        del obj.attrs[attr]
+        
+        # Copy the file and clean it
+        with h5py.File(input_path, 'r') as src:
+            with h5py.File(output_path, 'w') as dst:
+                # Copy everything first
+                src.copy(src, dst)
+                
+                # Now clean the problematic attributes
+                dst.visititems(clean_attributes)
+                
+                logger.info("Model cleaning completed")
+    
     def load_model(model_path=None):
-        """Load the model with the simplest possible approach."""
+        """Load the model with H5 cleaning approach."""
         global default_model, default_model_path, default_model_loaded
         
         # Check if model is already loaded
@@ -86,62 +115,57 @@ try:
             logger.info(f"TensorFlow version: {tf.__version__}")
             logger.info(f"Keras version: {keras.__version__}")
 
-            # Try the absolute simplest loading approaches
-            model = None
+            # Create a temporary cleaned model file
+            temp_dir = tempfile.mkdtemp()
+            cleaned_model_path = os.path.join(temp_dir, 'cleaned_model.h5')
             
-            # Method 1: Basic keras load_model with compile=False
             try:
-                logger.info("Trying basic keras.models.load_model...")
-                model = keras.models.load_model(model_path, compile=False)
-                logger.info("Basic keras loading succeeded!")
-            except Exception as e:
-                logger.warning(f"Basic keras loading failed: {e}")
-            
-            # Method 2: Basic tf.keras load_model with compile=False
-            if model is None:
-                try:
-                    logger.info("Trying basic tf.keras.models.load_model...")
-                    model = tf.keras.models.load_model(model_path, compile=False)
-                    logger.info("Basic tf.keras loading succeeded!")
-                except Exception as e:
-                    logger.warning(f"Basic tf.keras loading failed: {e}")
-            
-            # Method 3: Load with minimal custom objects (only the essentials)
-            if model is None:
-                try:
-                    logger.info("Trying with minimal custom objects...")
-                    # Only add the most basic custom object that might be needed
-                    custom_objects = {}
-                    
-                    # Try to create a basic DTypePolicy replacement if needed
-                    try:
-                        class BasicDTypePolicy:
-                            def __init__(self, name='float32'):
-                                self.name = name
-                        custom_objects['DTypePolicy'] = BasicDTypePolicy
-                    except:
-                        pass
-                    
-                    model = tf.keras.models.load_model(model_path, compile=False, custom_objects=custom_objects)
-                    logger.info("Loading with minimal custom objects succeeded!")
-                except Exception as e:
-                    logger.warning(f"Loading with minimal custom objects failed: {e}")
-            
-            if model is not None:
+                # Clean the model file
+                clean_h5_model(model_path, cleaned_model_path)
+                
+                logger.info("Attempting to load cleaned model...")
+                
+                # Try loading the cleaned model with compile=False
+                model = tf.keras.models.load_model(cleaned_model_path, compile=False)
+                
+                logger.info("Cleaned model loaded successfully!")
+                
                 default_model = model
                 default_model_path = model_path
                 default_model_loaded = True
                 
                 # Log model summary for verification
-                logger.info("Model loaded successfully!")
                 logger.info(f"Model input shape: {model.input_shape}")
                 logger.info(f"Model output shape: {model.output_shape}")
                 logger.info(f"Number of layers: {len(model.layers)}")
                 
                 return True
-            else:
-                logger.error("All simple loading attempts failed")
-                return False
+                
+            except Exception as e:
+                logger.error(f"Failed to load cleaned model: {e}")
+                
+                # Fallback: try original approaches on cleaned file
+                try:
+                    logger.info("Trying keras.models.load_model on cleaned file...")
+                    model = keras.models.load_model(cleaned_model_path, compile=False)
+                    
+                    default_model = model
+                    default_model_path = model_path
+                    default_model_loaded = True
+                    
+                    logger.info("Model loaded with keras fallback!")
+                    return True
+                    
+                except Exception as e2:
+                    logger.error(f"Keras fallback also failed: {e2}")
+                    return False
+                    
+            finally:
+                # Clean up temporary files
+                try:
+                    shutil.rmtree(temp_dir)
+                except:
+                    pass
                 
         except Exception as e:
             logger.error(f"Error loading model: {e}")
@@ -246,34 +270,6 @@ try:
             "default_model_path": default_model_path,
             "default_model_loaded": default_model_loaded
         }
-        
-        # Check if requirements are met
-        requirements = {
-            "all_ok": True,
-            "missing_packages": [],
-            "incorrect_versions": []
-        }
-        
-        # Check required packages
-        required_packages = {
-            "tensorflow": "2.10.0",
-            "keras": "2.10.0",
-            "h5py": "3.7.0",
-            "numpy": "1.23.5",
-            "pillow": "9.2.0"
-        }
-        
-        for pkg, version in required_packages.items():
-            installed_version = get_package_version(pkg)
-            if not installed_version:
-                requirements["all_ok"] = False
-                requirements["missing_packages"].append(pkg)
-            elif installed_version != version:
-                requirements["all_ok"] = False
-                requirements["incorrect_versions"].append(f"{pkg}={installed_version} (required: {version})")
-        
-        env_info["requirements_check"] = requirements
-        
         return jsonify(env_info)
     
     @app.route('/load_model', methods=['POST'])
