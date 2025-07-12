@@ -14,9 +14,6 @@ try:
     from flask import Flask, request, jsonify
     from flask_cors import CORS
     import time
-    import h5py
-    import tempfile
-    import shutil
 
     # Suppress TensorFlow warnings at the very beginning
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -53,34 +50,8 @@ try:
         except ImportError:
             return None
     
-    def clean_h5_model(input_path, output_path):
-        """Clean problematic attributes from H5 model file."""
-        logger.info(f"Cleaning H5 model: {input_path} -> {output_path}")
-        
-        def clean_attributes(name, obj):
-            """Remove problematic attributes from H5 objects."""
-            if hasattr(obj, 'attrs'):
-                # List of problematic attributes to remove
-                problematic_attrs = ['batch_shape', 'synchronized', 'batch_input_shape']
-                
-                for attr in problematic_attrs:
-                    if attr in obj.attrs:
-                        logger.info(f"Removing attribute '{attr}' from {name}")
-                        del obj.attrs[attr]
-        
-        # Copy the file and clean it
-        with h5py.File(input_path, 'r') as src:
-            with h5py.File(output_path, 'w') as dst:
-                # Copy everything first
-                src.copy(src, dst)
-                
-                # Now clean the problematic attributes
-                dst.visititems(clean_attributes)
-                
-                logger.info("Model cleaning completed")
-    
     def load_model(model_path=None):
-        """Load the model with H5 cleaning approach."""
+        """Load the model with custom object handling."""
         global default_model, default_model_path, default_model_loaded
         
         # Check if model is already loaded
@@ -114,58 +85,41 @@ try:
             
             logger.info(f"TensorFlow version: {tf.__version__}")
             logger.info(f"Keras version: {keras.__version__}")
-
-            # Create a temporary cleaned model file
-            temp_dir = tempfile.mkdtemp()
-            cleaned_model_path = os.path.join(temp_dir, 'cleaned_model.h5')
             
-            try:
-                # Clean the model file
-                clean_h5_model(model_path, cleaned_model_path)
-                
-                logger.info("Attempting to load cleaned model...")
-                
-                # Try loading the cleaned model with compile=False
-                model = tf.keras.models.load_model(cleaned_model_path, compile=False)
-                
-                logger.info("Cleaned model loaded successfully!")
-                
-                default_model = model
-                default_model_path = model_path
-                default_model_loaded = True
-                
-                # Log model summary for verification
-                logger.info(f"Model input shape: {model.input_shape}")
-                logger.info(f"Model output shape: {model.output_shape}")
-                logger.info(f"Number of layers: {len(model.layers)}")
-                
-                return True
-                
-            except Exception as e:
-                logger.error(f"Failed to load cleaned model: {e}")
-                
-                # Fallback: try original approaches on cleaned file
+            # Try different loading approaches in order of preference
+            loading_attempts = [
+                ("Basic load_model with compile=False", lambda: tf.keras.models.load_model(model_path, compile=False)),
+                ("Keras load_model with compile=False", lambda: keras.models.load_model(model_path, compile=False)),
+                ("Load with custom objects", lambda: tf.keras.models.load_model(model_path, compile=False, custom_objects={})),
+            ]
+            
+            for attempt_name, load_func in loading_attempts:
                 try:
-                    logger.info("Trying keras.models.load_model on cleaned file...")
-                    model = keras.models.load_model(cleaned_model_path, compile=False)
+                    logger.info(f"Trying: {attempt_name}")
+                    model = load_func()
                     
-                    default_model = model
-                    default_model_path = model_path
-                    default_model_loaded = True
-                    
-                    logger.info("Model loaded with keras fallback!")
-                    return True
-                    
-                except Exception as e2:
-                    logger.error(f"Keras fallback also failed: {e2}")
-                    return False
-                    
-            finally:
-                # Clean up temporary files
-                try:
-                    shutil.rmtree(temp_dir)
-                except:
-                    pass
+                    # Test if model loaded successfully
+                    if model is not None:
+                        logger.info(f"✅ Model loaded successfully with: {attempt_name}")
+                        
+                        default_model = model
+                        default_model_path = model_path
+                        default_model_loaded = True
+                        
+                        # Log model summary for verification
+                        logger.info(f"Model input shape: {model.input_shape}")
+                        logger.info(f"Model output shape: {model.output_shape}")
+                        logger.info(f"Number of layers: {len(model.layers)}")
+                        
+                        return True
+                        
+                except Exception as e:
+                    logger.warning(f"{attempt_name} failed: {str(e)}")
+                    continue
+            
+            # If all attempts failed, log the error
+            logger.error("All loading attempts failed")
+            return False
                 
         except Exception as e:
             logger.error(f"Error loading model: {e}")
