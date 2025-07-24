@@ -127,9 +127,9 @@ function startPythonServer() {
   // Install necessary packages first
   try {
     console.log('Installing required Python packages...');
-    // Install all required packages according to the requirements.txt
-    const packagesToInstall = ['flask', 'flask-cors', 'tensorflow', 'pillow', 'numpy'];
-    const pipInstall = spawn(pythonCommand, ['-m', 'pip', 'install', ...packagesToInstall]);
+    // Force upgrade TensorFlow and Keras to latest versions
+    const packagesToInstall = ['flask>=3.0.0', 'flask-cors>=4.0.0', 'tensorflow>=2.15.0', 'keras>=3.0.0', 'pillow>=10.0.0', 'numpy>=1.24.0', 'h5py>=3.8.0'];
+    const pipInstall = spawn(pythonCommand, ['-m', 'pip', 'install', '--upgrade', ...packagesToInstall]);
     
     pipInstall.stdout.on('data', (data) => {
       console.log(`pip install output: ${data}`);
