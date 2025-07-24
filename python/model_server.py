@@ -53,20 +53,13 @@ def load_model_with_latest_versions(model_file_path):
     
     try:
         import tensorflow as tf
-        import keras
+        from tensorflow import keras
         
         logger.info(f"TensorFlow version: {tf.__version__}")
         logger.info(f"Keras version: {keras.__version__}")
         
-        # Load the model with latest Keras
-        model = keras.models.load_model(model_file_path, compile=False)
-        
-        # Compile the model for inference
-        model.compile(
-            optimizer='adam',
-            loss='categorical_crossentropy',
-            metrics=['accuracy']
-        )
+        # Load the model directly - should work with latest TF/Keras
+        model = keras.models.load_model(model_file_path)
         
         model_path = model_file_path
         model_loaded = True
