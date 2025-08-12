@@ -84,7 +84,20 @@ const ModelLoader: React.FC = () => {
                 
                 if (response.status === 200 && data.model_loaded) {
                   setBackendModelLoaded(true);
-                  if (modelInitialized) {
+                  if (!isModelInitialized()) {
+                    try {
+                      const defaultPath = await window.electron.getDefaultModelPath();
+                      if (defaultPath) {
+                        const ok = await initializeModel(defaultPath);
+                        if (ok) {
+                          setIsModelLoaded(true);
+                          setModelCheckStatus('success');
+                        }
+                      }
+                    } catch (initErr) {
+                      console.error('Auto-initialize frontend model failed:', initErr);
+                    }
+                  } else {
                     setModelCheckStatus('success');
                   }
                 } else {

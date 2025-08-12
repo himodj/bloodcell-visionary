@@ -159,6 +159,17 @@ export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult
     if (!serverRunning) {
       throw new Error('Python server is not running. Please restart the application.');
     }
+
+    // Strict: verify backend model is reported as loaded via health endpoint
+    try {
+      const healthRes = await fetch('http://localhost:5000/health');
+      const health = await healthRes.json();
+      if (!(healthRes.status === 200 && health?.model_loaded === true)) {
+        throw new Error('Backend model is not loaded.');
+      }
+    } catch (e) {
+      throw new Error('Backend model is not loaded. Please load the model before analyzing.');
+    }
     
     // Call the electron method to analyze the image
     const response = await window.electron.analyzeWithH5Model(modelPath, imageDataUrl) as PythonServerResponse;
