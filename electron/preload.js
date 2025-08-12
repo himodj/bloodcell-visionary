@@ -96,12 +96,13 @@ try {
     // Add isPythonServerRunning implementation
     electronAPI.isPythonServerRunning = async () => {
       try {
-        console.log('Checking if Python server is running...');
         const response = await axios.get('http://localhost:5000/health', {
           ...axiosConfig,
-          timeout: 2000 // Even shorter timeout for quick health check
+          timeout: 2000
         });
-        return response.data && response.data.status === 'ok';
+        const status = response.data?.status;
+        const loaded = response.data?.model_loaded;
+        return response.status === 200 && (status === 'healthy' || status === 'ok' || loaded === true);
       } catch (error) {
         console.error('Python server health check failed:', error.message);
         return false;

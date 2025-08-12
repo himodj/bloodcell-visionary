@@ -206,8 +206,8 @@ export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult
       coordinates: {
         x: 0,
         y: 0,
-        width: 224,
-        height: 224
+        width: 360,
+        height: 360
       }
     };
     
@@ -394,7 +394,7 @@ const generatePossibleConditions = (cellType: CellType): string[] => {
 // Resize and crop image to square
 export const resizeImageWithCenterCrop = (
   imageDataUrl: string,
-  targetSize: number = 224
+  targetSize: number = 360
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     const img = new Image();

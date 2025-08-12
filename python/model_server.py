@@ -76,7 +76,7 @@ def load_model_with_latest_versions(model_file_path):
         model_loaded = False
         return False
 
-def preprocess_image(image_data_url, target_size=(224, 224)):
+def preprocess_image(image_data_url, target_size=(360, 360)):
     """Preprocess image for model prediction."""
     try:
         # Remove data URL prefix

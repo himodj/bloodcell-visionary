@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useAnalysis } from '../contexts/AnalysisContext';
-import { handleImageUpload, analyzeImage, resizeImageWithCenterCrop } from '../utils/analysisUtils';
+import { handleImageUpload, analyzeImage, resizeImageWithCenterCrop, isModelInitialized } from '../utils/analysisUtils';
 import { Button } from '@/components/ui/button';
 import { Upload, ImagePlus, X, Microscope, Camera } from 'lucide-react';
 import { toast } from 'sonner';
@@ -268,7 +268,7 @@ const ImageUploader: React.FC = () => {
           <div className="p-4 text-center">
             <Button 
               onClick={handleStartAnalysis}
-              disabled={isAnalyzing}
+              disabled={isAnalyzing || !isModelInitialized()}
               className="neo-button bg-medical-red text-white hover:bg-medical-red/90 w-full"
             >
               {isAnalyzing ? (
