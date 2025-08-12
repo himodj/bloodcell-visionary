@@ -126,25 +126,76 @@ function startPythonServer() {
   
   // Install necessary packages first
   try {
-    console.log('Installing required Python packages...');
-    // Force upgrade TensorFlow and Keras to latest versions
-    const packagesToInstall = ['flask>=3.0.0', 'flask-cors>=4.0.0', 'tensorflow>=2.15.0', 'keras>=3.0.0', 'pillow>=10.0.0', 'numpy>=1.24.0', 'h5py>=3.8.0'];
-    const pipInstall = spawn(pythonCommand, ['-m', 'pip', 'install', '--upgrade', ...packagesToInstall]);
-    
+    console.log('Checking required Python packages (skip downloads if up-to-date)...');
+
+    const required = {
+      'flask': '3.0.0',
+      'flask-cors': '4.0.0',
+      'tensorflow': '2.15.0',
+      'keras': '3.0.0',
+      'pillow': '10.0.0',
+      'numpy': '1.24.0',
+      'h5py': '3.8.0'
+    };
+
+    const spawnSync = require('child_process').spawnSync;
+
+    const getInstalledVersion = (pkg) => {
+      try {
+        const res = spawnSync(pythonCommand, ['-m', 'pip', 'show', pkg], { encoding: 'utf8' });
+        if (res.status !== 0) return null;
+        const match = /Version:\s*([^\r\n]+)/.exec(res.stdout || '');
+        return match ? match[1].trim() : null;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    const cmp = (a, b) => {
+      const pa = (a || '').split('.').map(x => parseInt(x, 10) || 0);
+      const pb = (b || '').split('.').map(x => parseInt(x, 10) || 0);
+      const len = Math.max(pa.length, pb.length);
+      for (let i = 0; i < len; i++) {
+        const ai = pa[i] || 0;
+        const bi = pb[i] || 0;
+        if (ai > bi) return 1;
+        if (ai < bi) return -1;
+      }
+      return 0;
+    };
+
+    const needUpgrade = [];
+    for (const [pkg, minV] of Object.entries(required)) {
+      const curV = getInstalledVersion(pkg);
+      if (!curV || cmp(curV, minV) < 0) {
+        needUpgrade.push(`${pkg}>=${minV}`);
+        console.log(`Package ${pkg} ${curV || '(not installed)'} -> requires >= ${minV}`);
+      }
+    }
+
+    if (needUpgrade.length === 0) {
+      console.log('All required Python packages are up to date. Skipping pip install.');
+      startActualPythonServer();
+      return;
+    }
+
+    console.log('Installing/upgrading Python packages:', needUpgrade.join(', '));
+    const pipInstall = spawn(pythonCommand, ['-m', 'pip', 'install', '--upgrade', ...needUpgrade]);
+
     pipInstall.stdout.on('data', (data) => {
       console.log(`pip install output: ${data}`);
     });
-    
+
     pipInstall.stderr.on('data', (data) => {
       console.log(`pip install error: ${data}`);
     });
-    
+
     pipInstall.on('close', (code) => {
       console.log(`pip install exited with code ${code}`);
       startActualPythonServer();
     });
   } catch (error) {
-    console.error('Error installing Python packages:', error);
+    console.error('Error checking/installing Python packages:', error);
     startActualPythonServer();
   }
 }
