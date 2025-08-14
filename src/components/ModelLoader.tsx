@@ -50,16 +50,15 @@ const ModelLoader: React.FC = () => {
         }, 1000);
       }
 
-      // Set up a periodic check for model state and server status
+      // Set up a periodic check for model state and server status (reduced frequency)
       const interval = setInterval(async () => {
         // Check if model is initialized
         const modelInitialized = isModelInitialized();
-        console.log('Model initialized check:', modelInitialized);
         setIsModelLoaded(modelInitialized && backendModelLoaded);
         
-        // If more than 10 seconds have passed since last check, check server status
+        // Only check server status every 30 seconds to reduce load
         const now = Date.now();
-        if (window.electron && now - lastCheckTime > 10000) {
+        if (window.electron && now - lastCheckTime > 30000) {
           setLastCheckTime(now); // Update last check time
           try {
             // Check if the Python server is running
@@ -69,21 +68,22 @@ const ModelLoader: React.FC = () => {
             if (!serverRunning) {
               setModelCheckStatus('error');
               setBackendModelLoaded(false);
-              console.log('Python server not running');
               if (isModelLoaded) {
                 // If model was previously loaded but server is now down
                 setIsModelLoaded(false);
                 toast.error('Python server is no longer running. Analysis will not work.');
               }
-            } else if (serverRunning) {
-              // If server is running, check if it has the model loaded
-              // This uses the enhanced /health endpoint we added
+            } else if (serverRunning && !backendModelLoaded) {
+              // Only check model status if we don't think it's loaded yet
               try {
                 const response = await fetch('http://localhost:5000/health');
                 const data = await response.json();
                 
                 if (response.status === 200 && data.model_loaded) {
                   setBackendModelLoaded(true);
+                  setModelCheckStatus('success');
+                  
+                  // Auto-initialize frontend if not already done
                   if (!isModelInitialized()) {
                     try {
                       const defaultPath = await window.electron.getDefaultModelPath();
@@ -91,14 +91,11 @@ const ModelLoader: React.FC = () => {
                         const ok = await initializeModel(defaultPath);
                         if (ok) {
                           setIsModelLoaded(true);
-                          setModelCheckStatus('success');
                         }
                       }
                     } catch (initErr) {
                       console.error('Auto-initialize frontend model failed:', initErr);
                     }
-                  } else {
-                    setModelCheckStatus('success');
                   }
                 } else {
                   setBackendModelLoaded(false);
@@ -116,7 +113,7 @@ const ModelLoader: React.FC = () => {
             setModelCheckStatus('error');
           }
         }
-      }, 2000);
+      }, 10000);
 
       return () => clearInterval(interval);
     } catch (err) {
@@ -142,7 +139,7 @@ const ModelLoader: React.FC = () => {
     }
   };
 
-  // Function to check Python model status
+  // Function to check Python model status - only check, don't reload unless needed
   const checkPythonModelStatus = async () => {
     if (!window.electron) {
       return { loaded: false, error: 'Electron not available' };
@@ -150,22 +147,36 @@ const ModelLoader: React.FC = () => {
     
     setModelCheckStatus('checking');
     try {
-      // If model path is available, try to reload it
+      // First check if Python server is running
+      const serverRunning = await window.electron.isPythonServerRunning();
+      
+      if (!serverRunning) {
+        setModelCheckStatus('error');
+        setBackendModelLoaded(false);
+        return { loaded: false, error: 'Python server not running' };
+      }
+      
+      // Check health endpoint first before attempting to reload
+      try {
+        const response = await fetch('http://localhost:5000/health');
+        const data = await response.json();
+        
+        if (response.status === 200 && data.model_loaded) {
+          setModelCheckStatus('success');
+          setBackendModelLoaded(true);
+          return { loaded: true };
+        }
+      } catch (healthErr) {
+        console.log("Health check failed, will try to load model:", healthErr);
+      }
+      
+      // Only try to reload if health check shows model is not loaded
       const path = modelPath || await window.electron.getDefaultModelPath();
       
       if (path) {
-        // First check if Python server is running
-        const serverRunning = await window.electron.isPythonServerRunning();
-        
-        if (!serverRunning) {
-          setModelCheckStatus('error');
-          setBackendModelLoaded(false);
-          return { loaded: false, error: 'Python server not running' };
-        }
-        
-        console.log("Checking Python model status for path:", path);
+        console.log("Loading Python model for path:", path);
         const result = await window.electron.reloadPythonModel(path);
-        console.log("Python model status result:", result);
+        console.log("Python model load result:", result);
         
         if (result.success) {
           setModelCheckStatus('success');

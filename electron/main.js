@@ -334,15 +334,31 @@ app.on('will-quit', () => {
   }
 });
 
+// Cache for model path to avoid repeated file system searches
+let cachedModelPath = null;
+let modelPathSearched = false;
+
 function getModelPath() {
+  // Return cached path if already found
+  if (cachedModelPath) {
+    return cachedModelPath;
+  }
+  
+  // If we've already searched and found nothing, don't search again
+  if (modelPathSearched && !cachedModelPath) {
+    return null;
+  }
+  
   console.log('Looking for model.h5 file in application directory...');
+  modelPathSearched = true;
   
   // First check the current directory where the app is running
   const currentDirModelPath = path.join(process.cwd(), 'model.h5');
   console.log('Checking current directory:', currentDirModelPath);
   if (fs.existsSync(currentDirModelPath)) {
     console.log('✅ Found model in current directory:', currentDirModelPath);
-    return currentDirModelPath;
+    cachedModelPath = currentDirModelPath;
+    return cachedModelPath;
   }
   
   // Check the app root directory (top priority)
@@ -350,7 +366,8 @@ function getModelPath() {
   console.log('Checking app root directory:', appRootModelPath);
   if (fs.existsSync(appRootModelPath)) {
     console.log('✅ Found model at application root:', appRootModelPath);
-    return appRootModelPath;
+    cachedModelPath = appRootModelPath;
+    return cachedModelPath;
   }
   
   // Check the directory where the executable is located
@@ -359,7 +376,8 @@ function getModelPath() {
   console.log('Checking executable directory:', execDirModelPath);
   if (fs.existsSync(execDirModelPath)) {
     console.log('✅ Found model in executable directory:', execDirModelPath);
-    return execDirModelPath;
+    cachedModelPath = execDirModelPath;
+    return cachedModelPath;
   }
   
   // Then check one level up from app path
@@ -367,7 +385,8 @@ function getModelPath() {
   console.log('Checking parent directory:', parentDirModelPath);
   if (fs.existsSync(parentDirModelPath)) {
     console.log('✅ Found model in parent directory:', parentDirModelPath);
-    return parentDirModelPath;
+    cachedModelPath = parentDirModelPath;
+    return cachedModelPath;
   }
   
   if (isDev) {
@@ -375,7 +394,8 @@ function getModelPath() {
     console.log('Checking development model path:', devModelPath);
     if (fs.existsSync(devModelPath)) {
       console.log('✅ Found model at', devModelPath);
-      return devModelPath;
+      cachedModelPath = devModelPath;
+      return cachedModelPath;
     }
   }
   
@@ -383,7 +403,8 @@ function getModelPath() {
   console.log('Checking production model path:', prodModelPath);
   if (fs.existsSync(prodModelPath)) {
     console.log('✅ Found model at', prodModelPath);
-    return prodModelPath;
+    cachedModelPath = prodModelPath;
+    return cachedModelPath;
   }
 
   console.log('❌ Model not found in any location');
