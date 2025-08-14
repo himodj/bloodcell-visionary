@@ -34,6 +34,17 @@ export interface CellCounts {
   detectedCells: Record<CellType, number>;
 }
 
+// Define patient information
+export interface PatientInfo {
+  name: string;
+  age: string;
+  gender: string;
+  sampleType: string;
+  clinicalNotes: string;
+  physicianName: string;
+  labTechnician: string;
+}
+
 // Define the structure of the analysis result
 export interface AnalysisResult {
   image: string;
@@ -45,6 +56,7 @@ export interface AnalysisResult {
   recommendations: string[];
   possibleConditions: string[];
   notes?: string;
+  patientInfo: PatientInfo;
 }
 
 // Define the context interface
@@ -52,6 +64,7 @@ interface AnalysisContextType {
   isAnalyzing: boolean;
   analysisResult: AnalysisResult | null;
   originalImage: string | null;
+  patientInfo: PatientInfo;
   startAnalysis: () => void;
   finishAnalysis: (result: AnalysisResult) => void;
   resetAnalysis: () => void;
@@ -59,6 +72,7 @@ interface AnalysisContextType {
   updatePossibleConditions: (conditions: string[]) => void;
   updateProcessedImage: (imageUrl: string) => void;
   setOriginalImage: (imageUrl: string | null) => void;
+  updatePatientInfo: (info: PatientInfo) => void;
 }
 
 // Create the context
@@ -74,6 +88,15 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
+  const [patientInfo, setPatientInfo] = useState<PatientInfo>({
+    name: '',
+    age: '',
+    gender: '',
+    sampleType: 'Blood Sample',
+    clinicalNotes: '',
+    physicianName: '',
+    labTechnician: ''
+  });
 
   // Analysis workflow functions
   const startAnalysis = async () => {
@@ -175,6 +198,16 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
     });
   };
 
+  const updatePatientInfo = (info: PatientInfo) => {
+    setPatientInfo(info);
+    if (analysisResult) {
+      setAnalysisResult({
+        ...analysisResult,
+        patientInfo: info,
+      });
+    }
+  };
+
   // Return the provider
   return (
     <AnalysisContext.Provider
@@ -182,6 +215,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
         isAnalyzing,
         analysisResult,
         originalImage,
+        patientInfo,
         startAnalysis,
         finishAnalysis,
         resetAnalysis,
@@ -189,6 +223,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
         updatePossibleConditions,
         updateProcessedImage,
         setOriginalImage,
+        updatePatientInfo,
       }}
     >
       {children}

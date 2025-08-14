@@ -1,16 +1,23 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useAnalysis } from '../contexts/AnalysisContext';
 import { formatNumber, determineSeverity, getCellTypeColor } from '../utils/analysisUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { AlertTriangle, Droplet, Circle, Edit3 } from 'lucide-react';
+import { AlertTriangle, Droplet, Circle, Edit3, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import ImageWithDetection from './ImageWithDetection';
+import PatientInfoForm from './PatientInfoForm';
 
 const AnalysisResults: React.FC = () => {
-  const { analysisResult, updateRecommendations, updatePossibleConditions } = useAnalysis();
+  const { analysisResult, updateRecommendations, updatePossibleConditions, updatePatientInfo, patientInfo } = useAnalysis();
+  const [editingRecommendations, setEditingRecommendations] = useState(false);
+  const [editingConditions, setEditingConditions] = useState(false);
+  const [tempRecommendations, setTempRecommendations] = useState('');
+  const [tempConditions, setTempConditions] = useState('');
   
   if (!analysisResult) return null;
 
@@ -40,50 +47,57 @@ const AnalysisResults: React.FC = () => {
   };
 
   const handleEditRecommendations = () => {
-    // Simple prompt for editing recommendations
-    const currentRecs = analysisResult.recommendations.join('\n');
-    const newRecs = prompt('Edit recommendations (one per line):', currentRecs);
-    
-    if (newRecs !== null) {
-      const recArray = newRecs.split('\n').filter(rec => rec.trim() !== '');
-      updateRecommendations(recArray);
-      toast.success('Recommendations updated');
-    }
+    if (!analysisResult) return;
+    setTempRecommendations(analysisResult.recommendations.join('\n'));
+    setEditingRecommendations(true);
+  };
+
+  const handleSaveRecommendations = () => {
+    const recArray = tempRecommendations.split('\n').filter(rec => rec.trim() !== '');
+    updateRecommendations(recArray);
+    setEditingRecommendations(false);
+    toast.success('Recommendations updated');
+  };
+
+  const handleCancelEditRecommendations = () => {
+    setEditingRecommendations(false);
+    setTempRecommendations('');
   };
 
   const handleEditConditions = () => {
-    // Simple prompt for editing conditions
-    const currentConditions = analysisResult.possibleConditions.join('\n');
-    const newConditions = prompt('Edit possible conditions (one per line):', currentConditions);
-    
-    if (newConditions !== null) {
-      const conditionArray = newConditions.split('\n').filter(cond => cond.trim() !== '');
-      updatePossibleConditions(conditionArray);
-      toast.success('Conditions updated');
-    }
+    if (!analysisResult) return;
+    setTempConditions(analysisResult.possibleConditions.join('\n'));
+    setEditingConditions(true);
+  };
+
+  const handleSaveConditions = () => {
+    const conditionArray = tempConditions.split('\n').filter(cond => cond.trim() !== '');
+    updatePossibleConditions(conditionArray);
+    setEditingConditions(false);
+    toast.success('Conditions updated');
+  };
+
+  const handleCancelEditConditions = () => {
+    setEditingConditions(false);
+    setTempConditions('');
   };
 
   return (
     <div className="animate-fade-in">
-      <div className="mb-6">
-        <Card className="medical-card overflow-hidden">
-          <div className="p-4 bg-medical-blue bg-opacity-5 border-b border-medical-blue border-opacity-10">
-            <h3 className="font-display font-medium flex items-center text-medical-dark">
-              <Circle size={16} className="text-medical-blue mr-2" />
-              Processed Image with Cell Detection
-            </h3>
-          </div>
-          <CardContent className="p-0">
-            {processedImage && (
-              <img 
-                src={processedImage} 
-                alt="Processed Blood Sample" 
-                className="w-full h-auto object-contain"
-              />
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* Patient Information Form */}
+      <PatientInfoForm
+        patientInfo={patientInfo}
+        onPatientInfoChange={updatePatientInfo}
+      />
+      
+      {/* Image with detection overlay */}
+      {(processedImage || analysisResult.image) && (
+        <ImageWithDetection
+          imageUrl={processedImage || analysisResult.image}
+          detectedCells={detectedCells}
+          title="Blood Sample Analysis with Cell Detection"
+        />
+      )}
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <Card className="medical-card overflow-hidden">
@@ -154,24 +168,56 @@ const AnalysisResults: React.FC = () => {
               <AlertTriangle size={18} style={{ color: getSeverityColor(severity) }} className="mr-2" />
               <h3 className="font-display font-medium text-medical-dark">Possible Conditions</h3>
             </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleEditConditions}
-              className="text-xs"
-            >
-              <Edit3 size={14} className="mr-1" />
-              Edit
-            </Button>
+            {!editingConditions ? (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleEditConditions}
+                className="text-xs"
+              >
+                <Edit3 size={14} className="mr-1" />
+                Edit
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleSaveConditions}
+                  className="text-xs text-green-600"
+                >
+                  <Save size={14} className="mr-1" />
+                  Save
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleCancelEditConditions}
+                  className="text-xs text-red-600"
+                >
+                  <X size={14} className="mr-1" />
+                  Cancel
+                </Button>
+              </div>
+            )}
           </div>
           <CardContent className="p-4">
-            <ul className="list-disc pl-6 space-y-2">
-              {possibleConditions.map((condition, index) => (
-                <li key={index} className="text-medical-dark">
-                  {condition}
-                </li>
-              ))}
-            </ul>
+            {editingConditions ? (
+              <Textarea
+                value={tempConditions}
+                onChange={(e) => setTempConditions(e.target.value)}
+                placeholder="Enter possible conditions (one per line)..."
+                rows={4}
+              />
+            ) : (
+              <ul className="list-disc pl-6 space-y-2">
+                {possibleConditions.map((condition, index) => (
+                  <li key={index} className="text-medical-dark">
+                    {condition}
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
       )}
@@ -183,24 +229,56 @@ const AnalysisResults: React.FC = () => {
               <Circle size={16} className="text-medical-blue mr-2" />
               Recommendations
             </h3>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleEditRecommendations}
-              className="text-xs"
-            >
-              <Edit3 size={14} className="mr-1" />
-              Edit
-            </Button>
+            {!editingRecommendations ? (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleEditRecommendations}
+                className="text-xs"
+              >
+                <Edit3 size={14} className="mr-1" />
+                Edit
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleSaveRecommendations}
+                  className="text-xs text-green-600"
+                >
+                  <Save size={14} className="mr-1" />
+                  Save
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleCancelEditRecommendations}
+                  className="text-xs text-red-600"
+                >
+                  <X size={14} className="mr-1" />
+                  Cancel
+                </Button>
+              </div>
+            )}
           </div>
           <CardContent className="p-4">
-            <ul className="list-disc pl-6 space-y-2">
-              {analysisResult.recommendations.map((recommendation, index) => (
-                <li key={index} className="text-medical-dark">
-                  {recommendation}
-                </li>
-              ))}
-            </ul>
+            {editingRecommendations ? (
+              <Textarea
+                value={tempRecommendations}
+                onChange={(e) => setTempRecommendations(e.target.value)}
+                placeholder="Enter recommendations (one per line)..."
+                rows={4}
+              />
+            ) : (
+              <ul className="list-disc pl-6 space-y-2">
+                {analysisResult.recommendations.map((recommendation, index) => (
+                  <li key={index} className="text-medical-dark">
+                    {recommendation}
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
       )}

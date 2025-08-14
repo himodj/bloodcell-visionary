@@ -409,7 +409,10 @@ const ModelLoader: React.FC = () => {
         if (pythonReloadResult.success) {
           setIsModelLoaded(frontendInitSuccess);
           setBackendModelLoaded(true);
-          toast.success(`Model loaded successfully from: ${modelPath}`);
+          // Only show success message on first load attempt
+          if (loadAttempts === 1) {
+            toast.success(`Model loaded successfully from: ${modelPath}`);
+          }
           setModelCheckStatus('success');
         } else {
           // Error loading model

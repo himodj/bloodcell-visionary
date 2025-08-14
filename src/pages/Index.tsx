@@ -4,7 +4,7 @@ import { AnalysisProvider, useAnalysis } from '../contexts/AnalysisContext';
 import Header from '../components/Header';
 import ImageUploader from '../components/ImageUploader';
 import AnalysisResults from '../components/AnalysisResults';
-import ReportGenerator from '../components/ReportGenerator';
+import FormalReportGenerator from '../components/FormalReportGenerator';
 import Footer from '../components/Footer';
 import ModelLoader from '../components/ModelLoader';
 
@@ -46,7 +46,7 @@ const AnalysisWorkflow: React.FC = () => {
               <AnalysisResults />
             </div>
             <div>
-              <ReportGenerator />
+              <FormalReportGenerator />
             </div>
           </div>
         )}
