@@ -351,6 +351,20 @@ try {
         };
       }
     };
+
+    // Add saveReport implementation
+    electronAPI.saveReport = async (reportData) => {
+      try {
+        console.log('Saving report...');
+        return await ipcRenderer.invoke('save-report', reportData);
+      } catch (error) {
+        console.error('Error saving report:', error);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+    };
   } else {
     console.error('Failed to load axios. The application will use the fallback implementation');
   }
@@ -379,7 +393,8 @@ try {
       getPythonEnvironmentInfo: () => Promise.resolve({ error: 'Not in Electron environment' }),
       isPythonServerRunning: () => Promise.resolve(false),
       checkRequirements: () => Promise.resolve({ error: 'Not in Electron environment', all_ok: false }),
-      installRequirements: () => Promise.resolve({ error: 'Not in Electron environment', success: false })
+      installRequirements: () => Promise.resolve({ error: 'Not in Electron environment', success: false }),
+      saveReport: () => Promise.resolve({ success: false, error: 'Not in Electron environment' })
     };
     console.log('Created browser fallback for electron API');
   } catch (fallbackError) {

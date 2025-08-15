@@ -583,6 +583,43 @@ ipcMain.handle('test-axios', async () => {
   }
 });
 
+ipcMain.handle('save-report', async (event, reportData) => {
+  try {
+    const { dialog } = require('electron');
+    const fs = require('fs').promises;
+    
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Save Lab Report',
+      defaultPath: `Report_${reportData.reportId}.html`,
+      filters: [
+        { name: 'HTML Files', extensions: ['html'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+    
+    if (!result.canceled && result.filePath) {
+      // Create HTML report content
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html><head><title>Lab Report ${reportData.reportId}</title></head>
+        <body>
+          <h1>${reportData.labConfig.labName || 'Clinical Laboratory'}</h1>
+          <p>Report ID: ${reportData.reportId}</p>
+          <p>Patient: ${reportData.patientInfo.name}</p>
+          <p>Date: ${reportData.reportDate}</p>
+        </body></html>
+      `;
+      
+      await fs.writeFile(result.filePath, htmlContent);
+      return { success: true, filePath: result.filePath };
+    }
+    
+    return { success: false, error: 'Save cancelled' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle('browse-for-model', async () => {
   try {
     console.log('Opening file dialog to browse for model...');

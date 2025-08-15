@@ -75,6 +75,11 @@ interface ElectronAPI {
     error?: string;
     details?: string;
   }>;
+  saveReport: (reportData: any) => Promise<{
+    success: boolean;
+    filePath?: string;
+    error?: string;
+  }>;
 }
 
 interface Window {

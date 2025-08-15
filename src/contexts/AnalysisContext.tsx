@@ -41,8 +41,6 @@ export interface PatientInfo {
   gender: string;
   sampleType: string;
   clinicalNotes: string;
-  physicianName: string;
-  labTechnician: string;
 }
 
 // Define the structure of the analysis result
@@ -93,9 +91,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
     age: '',
     gender: '',
     sampleType: 'Blood Sample',
-    clinicalNotes: '',
-    physicianName: '',
-    labTechnician: ''
+    clinicalNotes: ''
   });
 
   // Analysis workflow functions
@@ -171,6 +167,14 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
     setIsAnalyzing(false);
     setAnalysisResult(null);
     setOriginalImage(null);
+    // Reset patient info for new test
+    setPatientInfo({
+      name: '',
+      age: '',
+      gender: '',
+      sampleType: 'Blood Sample',
+      clinicalNotes: ''
+    });
   };
 
   // Update functions

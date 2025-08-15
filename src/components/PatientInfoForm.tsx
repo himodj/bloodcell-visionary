@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { User, Calendar, FileText, Edit3, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -13,8 +14,6 @@ export interface PatientInfo {
   gender: string;
   sampleType: string;
   clinicalNotes: string;
-  physicianName: string;
-  labTechnician: string;
 }
 
 interface PatientInfoFormProps {
@@ -88,7 +87,7 @@ const PatientInfoForm: React.FC<PatientInfoFormProps> = ({
         )}
       </div>
       <CardContent className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="patient-name">Patient Name</Label>
             {isEditing ? (
@@ -124,12 +123,15 @@ const PatientInfoForm: React.FC<PatientInfoFormProps> = ({
           <div>
             <Label htmlFor="patient-gender">Gender</Label>
             {isEditing ? (
-              <Input
-                id="patient-gender"
-                value={formData.gender}
-                onChange={(e) => handleInputChange('gender', e.target.value)}
-                placeholder="Enter gender"
-              />
+              <Select value={formData.gender} onValueChange={(value) => handleInputChange('gender', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Male">Male</SelectItem>
+                  <SelectItem value="Female">Female</SelectItem>
+                </SelectContent>
+              </Select>
             ) : (
               <div className="p-2 bg-gray-50 rounded min-h-[40px] flex items-center">
                 {patientInfo.gender || 'Not specified'}
@@ -140,47 +142,21 @@ const PatientInfoForm: React.FC<PatientInfoFormProps> = ({
           <div>
             <Label htmlFor="sample-type">Sample Type</Label>
             {isEditing ? (
-              <Input
-                id="sample-type"
-                value={formData.sampleType}
-                onChange={(e) => handleInputChange('sampleType', e.target.value)}
-                placeholder="Blood, Bone Marrow, etc."
-              />
+              <Select value={formData.sampleType} onValueChange={(value) => handleInputChange('sampleType', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select sample type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Blood Sample">Blood Sample</SelectItem>
+                  <SelectItem value="Bone Marrow">Bone Marrow</SelectItem>
+                  <SelectItem value="Peripheral Blood">Peripheral Blood</SelectItem>
+                  <SelectItem value="CSF">CSF</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             ) : (
               <div className="p-2 bg-gray-50 rounded min-h-[40px] flex items-center">
                 {patientInfo.sampleType || 'Blood Sample'}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="physician-name">Physician</Label>
-            {isEditing ? (
-              <Input
-                id="physician-name"
-                value={formData.physicianName}
-                onChange={(e) => handleInputChange('physicianName', e.target.value)}
-                placeholder="Enter physician name"
-              />
-            ) : (
-              <div className="p-2 bg-gray-50 rounded min-h-[40px] flex items-center">
-                {patientInfo.physicianName || 'Not specified'}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="lab-technician">Lab Technician</Label>
-            {isEditing ? (
-              <Input
-                id="lab-technician"
-                value={formData.labTechnician}
-                onChange={(e) => handleInputChange('labTechnician', e.target.value)}
-                placeholder="Enter technician name"
-              />
-            ) : (
-              <div className="p-2 bg-gray-50 rounded min-h-[40px] flex items-center">
-                {patientInfo.labTechnician || 'Not specified'}
               </div>
             )}
           </div>

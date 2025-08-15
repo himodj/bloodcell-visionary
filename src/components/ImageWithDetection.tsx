@@ -36,26 +36,18 @@ const ImageWithDetection: React.FC<ImageWithDetectionProps> = ({
             {/* Detection overlay */}
             {primaryCell && (
               <div className="absolute inset-0 pointer-events-none">
-                {/* Red bounding box - centered if no coordinates available */}
+                {/* Red bounding box - centered with proper positioning */}
                 <div
                   className="absolute border-2 border-red-500 bg-red-500 bg-opacity-10"
                   style={{
-                    left: primaryCell.coordinates 
-                      ? `${(primaryCell.coordinates.x / 360) * 100}%`
-                      : '40%', // Center if no coordinates
-                    top: primaryCell.coordinates 
-                      ? `${(primaryCell.coordinates.y / 360) * 100}%`
-                      : '40%', // Center if no coordinates
-                    width: primaryCell.coordinates 
-                      ? `${(primaryCell.coordinates.width / 360) * 100}%`
-                      : '20%', // Default size
-                    height: primaryCell.coordinates 
-                      ? `${(primaryCell.coordinates.height / 360) * 100}%`
-                      : '20%', // Default size
+                    left: '35%',
+                    top: '35%',
+                    width: '30%',
+                    height: '30%',
                   }}
                 >
-                  {/* Label on top of the box */}
-                  <div className="absolute -top-8 left-0 bg-red-500 text-white px-2 py-1 text-xs font-medium rounded shadow-lg whitespace-nowrap">
+                  {/* Label on top of the box - positioned to stay within image */}
+                  <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-2 py-1 text-xs font-medium rounded shadow-lg whitespace-nowrap z-10">
                     {primaryCell.type}
                   </div>
                 </div>

@@ -243,15 +243,13 @@ export const analyzeImage = async (imageDataUrl: string): Promise<AnalysisResult
       abnormalityRate: isAbnormal ? 1.0 : 0.0,
       recommendations: generateRecommendations(cellType),
       possibleConditions: generatePossibleConditions(cellType),
-      patientInfo: {
-        name: '',
-        age: '',
-        gender: '',
-        sampleType: 'Blood Sample',
-        clinicalNotes: '',
-        physicianName: '',
-        labTechnician: ''
-      }
+        patientInfo: {
+          name: '',
+          age: '',
+          gender: '',
+          sampleType: 'Blood Sample',
+          clinicalNotes: ''
+        }
     };
     
     return result;

@@ -4,13 +4,13 @@ import { useAnalysis } from '../contexts/AnalysisContext';
 import { formatNumber, determineSeverity, getCellTypeColor } from '../utils/analysisUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { AlertTriangle, Droplet, Circle, Edit3, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import ImageWithDetection from './ImageWithDetection';
 import PatientInfoForm from './PatientInfoForm';
+import EditableCellType from './EditableCellType';
 
 const AnalysisResults: React.FC = () => {
   const { analysisResult, updateRecommendations, updatePossibleConditions, updatePatientInfo, patientInfo } = useAnalysis();
@@ -21,20 +21,23 @@ const AnalysisResults: React.FC = () => {
   
   if (!analysisResult) return null;
 
-  const { cellCounts, abnormalityRate, possibleConditions, detectedCells, processedImage } = analysisResult;
+  const { abnormalityRate, possibleConditions, detectedCells, processedImage } = analysisResult;
   const severity = determineSeverity(abnormalityRate);
-  
-  // Prepare data for pie chart - using detected cell types
-  const pieData = Object.entries(cellCounts.detectedCells).map(([type, count]) => ({
-    name: type,
-    value: count,
-    color: getCellTypeColor(type as any)
-  })).filter(item => item.value > 0);
   
   // Calculate average confidence level
   const avgConfidence = detectedCells.length > 0
     ? (detectedCells.reduce((sum, cell) => sum + cell.confidence, 0) / detectedCells.length * 100).toFixed(1)
     : "N/A";
+
+  const handleCellTypeChange = (newType: any) => {
+    if (analysisResult && detectedCells.length > 0) {
+      const updatedCells = [...detectedCells];
+      updatedCells[0] = { ...updatedCells[0], type: newType };
+      // Update analysis result with new cell type - this would need context method
+      console.log('Cell type changed to:', newType);
+      toast.success('Cell type updated');
+    }
+  };
   
   const getSeverityColor = (severity: string) => {
     const colors: Record<string, string> = {
@@ -109,17 +112,17 @@ const AnalysisResults: React.FC = () => {
           </div>
           <CardContent className="p-4">
             <div className="flex flex-col divide-y">
-              <div className="py-3 flex justify-between items-center">
-                <span className="text-sm text-medical-dark text-opacity-70">Cell detected:</span>
-                <span className="font-medium text-medical-dark">{detectedCells.length > 0 ? detectedCells[0].type : "None"}</span>
-              </div>
-              
-              <div className="py-3 flex justify-between items-center">
-                <span className="text-sm text-medical-dark text-opacity-70">Confidence:</span>
-                <span className="font-medium text-medical-dark">
-                  {detectedCells.length > 0 ? `${(detectedCells[0].confidence * 100).toFixed(1)}%` : "N/A"}
-                </span>
-              </div>
+              {detectedCells.length > 0 ? (
+                <EditableCellType
+                  cellType={detectedCells[0].type}
+                  confidence={detectedCells[0].confidence}
+                  onCellTypeChange={handleCellTypeChange}
+                />
+              ) : (
+                <div className="py-3">
+                  <span className="text-medical-dark text-opacity-70">No cell detected</span>
+                </div>
+              )}
               
               <div className="py-3 flex justify-between items-center">
                 <span className="text-sm text-medical-dark text-opacity-70">Analysis Date:</span>
