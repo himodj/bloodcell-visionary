@@ -71,6 +71,7 @@ interface AnalysisContextType {
   updateProcessedImage: (imageUrl: string) => void;
   setOriginalImage: (imageUrl: string | null) => void;
   updatePatientInfo: (info: PatientInfo) => void;
+  updateCellType: (cellType: CellType) => void;
 }
 
 // Create the context
@@ -212,6 +213,18 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
     }
   };
 
+  const updateCellType = (cellType: CellType) => {
+    if (!analysisResult || analysisResult.detectedCells.length === 0) return;
+    
+    const updatedCells = [...analysisResult.detectedCells];
+    updatedCells[0] = { ...updatedCells[0], type: cellType };
+    
+    setAnalysisResult({
+      ...analysisResult,
+      detectedCells: updatedCells,
+    });
+  };
+
   // Return the provider
   return (
     <AnalysisContext.Provider
@@ -228,6 +241,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
         updateProcessedImage,
         setOriginalImage,
         updatePatientInfo,
+        updateCellType,
       }}
     >
       {children}

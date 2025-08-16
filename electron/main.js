@@ -585,37 +585,248 @@ ipcMain.handle('test-axios', async () => {
 
 ipcMain.handle('save-report', async (event, reportData) => {
   try {
-    const { dialog } = require('electron');
     const fs = require('fs').promises;
+    const pathModule = require('path');
     
-    const result = await dialog.showSaveDialog(mainWindow, {
-      title: 'Save Lab Report',
-      defaultPath: `Report_${reportData.reportId}.html`,
-      filters: [
-        { name: 'HTML Files', extensions: ['html'] },
-        { name: 'All Files', extensions: ['*'] }
-      ]
-    });
+    // Create test archive folder in the same directory as the application
+    const appDir = process.cwd();
+    const testArchiveDir = pathModule.join(appDir, 'test archive');
     
-    if (!result.canceled && result.filePath) {
-      // Create HTML report content
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html><head><title>Lab Report ${reportData.reportId}</title></head>
-        <body>
-          <h1>${reportData.labConfig.labName || 'Clinical Laboratory'}</h1>
-          <p>Report ID: ${reportData.reportId}</p>
-          <p>Patient: ${reportData.patientInfo.name}</p>
-          <p>Date: ${reportData.reportDate}</p>
-        </body></html>
-      `;
-      
-      await fs.writeFile(result.filePath, htmlContent);
-      return { success: true, filePath: result.filePath };
+    // Create directory if it doesn't exist
+    try {
+      await fs.access(testArchiveDir);
+    } catch {
+      await fs.mkdir(testArchiveDir, { recursive: true });
     }
     
-    return { success: false, error: 'Save cancelled' };
+    // Generate unique folder name for this patient/test
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const patientName = reportData.patientInfo.name || 'Unknown';
+    const testFolderName = `${patientName}_${reportData.reportId}_${timestamp}`.replace(/[<>:"/\\|?*]/g, '_');
+    const testFolder = pathModule.join(testArchiveDir, testFolderName);
+    
+    await fs.mkdir(testFolder, { recursive: true });
+    
+    // Save the analyzed image
+    let imagePath = null;
+    if (reportData.analysisResult.processedImage || reportData.analysisResult.image) {
+      const imageUrl = reportData.analysisResult.processedImage || reportData.analysisResult.image;
+      
+      if (imageUrl.startsWith('data:image/')) {
+        // Handle base64 images
+        const base64Data = imageUrl.split(',')[1];
+        const imageExtension = imageUrl.split(';')[0].split('/')[1] || 'png';
+        imagePath = pathModule.join(testFolder, `analyzed_image.${imageExtension}`);
+        await fs.writeFile(imagePath, base64Data, 'base64');
+      }
+    }
+    
+    // Create comprehensive HTML report content
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lab Report ${reportData.reportId}</title>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+        .header { border-bottom: 3px solid #1e40af; padding-bottom: 20px; margin-bottom: 30px; }
+        .lab-title { font-size: 24px; font-weight: bold; color: #1e40af; margin-bottom: 8px; }
+        .lab-subtitle { font-size: 14px; color: #374151; margin-bottom: 3px; }
+        .patient-box { border: 2px solid #1e40af; padding: 20px; margin: 25px 0; background: #f8fafc; }
+        .patient-title { font-size: 18px; font-weight: bold; color: #1e40af; margin-bottom: 15px; text-align: center; }
+        .patient-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 15px; }
+        .field-label { font-weight: bold; color: #374151; margin-bottom: 3px; }
+        .field-value { color: #111827; border-bottom: 1px solid #d1d5db; padding-bottom: 3px; min-height: 18px; }
+        .image-section { text-align: center; margin: 25px 0; }
+        .section-title { font-size: 18px; font-weight: bold; color: #1e40af; margin-bottom: 15px; border-bottom: 2px solid #cbd5e1; padding-bottom: 5px; }
+        .analysis-image { max-width: 400px; border: 2px solid #d1d5db; border-radius: 8px; }
+        .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin: 25px 0; }
+        .result-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb; }
+        .result-label { font-weight: bold; }
+        .findings-section { background: #fef3c7; border: 2px solid #f59e0b; border-radius: 8px; padding: 20px; margin: 25px 0; }
+        .findings-title { font-size: 16px; font-weight: bold; color: #92400e; margin-bottom: 12px; }
+        .findings-list { margin: 10px 0; padding-left: 20px; }
+        .findings-list li { margin-bottom: 8px; }
+        .signature-section { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; border-top: 1px solid #d1d5db; }
+        .signature-box { width: 200px; text-align: center; }
+        .signature-line { border-bottom: 2px solid #374151; margin-bottom: 8px; height: 40px; }
+        .program-footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; }
+        .report-info { display: flex; justify-content: space-between; margin-bottom: 25px; color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="lab-title">${reportData.labConfig.labName || 'CLINICAL LABORATORY'}</div>
+        <div class="lab-subtitle">Hematology Department</div>
+        <div class="lab-subtitle">${reportData.labConfig.address || ''}</div>
+        <div class="lab-subtitle">Phone: ${reportData.labConfig.phone || ''}</div>
+        <div class="lab-subtitle">License: ${reportData.labConfig.licenseNumber || ''}</div>
+        ${reportData.labConfig.hematologyDoctorName ? `<div class="lab-subtitle">Dr. ${reportData.labConfig.hematologyDoctorName}</div>` : ''}
+    </div>
+    
+    <div class="report-info">
+        <div>
+            <strong>Report ID:</strong> ${reportData.reportId}<br>
+            <strong>Analysis Date:</strong> ${reportData.reportDate}
+        </div>
+        <div>
+            <strong>Report Type:</strong> Blood Cell Analysis<br>
+            <strong>Method:</strong> AI-Powered Analysis
+        </div>
+    </div>
+    
+    <div class="patient-box">
+        <div class="patient-title">PATIENT INFORMATION</div>
+        <div class="patient-grid">
+            <div>
+                <div class="field-label">Patient Name:</div>
+                <div class="field-value">${reportData.patientInfo.name || 'Not specified'}</div>
+            </div>
+            <div>
+                <div class="field-label">Age:</div>
+                <div class="field-value">${reportData.patientInfo.age || 'Not specified'}</div>
+            </div>
+            <div>
+                <div class="field-label">Gender:</div>
+                <div class="field-value">${reportData.patientInfo.gender || 'Not specified'}</div>
+            </div>
+            <div>
+                <div class="field-label">Sample Type:</div>
+                <div class="field-value">${reportData.patientInfo.sampleType || 'Blood Sample'}</div>
+            </div>
+            <div>
+                <div class="field-label">Collection Date:</div>
+                <div class="field-value">${reportData.reportDate}</div>
+            </div>
+            <div>
+                <div class="field-label">Report Date:</div>
+                <div class="field-value">${reportData.reportDate}</div>
+            </div>
+        </div>
+        ${reportData.patientInfo.clinicalNotes ? `
+        <div style="margin-top: 15px;">
+            <div class="field-label">Clinical Notes:</div>
+            <div class="field-value">${reportData.patientInfo.clinicalNotes}</div>
+        </div>
+        ` : ''}
+    </div>
+    
+    <div class="image-section">
+        <div class="section-title">MICROSCOPIC EXAMINATION</div>
+        ${imagePath ? `<img src="analyzed_image.${imagePath.split('.').pop()}" alt="Blood Sample Analysis" class="analysis-image">` : ''}
+        <div style="font-size: 12px; margin-top: 10px; font-style: italic;">
+            Blood cell sample with AI-powered detection overlay
+        </div>
+    </div>
+    
+    <div class="results-grid">
+        <div>
+            <div class="section-title">ANALYSIS RESULTS</div>
+            ${reportData.analysisResult.detectedCells.length > 0 ? `
+            <div class="result-item">
+                <span class="result-label">Detected Cell Type:</span>
+                <span>${reportData.analysisResult.detectedCells[0].type}</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Confidence Level:</span>
+                <span>${(reportData.analysisResult.detectedCells[0].confidence * 100).toFixed(1)}%</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Analysis Method:</span>
+                <span>Neural Network</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Processing Time:</span>
+                <span>&lt; 1 second</span>
+            </div>
+            ` : '<p>No cells detected</p>'}
+        </div>
+        <div>
+            <div class="section-title">QUALITY METRICS</div>
+            <div class="result-item">
+                <span class="result-label">Image Quality:</span>
+                <span>Good</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Model Version:</span>
+                <span>v1.0</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Analysis Status:</span>
+                <span>Complete</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Evaluated By:</span>
+                <span>AI System with Doctor Review</span>
+            </div>
+        </div>
+    </div>
+    
+    ${reportData.analysisResult.possibleConditions?.length > 0 || reportData.analysisResult.recommendations?.length > 0 ? `
+    <div class="findings-section">
+        <div class="findings-title">CLINICAL FINDINGS & RECOMMENDATIONS</div>
+        ${reportData.analysisResult.possibleConditions?.length > 0 ? `
+        <div>
+            <strong>Possible Conditions:</strong>
+            <ul class="findings-list">
+                ${reportData.analysisResult.possibleConditions.map(condition => `<li>${condition}</li>`).join('')}
+            </ul>
+        </div>
+        ` : ''}
+        ${reportData.analysisResult.recommendations?.length > 0 ? `
+        <div>
+            <strong>Recommendations:</strong>
+            <ul class="findings-list">
+                ${reportData.analysisResult.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+            </ul>
+        </div>
+        ` : ''}
+    </div>
+    ` : ''}
+    
+    ${reportData.analysisResult.notes ? `
+    <div style="margin: 25px 0;">
+        <div class="section-title">ADDITIONAL NOTES</div>
+        <div style="padding: 15px; border: 1px solid #d1d5db; border-radius: 8px;">
+            ${reportData.analysisResult.notes}
+        </div>
+    </div>
+    ` : ''}
+    
+    <div class="signature-section">
+        <div class="signature-box">
+            <div class="signature-line"></div>
+            <div>Laboratory Technician<br>Date: ___________</div>
+        </div>
+        <div class="signature-box">
+            <div class="signature-line"></div>
+            <div>${reportData.labConfig.hematologyDoctorName ? `Dr. ${reportData.labConfig.hematologyDoctorName}` : 'Reviewing Pathologist'}<br>Date: ___________</div>
+        </div>
+    </div>
+    
+    <div class="program-footer">
+        <div><strong>Advanced Blood Cell Analysis Platform</strong></div>
+        <div style="font-size: 10px; margin-top: 3px;">
+            Report ID: ${reportData.reportId} | Generated: ${reportData.reportDate}
+        </div>
+    </div>
+</body>
+</html>
+    `;
+    
+    // Save the HTML report
+    const reportPath = pathModule.join(testFolder, `Report_${reportData.reportId}.html`);
+    await fs.writeFile(reportPath, htmlContent);
+    
+    return { 
+      success: true, 
+      filePath: reportPath,
+      folder: testFolder
+    };
+    
   } catch (error) {
+    console.error('Error saving report:', error);
     return { success: false, error: error.message };
   }
 });

@@ -13,7 +13,7 @@ import PatientInfoForm from './PatientInfoForm';
 import EditableCellType from './EditableCellType';
 
 const AnalysisResults: React.FC = () => {
-  const { analysisResult, updateRecommendations, updatePossibleConditions, updatePatientInfo, patientInfo } = useAnalysis();
+  const { analysisResult, updateRecommendations, updatePossibleConditions, updatePatientInfo, patientInfo, updateCellType } = useAnalysis();
   const [editingRecommendations, setEditingRecommendations] = useState(false);
   const [editingConditions, setEditingConditions] = useState(false);
   const [tempRecommendations, setTempRecommendations] = useState('');
@@ -30,13 +30,7 @@ const AnalysisResults: React.FC = () => {
     : "N/A";
 
   const handleCellTypeChange = (newType: any) => {
-    if (analysisResult && detectedCells.length > 0) {
-      const updatedCells = [...detectedCells];
-      updatedCells[0] = { ...updatedCells[0], type: newType };
-      // Update analysis result with new cell type - this would need context method
-      console.log('Cell type changed to:', newType);
-      toast.success('Cell type updated');
-    }
+    updateCellType(newType);
   };
   
   const getSeverityColor = (severity: string) => {
@@ -104,11 +98,52 @@ const AnalysisResults: React.FC = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <Card className="medical-card overflow-hidden">
-          <div className="p-4 bg-medical-red bg-opacity-5 border-b border-medical-red border-opacity-10">
+          <div className="p-4 bg-medical-red bg-opacity-5 border-b border-medical-red border-opacity-10 flex items-center justify-between">
             <h3 className="font-display font-medium flex items-center text-medical-dark">
               <Droplet size={16} className="text-medical-red mr-2" />
               Blood Cell Analysis
             </h3>
+            {/* Save Report Button */}
+            {window.electron && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={async () => {
+                  if (!analysisResult) return;
+                  
+                  try {
+                    const reportData = {
+                      reportId: `REP${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+                      patientInfo,
+                      analysisResult,
+                      reportDate: new Date().toLocaleString(),
+                      labConfig: {
+                        labName: '',
+                        address: '',
+                        phone: '',
+                        hematologyDoctorName: '',
+                        licenseNumber: '',
+                        logo: null
+                      }
+                    };
+
+                    const result = await window.electron.saveReport(reportData);
+                    if (result.success) {
+                      toast.success(`Report saved to: ${result.folder}`);
+                    } else {
+                      toast.error(`Failed to save report: ${result.error}`);
+                    }
+                  } catch (error) {
+                    console.error('Error saving report:', error);
+                    toast.error('Failed to save report');
+                  }
+                }}
+                className="text-xs"
+              >
+                <Save size={14} className="mr-1" />
+                Save Report
+              </Button>
+            )}
           </div>
           <CardContent className="p-4">
             <div className="flex flex-col divide-y">

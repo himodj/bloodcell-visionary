@@ -396,14 +396,46 @@ const FormalReportGeneratorNew: React.FC = () => {
           )}
         </div>
         
-        {/* Analyzed Image */}
+        {/* Analyzed Image with Bounding Box */}
         <div className="image-section">
           <div className="section-title">MICROSCOPIC EXAMINATION</div>
-          <img 
-            src={analysisResult.processedImage || analysisResult.image} 
-            alt="Blood Sample Analysis" 
-            className="analysis-image"
-          />
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <img 
+              src={analysisResult.processedImage || analysisResult.image} 
+              alt="Blood Sample Analysis" 
+              className="analysis-image"
+            />
+            {analysisResult.detectedCells.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: analysisResult.detectedCells[0].coordinates ? `${analysisResult.detectedCells[0].coordinates.y}%` : '37.5%',
+                left: analysisResult.detectedCells[0].coordinates ? `${analysisResult.detectedCells[0].coordinates.x}%` : '37.5%',
+                width: analysisResult.detectedCells[0].coordinates ? `${analysisResult.detectedCells[0].coordinates.width}%` : '25%',
+                height: analysisResult.detectedCells[0].coordinates ? `${analysisResult.detectedCells[0].coordinates.height}%` : '25%',
+                border: '2px solid #ef4444',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                aspectRatio: '1',
+                pointerEvents: 'none'
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  top: (analysisResult.detectedCells[0].coordinates?.y || 37.5) < 15 ? '100%' : '-25px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  backgroundColor: '#ef4444',
+                  color: 'white',
+                  padding: '4px 8px',
+                  fontSize: '10pt',
+                  fontWeight: 'bold',
+                  borderRadius: '4px',
+                  whiteSpace: 'nowrap',
+                  marginTop: (analysisResult.detectedCells[0].coordinates?.y || 37.5) < 15 ? '2px' : '0'
+                }}>
+                  {analysisResult.detectedCells[0].type}
+                </div>
+              </div>
+            )}
+          </div>
           <div className="image-caption">
             Blood cell sample with AI-powered detection overlay
           </div>

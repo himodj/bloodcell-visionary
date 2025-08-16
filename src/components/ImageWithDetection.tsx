@@ -36,18 +36,25 @@ const ImageWithDetection: React.FC<ImageWithDetectionProps> = ({
             {/* Detection overlay */}
             {primaryCell && (
               <div className="absolute inset-0 pointer-events-none">
-                {/* Red bounding box - centered with proper positioning */}
+                {/* Red bounding box - square and positioned on detected cell */}
                 <div
                   className="absolute border-2 border-red-500 bg-red-500 bg-opacity-10"
                   style={{
-                    left: '35%',
-                    top: '35%',
-                    width: '30%',
-                    height: '30%',
+                    left: primaryCell.coordinates ? `${primaryCell.coordinates.x}%` : '37.5%',
+                    top: primaryCell.coordinates ? `${primaryCell.coordinates.y}%` : '37.5%',
+                    width: primaryCell.coordinates ? `${primaryCell.coordinates.width}%` : '25%',
+                    height: primaryCell.coordinates ? `${primaryCell.coordinates.height}%` : '25%',
+                    aspectRatio: '1',
                   }}
                 >
-                  {/* Label on top of the box - positioned to stay within image */}
-                  <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-2 py-1 text-xs font-medium rounded shadow-lg whitespace-nowrap z-10">
+                  {/* Label positioned to stay within image bounds */}
+                  <div className="absolute bg-red-500 text-white px-2 py-1 text-xs font-medium rounded shadow-lg whitespace-nowrap z-10"
+                       style={{
+                         top: primaryCell.coordinates && primaryCell.coordinates.y < 15 ? '100%' : '-25px',
+                         left: '50%',
+                         transform: 'translateX(-50%)',
+                         marginTop: primaryCell.coordinates && primaryCell.coordinates.y < 15 ? '2px' : '0'
+                       }}>
                     {primaryCell.type}
                   </div>
                 </div>
