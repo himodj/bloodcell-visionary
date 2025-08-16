@@ -81,6 +81,17 @@ interface ElectronAPI {
     folder?: string;
     error?: string;
   }>;
+  getPatientReports: () => Promise<{
+    success: boolean;
+    reports: Array<{
+      id: string;
+      patientName: string;
+      cellType: string;
+      reportDate: string;
+      folderPath: string;
+    }>;
+  }>;
+  openReportFolder: (folderPath: string) => Promise<void>;
 }
 
 interface Window {

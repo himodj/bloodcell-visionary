@@ -275,6 +275,29 @@ const FormalReportGeneratorNew: React.FC = () => {
               border-top: 1px solid #e5e7eb !important;
               padding-top: 10px !important;
             }
+
+            .print-image-container {
+              position: relative !important;
+              display: inline-block !important;
+            }
+
+            .print-bounding-box {
+              position: absolute !important;
+              border: 2px solid #ef4444 !important;
+              background-color: rgba(239, 68, 68, 0.1) !important;
+              pointer-events: none !important;
+            }
+
+            .print-cell-label {
+              position: absolute !important;
+              background-color: #ef4444 !important;
+              color: white !important;
+              padding: 2px 6px !important;
+              font-size: 9pt !important;
+              font-weight: bold !important;
+              border-radius: 3px !important;
+              white-space: nowrap !important;
+            }
             
             .report-info {
               display: flex !important;
@@ -399,41 +422,31 @@ const FormalReportGeneratorNew: React.FC = () => {
         {/* Analyzed Image with Bounding Box */}
         <div className="image-section">
           <div className="section-title">MICROSCOPIC EXAMINATION</div>
-          <div style={{ position: 'relative', display: 'inline-block' }}>
+          <div className="print-image-container">
             <img 
               src={analysisResult.processedImage || analysisResult.image} 
               alt="Blood Sample Analysis" 
               className="analysis-image"
             />
             {analysisResult.detectedCells.length > 0 && (
-              <div style={{
-                position: 'absolute',
-                top: analysisResult.detectedCells[0].coordinates ? `${analysisResult.detectedCells[0].coordinates.y}%` : '37.5%',
-                left: analysisResult.detectedCells[0].coordinates ? `${analysisResult.detectedCells[0].coordinates.x}%` : '37.5%',
-                width: analysisResult.detectedCells[0].coordinates ? `${analysisResult.detectedCells[0].coordinates.width}%` : '25%',
-                height: analysisResult.detectedCells[0].coordinates ? `${analysisResult.detectedCells[0].coordinates.height}%` : '25%',
-                border: '2px solid #ef4444',
-                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                aspectRatio: '1',
-                pointerEvents: 'none'
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  top: (analysisResult.detectedCells[0].coordinates?.y || 37.5) < 15 ? '100%' : '-25px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  backgroundColor: '#ef4444',
-                  color: 'white',
-                  padding: '4px 8px',
-                  fontSize: '10pt',
-                  fontWeight: 'bold',
-                  borderRadius: '4px',
-                  whiteSpace: 'nowrap',
-                  marginTop: (analysisResult.detectedCells[0].coordinates?.y || 37.5) < 15 ? '2px' : '0'
+              <>
+                <div className="print-bounding-box" style={{
+                  top: analysisResult.detectedCells[0].coordinates ? `${analysisResult.detectedCells[0].coordinates.y}%` : '37.5%',
+                  left: analysisResult.detectedCells[0].coordinates ? `${analysisResult.detectedCells[0].coordinates.x}%` : '37.5%',
+                  width: analysisResult.detectedCells[0].coordinates ? `${analysisResult.detectedCells[0].coordinates.width}%` : '25%',
+                  height: analysisResult.detectedCells[0].coordinates ? `${analysisResult.detectedCells[0].coordinates.height}%` : '25%',
+                }}>
+                </div>
+                <div className="print-cell-label" style={{
+                  top: (analysisResult.detectedCells[0].coordinates?.y || 37.5) < 15 ? 
+                    `${(analysisResult.detectedCells[0].coordinates?.y || 37.5) + (analysisResult.detectedCells[0].coordinates?.height || 25) + 2}%` : 
+                    `${(analysisResult.detectedCells[0].coordinates?.y || 37.5) - 3}%`,
+                  left: `${(analysisResult.detectedCells[0].coordinates?.x || 37.5) + ((analysisResult.detectedCells[0].coordinates?.width || 25) / 2)}%`,
+                  transform: 'translateX(-50%)'
                 }}>
                   {analysisResult.detectedCells[0].type}
                 </div>
-              </div>
+              </>
             )}
           </div>
           <div className="image-caption">
@@ -538,7 +551,7 @@ const FormalReportGeneratorNew: React.FC = () => {
         
         {/* Program Footer */}
         <div className="program-footer">
-          <div><strong>Advanced Blood Cell Analysis Platform</strong></div>
+          <div><strong>BloodCellVision</strong></div>
           <div style={{ fontSize: '8pt', marginTop: '3px' }}>
             Report ID: {reportId} | Generated: {reportDate}
           </div>

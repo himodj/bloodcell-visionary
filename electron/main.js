@@ -601,8 +601,9 @@ ipcMain.handle('save-report', async (event, reportData) => {
     
     // Generate unique folder name for this patient/test
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const cellType = reportData.analysisResult?.detectedCells?.[0]?.type || 'Unknown_Cell';
     const patientName = reportData.patientInfo.name || 'Unknown';
-    const testFolderName = `${patientName}_${reportData.reportId}_${timestamp}`.replace(/[<>:"/\\|?*]/g, '_');
+    const testFolderName = `${cellType}_${patientName}_${reportData.reportId}_${timestamp}`.replace(/[<>:"/\\|?*]/g, '_');
     const testFolder = pathModule.join(testArchiveDir, testFolderName);
     
     await fs.mkdir(testFolder, { recursive: true });
@@ -806,7 +807,7 @@ ipcMain.handle('save-report', async (event, reportData) => {
     </div>
     
     <div class="program-footer">
-        <div><strong>Advanced Blood Cell Analysis Platform</strong></div>
+        <div><strong>BloodCellVision</strong></div>
         <div style="font-size: 10px; margin-top: 3px;">
             Report ID: ${reportData.reportId} | Generated: ${reportData.reportDate}
         </div>
@@ -903,5 +904,65 @@ ipcMain.handle('check-file-exists', async (event, filePath) => {
   } catch (error) {
     console.error('Error checking if file exists:', error);
     return false;
+  }
+});
+
+ipcMain.handle('get-patient-reports', async () => {
+  try {
+    const pathModule = require('path');
+    const appDir = process.cwd();
+    const testArchiveDir = pathModule.join(appDir, 'test archive');
+    
+    if (!fs.existsSync(testArchiveDir)) {
+      return { success: true, reports: [] };
+    }
+    
+    const folders = fs.readdirSync(testArchiveDir);
+    const reports = [];
+    
+    for (const folder of folders) {
+      const folderPath = pathModule.join(testArchiveDir, folder);
+      const stat = fs.statSync(folderPath);
+      
+      if (stat.isDirectory()) {
+        try {
+          // Parse folder name: CellType_PatientName_ReportID_Timestamp
+          const parts = folder.split('_');
+          if (parts.length >= 2) {
+            const cellType = parts[0];
+            const patientName = parts[1];
+            const reportDate = stat.ctime.toLocaleDateString();
+            
+            reports.push({
+              id: folder,
+              patientName: patientName.replace(/_/g, ' '),
+              cellType: cellType.replace(/_/g, ' '),
+              reportDate: reportDate,
+              folderPath: folderPath
+            });
+          }
+        } catch (err) {
+          console.error('Error parsing folder name:', folder, err);
+        }
+      }
+    }
+    
+    // Sort by date, newest first
+    reports.sort((a, b) => new Date(b.reportDate) - new Date(a.reportDate));
+    
+    return { success: true, reports };
+  } catch (error) {
+    console.error('Error getting patient reports:', error);
+    return { success: false, reports: [] };
+  }
+});
+
+ipcMain.handle('open-report-folder', async (event, folderPath) => {
+  try {
+    const { shell } = require('electron');
+    await shell.openPath(folderPath);
+  } catch (error) {
+    console.error('Error opening report folder:', error);
+    throw error;
   }
 });
