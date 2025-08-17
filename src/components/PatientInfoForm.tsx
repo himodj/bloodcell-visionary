@@ -109,13 +109,16 @@ const PatientInfoForm: React.FC<PatientInfoFormProps> = ({
             {isEditing ? (
               <Input
                 id="patient-age"
+                type="number"
+                min="0"
+                max="150"
                 value={formData.age}
                 onChange={(e) => handleInputChange('age', e.target.value)}
                 placeholder="Enter age"
               />
             ) : (
               <div className="p-2 bg-gray-50 rounded min-h-[40px] flex items-center">
-                {patientInfo.age || 'Not specified'}
+                {patientInfo.age ? `${patientInfo.age} years` : 'Not specified'}
               </div>
             )}
           </div>

@@ -365,6 +365,15 @@ try {
         };
       }
     };
+
+    // Add getPatientReports implementation
+    electronAPI.getPatientReports = () => ipcRenderer.invoke('get-patient-reports');
+    
+    // Add openReportFolder implementation
+    electronAPI.openReportFolder = (folderPath) => ipcRenderer.invoke('open-report-folder', folderPath);
+    
+    // Add loadAnalysisFromReport implementation
+    electronAPI.loadAnalysisFromReport = (folderPath) => ipcRenderer.invoke('load-analysis-from-report', folderPath);
   } else {
     console.error('Failed to load axios. The application will use the fallback implementation');
   }
@@ -394,7 +403,10 @@ try {
       isPythonServerRunning: () => Promise.resolve(false),
       checkRequirements: () => Promise.resolve({ error: 'Not in Electron environment', all_ok: false }),
       installRequirements: () => Promise.resolve({ error: 'Not in Electron environment', success: false }),
-      saveReport: () => Promise.resolve({ success: false, error: 'Not in Electron environment' })
+      saveReport: () => Promise.resolve({ success: false, error: 'Not in Electron environment' }),
+      getPatientReports: () => Promise.resolve({ success: false, reports: [] }),
+      openReportFolder: () => Promise.resolve(),
+      loadAnalysisFromReport: () => Promise.resolve({ success: false, error: 'Not in Electron environment' })
     };
     console.log('Created browser fallback for electron API');
   } catch (fallbackError) {

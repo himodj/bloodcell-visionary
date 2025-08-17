@@ -966,3 +966,28 @@ ipcMain.handle('open-report-folder', async (event, folderPath) => {
     throw error;
   }
 });
+
+ipcMain.handle('load-analysis-from-report', async (event, folderPath) => {
+  try {
+    const pathModule = require('path');
+    const analysisDataPath = pathModule.join(folderPath, 'analysis_data.json');
+    
+    if (!fs.existsSync(analysisDataPath)) {
+      return { success: false, error: 'Analysis data not found' };
+    }
+    
+    const analysisData = JSON.parse(fs.readFileSync(analysisDataPath, 'utf8'));
+    
+    // Also load the image if it exists
+    const imagePath = pathModule.join(folderPath, 'analyzed_image.png');
+    if (fs.existsSync(imagePath)) {
+      const imageData = fs.readFileSync(imagePath);
+      analysisData.imageDataUrl = `data:image/png;base64,${imageData.toString('base64')}`;
+    }
+    
+    return { success: true, analysis: analysisData };
+  } catch (error) {
+    console.error('Error loading analysis from report:', error);
+    return { success: false, error: error.message };
+  }
+});

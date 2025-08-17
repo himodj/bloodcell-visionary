@@ -92,6 +92,11 @@ interface ElectronAPI {
     }>;
   }>;
   openReportFolder: (folderPath: string) => Promise<void>;
+  loadAnalysisFromReport: (folderPath: string) => Promise<{
+    success: boolean;
+    analysis?: any;
+    error?: string;
+  }>;
 }
 
 interface Window {

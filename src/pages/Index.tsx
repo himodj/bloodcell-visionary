@@ -8,7 +8,7 @@ import AnalysisResults from '../components/AnalysisResults';
 import PatientInfo from '../components/PatientInfoForm';
 import FormalReportGeneratorNew from '../components/FormalReportGeneratorNew';
 import { Button } from '@/components/ui/button';
-import { Settings } from 'lucide-react';
+import { Settings, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const AnalysisWorkflow: React.FC = () => {
@@ -25,18 +25,22 @@ const AnalysisWorkflow: React.FC = () => {
               alt="BloodCellVision Logo" 
               className="h-12 w-12"
             />
-            <h1 className="text-4xl font-bold" style={{ color: '#D21A1A' }}>
-              BloodCellVision
+            <h1 className="text-4xl font-bold">
+              <span className="text-gray-800">BloodCell</span>
+              <span style={{ color: '#D21A1A' }}>Vision</span>
             </h1>
           </div>
-          <p className="text-xl text-gray-600">
-            AI-powered microscopic blood cell identification and analysis
-          </p>
-          <div className="mt-4">
+          <div className="mt-4 flex gap-4 justify-center">
             <Link to="/management">
               <Button variant="outline" className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
                 Lab Management
+              </Button>
+            </Link>
+            <Link to="/search">
+              <Button variant="outline" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Search Reports
               </Button>
             </Link>
           </div>

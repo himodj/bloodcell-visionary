@@ -5,8 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Search, Settings, FileText, User, Calendar } from 'lucide-react';
+import { Search, Settings, FileText, User, Calendar, ArrowLeft, Upload, Image } from 'lucide-react';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
 interface PatientReport {
   id: string;
@@ -67,6 +68,18 @@ const Management: React.FC = () => {
     toast.success('Lab information saved successfully');
   };
 
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        setLabInfo({ ...labInfo, logo: result });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const openReport = async (report: PatientReport) => {
     if (!window.electron) return;
     
@@ -94,11 +107,20 @@ const Management: React.FC = () => {
               alt="BloodCellVision Logo" 
               className="h-12 w-12"
             />
-            <h1 className="text-4xl font-bold" style={{ color: '#D21A1A' }}>
-              BloodCellVision
+            <h1 className="text-4xl font-bold">
+              <span className="text-gray-800">BloodCell</span>
+              <span style={{ color: '#D21A1A' }}>Vision</span>
             </h1>
           </div>
           <p className="text-gray-600">Laboratory Management System</p>
+          <div className="mt-4">
+            <Link to="/">
+              <Button variant="outline" className="flex items-center gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Back to Analysis
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Lab Information Settings */}
@@ -158,6 +180,38 @@ const Management: React.FC = () => {
                 rows={3}
               />
             </div>
+            
+            {/* Lab Logo Upload */}
+            <div>
+              <Label htmlFor="logo">Lab Logo</Label>
+              <div className="flex items-center gap-4 mt-2">
+                {labInfo.logo && (
+                  <img 
+                    src={labInfo.logo} 
+                    alt="Lab Logo" 
+                    className="h-16 w-16 object-contain border rounded"
+                  />
+                )}
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                    id="logo-upload"
+                  />
+                  <label htmlFor="logo-upload">
+                    <Button variant="outline" className="cursor-pointer" asChild>
+                      <span className="flex items-center gap-2">
+                        <Upload className="h-4 w-4" />
+                        Upload Logo
+                      </span>
+                    </Button>
+                  </label>
+                </div>
+              </div>
+            </div>
+
             <Button onClick={saveLabInfo} className="mt-4">
               Save Lab Information
             </Button>
