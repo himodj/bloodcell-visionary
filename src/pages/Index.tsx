@@ -4,9 +4,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ImageUploader from '../components/ImageUploader';
 import ModelLoader from '../components/ModelLoader';
-import AnalysisResults from '../components/AnalysisResults';
 import PatientInfo from '../components/PatientInfoForm';
-import FormalReportGeneratorNew from '../components/FormalReportGeneratorNew';
 import { Button } from '@/components/ui/button';
 import { Settings, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -19,17 +17,6 @@ const AnalysisWorkflow: React.FC = () => {
       <Header />
       <main className="container mx-auto px-4 py-8 space-y-8">
         <div className="text-center mb-12">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <img 
-              src="/lovable-uploads/623308ff-1ed1-4208-9ef4-41e4d60d733d.png" 
-              alt="BloodCellVision Logo" 
-              className="h-12 w-12"
-            />
-            <h1 className="text-4xl font-bold">
-              <span className="text-gray-800">BloodCell</span>
-              <span style={{ color: '#D21A1A' }}>Vision</span>
-            </h1>
-          </div>
           <div className="mt-4 flex gap-4 justify-center">
             <Link to="/management">
               <Button variant="outline" className="flex items-center gap-2">
@@ -69,9 +56,14 @@ const AnalysisWorkflow: React.FC = () => {
         )}
         
         {analysisResult && (
-          <div className="space-y-8">
-            <AnalysisResults />
-            <FormalReportGeneratorNew />
+          <div className="text-center py-10">
+            <h2 className="text-2xl font-bold mb-4 text-gray-800">Analysis Complete!</h2>
+            <p className="text-gray-600 mb-6">Your blood cell analysis has been completed successfully.</p>
+            <Link to="/analysis">
+              <Button className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg text-lg">
+                View Results
+              </Button>
+            </Link>
           </div>
         )}
       </main>

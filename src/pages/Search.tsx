@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Search, User, Calendar, ArrowLeft, Eye } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Search, User, Calendar, ArrowLeft, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -13,11 +14,16 @@ interface PatientReport {
   cellType: string;
   reportDate: string;
   folderPath: string;
+  age?: string;
+  gender?: string;
 }
 
 const SearchPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [reports, setReports] = useState<PatientReport[]>([]);
+  const [ageFilter, setAgeFilter] = useState('');
+  const [genderFilter, setGenderFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -43,8 +49,8 @@ const SearchPage: React.FC = () => {
     try {
       const result = await window.electron.loadAnalysisFromReport(report.folderPath);
       if (result.success) {
-        // Navigate back to main page with the loaded analysis
-        navigate('/', { state: { loadedAnalysis: result.analysis } });
+        // Navigate to analysis page with the loaded analysis
+        navigate('/analysis', { state: { loadedAnalysis: result.analysis } });
         toast.success('Analysis loaded successfully');
       } else {
         toast.error('Failed to load analysis data');
@@ -66,10 +72,16 @@ const SearchPage: React.FC = () => {
     }
   };
 
-  const filteredReports = reports.filter(report =>
-    report.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    report.cellType.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredReports = reports.filter(report => {
+    const matchesSearch = report.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      report.cellType.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesAge = !ageFilter || (report.age && report.age.includes(ageFilter));
+    const matchesGender = !genderFilter || report.gender === genderFilter;
+    const matchesDate = !dateFilter || report.reportDate.includes(dateFilter);
+    
+    return matchesSearch && matchesAge && matchesGender && matchesDate;
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -108,7 +120,7 @@ const SearchPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="mb-6">
-              <div className="relative">
+              <div className="relative mb-4">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   placeholder="Search by patient name or cell type..."
@@ -116,6 +128,48 @@ const SearchPage: React.FC = () => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
                 />
+              </div>
+              
+              {/* Filters */}
+              <div className="flex items-center gap-4 mb-4">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-700">Filters:</span>
+                </div>
+                <Select value={genderFilter} onValueChange={setGenderFilter}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Genders</SelectItem>
+                    <SelectItem value="Male">Male</SelectItem>
+                    <SelectItem value="Female">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  placeholder="Age"
+                  value={ageFilter}
+                  onChange={(e) => setAgeFilter(e.target.value)}
+                  className="w-24"
+                />
+                <Input
+                  placeholder="Date (YYYY-MM-DD)"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="w-40"
+                />
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    setAgeFilter('');
+                    setGenderFilter('');
+                    setDateFilter('');
+                    setSearchQuery('');
+                  }}
+                >
+                  Clear Filters
+                </Button>
               </div>
             </div>
 
@@ -136,6 +190,8 @@ const SearchPage: React.FC = () => {
                         <h3 className="font-medium">{report.patientName}</h3>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant="outline">{report.cellType}</Badge>
+                          {report.age && <Badge variant="secondary">Age: {report.age}</Badge>}
+                          {report.gender && <Badge variant="secondary">{report.gender}</Badge>}
                           <span className="text-sm text-gray-500 flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
                             {report.reportDate}
@@ -144,14 +200,6 @@ const SearchPage: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => viewReport(report)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
                       <Button 
                         size="sm"
                         onClick={() => openReport(report)}

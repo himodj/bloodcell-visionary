@@ -23,7 +23,9 @@ const FormalReportGeneratorNew: React.FC = () => {
   const reportId = generateReportId();
   const reportDate = formatReportDate(analysisResult.analysisDate);
   
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    // Save report first, then print
+    await handleSaveReport();
     window.print();
   };
 
@@ -527,6 +529,16 @@ const FormalReportGeneratorNew: React.FC = () => {
           </div>
         )}
         
+        {/* Doctor Notes */}
+        {analysisResult.doctorNotes && (
+          <div style={{ marginBottom: '25px' }}>
+            <div className="section-title">DOCTOR NOTES</div>
+            <div style={{ padding: '15px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '11pt' }}>
+              {analysisResult.doctorNotes}
+            </div>
+          </div>
+        )}
+
         {/* Additional Notes */}
         {analysisResult.notes && (
           <div style={{ marginBottom: '25px' }}>
@@ -545,7 +557,7 @@ const FormalReportGeneratorNew: React.FC = () => {
           </div>
           <div className="signature-box">
             <div className="signature-line"></div>
-            <div className="signature-label">{labConfig.hematologyDoctorName ? `Dr. ${labConfig.hematologyDoctorName}` : 'Reviewing Pathologist'}<br />Date: ___________</div>
+            <div className="signature-label">{labConfig.hematologyDoctorName ? `Dr. ${labConfig.hematologyDoctorName}` : 'Reviewed by Doctor'}<br />Date: ___________</div>
           </div>
         </div>
         

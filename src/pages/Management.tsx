@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Search, Settings, FileText, User, Calendar, ArrowLeft, Upload, Image } from 'lucide-react';
+import { Settings, ArrowLeft, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 
@@ -27,8 +27,6 @@ interface LabInfo {
 }
 
 const Management: React.FC = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [reports, setReports] = useState<PatientReport[]>([]);
   const [labInfo, setLabInfo] = useState<LabInfo>({
     labName: '',
     address: '',
@@ -39,22 +37,9 @@ const Management: React.FC = () => {
   });
 
   useEffect(() => {
-    loadReports();
     loadLabInfo();
   }, []);
 
-  const loadReports = async () => {
-    if (!window.electron) return;
-    
-    try {
-      const result = await window.electron.getPatientReports();
-      if (result.success) {
-        setReports(result.reports);
-      }
-    } catch (error) {
-      console.error('Error loading reports:', error);
-    }
-  };
 
   const loadLabInfo = () => {
     const savedLabInfo = localStorage.getItem('labConfiguration');
@@ -80,21 +65,6 @@ const Management: React.FC = () => {
     }
   };
 
-  const openReport = async (report: PatientReport) => {
-    if (!window.electron) return;
-    
-    try {
-      await window.electron.openReportFolder(report.folderPath);
-    } catch (error) {
-      console.error('Error opening report:', error);
-      toast.error('Failed to open report folder');
-    }
-  };
-
-  const filteredReports = reports.filter(report =>
-    report.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    report.cellType.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -218,61 +188,6 @@ const Management: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Patient Reports Search */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Patient Reports
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search by patient name or cell type..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {filteredReports.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  {reports.length === 0 ? 'No reports found' : 'No reports match your search'}
-                </div>
-              ) : (
-                filteredReports.map((report) => (
-                  <div
-                    key={report.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                    onClick={() => openReport(report)}
-                  >
-                    <div className="flex items-center gap-4">
-                      <User className="h-8 w-8 text-gray-400" />
-                      <div>
-                        <h3 className="font-medium">{report.patientName}</h3>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline">{report.cellType}</Badge>
-                          <span className="text-sm text-gray-500 flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {report.reportDate}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Open Report
-                    </Button>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

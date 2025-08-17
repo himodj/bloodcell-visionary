@@ -54,6 +54,7 @@ export interface AnalysisResult {
   recommendations: string[];
   possibleConditions: string[];
   notes?: string;
+  doctorNotes?: string;
   patientInfo: PatientInfo;
 }
 
@@ -72,6 +73,7 @@ interface AnalysisContextType {
   setOriginalImage: (imageUrl: string | null) => void;
   updatePatientInfo: (info: PatientInfo) => void;
   updateCellType: (cellType: CellType) => void;
+  updateDoctorNotes: (notes: string) => void;
 }
 
 // Create the context
@@ -225,6 +227,14 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
     });
   };
 
+  const updateDoctorNotes = (notes: string) => {
+    if (!analysisResult) return;
+    setAnalysisResult({
+      ...analysisResult,
+      doctorNotes: notes,
+    });
+  };
+
   // Return the provider
   return (
     <AnalysisContext.Provider
@@ -242,6 +252,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
         setOriginalImage,
         updatePatientInfo,
         updateCellType,
+        updateDoctorNotes,
       }}
     >
       {children}

@@ -20,25 +20,25 @@ const Header: React.FC = () => {
     <header className="w-full py-4 px-6 glass-morphism mb-6 animate-slide-down">
       <div className="container mx-auto flex justify-between items-center">
         <div className="flex items-center space-x-4">
+          <div className="flex items-center">
+            <img 
+              src="/lovable-uploads/623308ff-1ed1-4208-9ef4-41e4d60d733d.png" 
+              alt="BloodCellVision Logo" 
+              className="h-10 w-10 mr-3"
+            />
+            <h1 className="text-2xl font-display font-semibold text-medical-dark">
+              BloodCell<span style={{ color: '#D21A1A' }}>Vision</span>
+            </h1>
+          </div>
           {analysisResult && (
             <Button 
               variant="ghost" 
               onClick={resetAnalysis}
-              className="group"
+              className="group ml-6"
             >
               <ArrowLeft size={18} className="mr-2 transition-transform group-hover:-translate-x-1" />
               <span>New Analysis</span>
             </Button>
-          )}
-          {!analysisResult && (
-            <div className="flex items-center">
-              <div className="w-10 h-10 rounded-full bg-medical-red flex items-center justify-center mr-3">
-                <div className="w-6 h-6 rounded-full bg-white"></div>
-              </div>
-              <h1 className="text-2xl font-display font-semibold text-medical-dark">
-                BloodCell<span className="text-medical-red">Vision</span>
-              </h1>
-            </div>
           )}
         </div>
         

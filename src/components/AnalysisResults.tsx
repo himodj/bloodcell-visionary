@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import ImageWithDetection from './ImageWithDetection';
 import PatientInfoForm from './PatientInfoForm';
 import EditableCellType from './EditableCellType';
+import DoctorNotes from './DoctorNotes';
 
 const AnalysisResults: React.FC = () => {
   const { analysisResult, updateRecommendations, updatePossibleConditions, updatePatientInfo, patientInfo, updateCellType } = useAnalysis();
@@ -320,6 +321,8 @@ const AnalysisResults: React.FC = () => {
           </CardContent>
         </Card>
       )}
+      
+      <DoctorNotes />
     </div>
   );
 };
