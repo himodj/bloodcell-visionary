@@ -9,6 +9,7 @@ import Analysis from "./pages/Analysis";
 import Management from "./pages/Management";
 import Search from "./pages/Search";
 import NotFound from "./pages/NotFound";
+import { AnalysisProvider } from "./contexts/AnalysisContext";
 
 const queryClient = new QueryClient();
 
@@ -18,13 +19,15 @@ const App = () => (
       <Toaster />
       <Sonner position="top-right" />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/analysis" element={<Analysis />} />
-          <Route path="/management" element={<Management />} />
-          <Route path="/search" element={<Search />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AnalysisProvider>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/analysis" element={<Analysis />} />
+            <Route path="/management" element={<Management />} />
+            <Route path="/search" element={<Search />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AnalysisProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

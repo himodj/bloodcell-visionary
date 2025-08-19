@@ -1,5 +1,5 @@
 import React from 'react';
-import { AnalysisProvider, useAnalysis } from '../contexts/AnalysisContext';
+import { useAnalysis } from '../contexts/AnalysisContext';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ImageUploader from '../components/ImageUploader';
@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Settings, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-const AnalysisWorkflow: React.FC = () => {
-  const { analysisResult, isAnalyzing, patientInfo, updatePatientInfo } = useAnalysis();
+const Index: React.FC = () => {
+  const { isAnalyzing, patientInfo, updatePatientInfo } = useAnalysis();
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -54,29 +54,9 @@ const AnalysisWorkflow: React.FC = () => {
             </p>
           </div>
         )}
-        
-        {analysisResult && (
-          <div className="text-center py-10">
-            <h2 className="text-2xl font-bold mb-4 text-gray-800">Analysis Complete!</h2>
-            <p className="text-gray-600 mb-6">Your blood cell analysis has been completed successfully.</p>
-            <Link to="/analysis">
-              <Button className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg text-lg">
-                View Results
-              </Button>
-            </Link>
-          </div>
-        )}
       </main>
       <Footer />
     </div>
-  );
-};
-
-const Index: React.FC = () => {
-  return (
-    <AnalysisProvider>
-      <AnalysisWorkflow />
-    </AnalysisProvider>
   );
 };
 
