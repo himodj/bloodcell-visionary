@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAnalysis } from '../contexts/AnalysisContext';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
@@ -7,10 +7,18 @@ import ModelLoader from '../components/ModelLoader';
 import PatientInfo from '../components/PatientInfoForm';
 import { Button } from '@/components/ui/button';
 import { Settings, FileText } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const Index: React.FC = () => {
-  const { isAnalyzing, patientInfo, updatePatientInfo } = useAnalysis();
+  const { isAnalyzing, patientInfo, updatePatientInfo, analysisResult } = useAnalysis();
+  const navigate = useNavigate();
+  
+  // Automatically navigate to analysis page when analysis is completed
+  useEffect(() => {
+    if (analysisResult && !isAnalyzing) {
+      navigate('/analysis');
+    }
+  }, [analysisResult, isAnalyzing, navigate]);
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">

@@ -2,7 +2,6 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { analyzeImage } from '../utils/analysisUtils';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
 
 // Define cell types based on the provided order
 export type CellType = 
@@ -86,8 +85,6 @@ interface AnalysisProviderProps {
 }
 
 export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) => {
-  const navigate = useNavigate();
-  
   // State variables
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
@@ -167,8 +164,6 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
   const finishAnalysis = (result: AnalysisResult) => {
     setIsAnalyzing(false);
     setAnalysisResult(result);
-    // Automatically navigate to analysis page
-    navigate('/analysis');
   };
 
   const resetAnalysis = () => {
