@@ -99,7 +99,7 @@ const SearchPage: React.FC = () => {
       report.cellType.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesAge = !ageFilter || (report.age && report.age.includes(ageFilter));
-    const matchesGender = !genderFilter || report.gender === genderFilter;
+    const matchesGender = !genderFilter || genderFilter === 'all' || report.gender === genderFilter;
     const matchesDate = !dateFilter || report.reportDate.includes(dateFilter);
     
     return matchesSearch && matchesAge && matchesGender && matchesDate;
@@ -165,7 +165,7 @@ const SearchPage: React.FC = () => {
                     <SelectValue placeholder="Gender" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Genders</SelectItem>
+                    <SelectItem value="all">All Genders</SelectItem>
                     <SelectItem value="Male">Male</SelectItem>
                     <SelectItem value="Female">Female</SelectItem>
                   </SelectContent>
@@ -187,7 +187,7 @@ const SearchPage: React.FC = () => {
                   size="sm"
                   onClick={() => {
                     setAgeFilter('');
-                    setGenderFilter('');
+                    setGenderFilter('all');
                     setDateFilter('');
                     setSearchQuery('');
                   }}
