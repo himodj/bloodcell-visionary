@@ -19,6 +19,8 @@ interface PatientReport {
 }
 
 const SearchPage: React.FC = () => {
+  console.log('SearchPage component rendering...');
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [reports, setReports] = useState<PatientReport[]>([]);
   const [ageFilter, setAgeFilter] = useState('');
@@ -27,12 +29,15 @@ const SearchPage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log('SearchPage useEffect running...');
     loadReports();
   }, []);
 
   const loadReports = async () => {
+    console.log('loadReports called, window.electron:', !!window.electron);
+    
     if (!window.electron) {
-      // Fallback for web preview - add some mock data
+      console.log('No electron API, using mock data');
       setReports([
         {
           id: '1',
@@ -42,24 +47,18 @@ const SearchPage: React.FC = () => {
           folderPath: '/mock/path',
           age: '35',
           gender: 'Male'
-        },
-        {
-          id: '2',
-          patientName: 'Jane Smith',
-          cellType: 'White Blood Cell',
-          reportDate: '2024-01-10',
-          folderPath: '/mock/path2',
-          age: '28',
-          gender: 'Female'
         }
       ]);
       return;
     }
     
     try {
+      console.log('Calling electron.getPatientReports...');
       const result = await window.electron.getPatientReports();
+      console.log('Reports result:', result);
       if (result.success) {
         setReports(result.reports);
+        console.log('Reports set:', result.reports.length);
       }
     } catch (error) {
       console.error('Error loading reports:', error);
@@ -106,6 +105,8 @@ const SearchPage: React.FC = () => {
     return matchesSearch && matchesAge && matchesGender && matchesDate;
   });
 
+  console.log('About to render SearchPage, reports count:', reports.length);
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-6xl mx-auto space-y-6">
