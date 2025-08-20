@@ -31,7 +31,30 @@ const SearchPage: React.FC = () => {
   }, []);
 
   const loadReports = async () => {
-    if (!window.electron) return;
+    if (!window.electron) {
+      // Fallback for web preview - add some mock data
+      setReports([
+        {
+          id: '1',
+          patientName: 'John Doe',
+          cellType: 'Red Blood Cell',
+          reportDate: '2024-01-15',
+          folderPath: '/mock/path',
+          age: '35',
+          gender: 'Male'
+        },
+        {
+          id: '2',
+          patientName: 'Jane Smith',
+          cellType: 'White Blood Cell',
+          reportDate: '2024-01-10',
+          folderPath: '/mock/path2',
+          age: '28',
+          gender: 'Female'
+        }
+      ]);
+      return;
+    }
     
     try {
       const result = await window.electron.getPatientReports();
