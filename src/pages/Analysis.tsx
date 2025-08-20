@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAnalysis } from '../contexts/AnalysisContext';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
@@ -6,10 +6,20 @@ import AnalysisResults from '../components/AnalysisResults';
 import FormalReportGeneratorNew from '../components/FormalReportGeneratorNew';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 const Analysis: React.FC = () => {
-  const { analysisResult } = useAnalysis();
+  const { analysisResult, finishAnalysis } = useAnalysis();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Check if analysis data was loaded from a report
+    const loadedAnalysis = location.state?.loadedAnalysis;
+    if (loadedAnalysis && !analysisResult) {
+      console.log('Loading analysis from navigation state:', loadedAnalysis);
+      finishAnalysis(loadedAnalysis);
+    }
+  }, [location.state, analysisResult, finishAnalysis]);
   
   if (!analysisResult) {
     return (
