@@ -36,8 +36,10 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: preloadPath,
-      webSecurity: true,
-      sandbox: false, // Disable sandbox to allow Node.js modules in preload
+      webSecurity: false,
+      sandbox: false,
+      enableRemoteModule: false,
+      allowRunningInsecureContent: false,
     },
     title: "BloodCell Analyzer",
     icon: path.join(__dirname, 'icon.ico')
