@@ -822,6 +822,22 @@ ipcMain.handle('save-report', async (event, reportData) => {
     const reportPath = pathModule.join(testFolder, `Report_${reportData.reportId}.html`);
     await fs.writeFile(reportPath, htmlContent);
     
+    // Save the analysis data as JSON for reopening later
+    const analysisDataPath = pathModule.join(testFolder, 'analysis_data.json');
+    const analysisData = {
+      image: reportData.analysisResult.image,
+      processedImage: reportData.analysisResult.processedImage || reportData.analysisResult.image,
+      analysisDate: new Date(),
+      cellCounts: reportData.analysisResult.cellCounts || {},
+      detectedCells: reportData.analysisResult.detectedCells || [],
+      abnormalityRate: reportData.analysisResult.abnormalityRate || 0,
+      recommendations: reportData.analysisResult.recommendations || [],
+      possibleConditions: reportData.analysisResult.possibleConditions || reportData.analysisResult.conditions || [],
+      doctorNotes: reportData.analysisResult.doctorNotes || '',
+      patientInfo: reportData.patientInfo
+    };
+    await fs.writeFile(analysisDataPath, JSON.stringify(analysisData, null, 2));
+    
     return { 
       success: true, 
       filePath: reportPath,
