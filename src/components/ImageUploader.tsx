@@ -1,12 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { useAnalysis } from '../contexts/AnalysisContext';
-import { handleImageUpload, analyzeImage, resizeImageWithCenterCrop, isModelInitialized } from '../utils/analysisUtils';
+import { handleImageUpload, resizeImageWithCenterCrop, isModelInitialized } from '../utils/analysisUtils';
 import { Button } from '@/components/ui/button';
 import { Upload, ImagePlus, X, Microscope, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 
 const ImageUploader: React.FC = () => {
-  const { setOriginalImage, startAnalysis, originalImage, isAnalyzing, finishAnalysis } = useAnalysis();
+  const { setOriginalImage, startAnalysis, originalImage, isAnalyzing } = useAnalysis();
   const [isDragging, setIsDragging] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -153,18 +153,8 @@ const ImageUploader: React.FC = () => {
       return;
     }
     
-    try {
-      startAnalysis();
-      const result = await analyzeImage(originalImage);
-      finishAnalysis(result);
-    } catch (error) {
-      console.error('Analysis failed:', error);
-      if (error instanceof Error) {
-        toast.error(`Analysis failed: ${error.message}`);
-      } else {
-        toast.error('Analysis failed with an unknown error');
-      }
-    }
+    // Only trigger the context's startAnalysis - it handles everything
+    startAnalysis();
   };
 
   return (
