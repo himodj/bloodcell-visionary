@@ -66,7 +66,34 @@ const SearchPage: React.FC = () => {
   };
 
   const openReport = async (report: PatientReport) => {
-    if (!window.electron) return;
+    if (!window.electron) {
+      // Browser mode - use mock data
+      const mockAnalysis = {
+        patientInfo: {
+          name: report.patientName,
+          age: report.age || '35',
+          gender: report.gender || 'Male',
+          id: report.id
+        },
+        analysisResult: {
+          cellCounts: {
+            "Red Blood Cell": 150,
+            "White Blood Cell": 25,
+            "Platelet": 75
+          },
+          analyzedCells: [],
+          totalCells: 250,
+          processedImageData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+          recommendations: ['Monitor blood cell levels regularly'],
+          conditions: ['Normal blood count'],
+          doctorNotes: 'Analysis reopened from saved report'
+        }
+      };
+      
+      navigate('/analysis', { state: { loadedAnalysis: mockAnalysis } });
+      toast.success('Analysis loaded successfully (Demo Mode)');
+      return;
+    }
     
     try {
       const result = await window.electron.loadAnalysisFromReport(report.folderPath);
