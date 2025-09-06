@@ -67,26 +67,27 @@ const SearchPage: React.FC = () => {
 
   const openReport = async (report: PatientReport) => {
     if (!window.electron) {
-      // Browser mode - use mock data
+      // Browser mode - use mock data that matches AnalysisResult interface
       const mockAnalysis = {
+        image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+        processedImage: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+        analysisDate: new Date(),
+        cellCounts: {
+          "Red Blood Cell": 150,
+          "White Blood Cell": 25,
+          "Platelet": 75
+        },
+        detectedCells: [],
+        abnormalityRate: 0.1,
+        recommendations: ['Monitor blood cell levels regularly'],
+        possibleConditions: ['Normal blood count'],
+        doctorNotes: 'Analysis reopened from saved report',
         patientInfo: {
           name: report.patientName,
           age: report.age || '35',
           gender: report.gender || 'Male',
-          id: report.id
-        },
-        analysisResult: {
-          cellCounts: {
-            "Red Blood Cell": 150,
-            "White Blood Cell": 25,
-            "Platelet": 75
-          },
-          analyzedCells: [],
-          totalCells: 250,
-          processedImageData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-          recommendations: ['Monitor blood cell levels regularly'],
-          conditions: ['Normal blood count'],
-          doctorNotes: 'Analysis reopened from saved report'
+          sampleType: 'Blood Sample',
+          clinicalNotes: ''
         }
       };
       
