@@ -838,6 +838,16 @@ ipcMain.handle('save-report', async (event, reportData) => {
     };
     await fs.writeFile(analysisDataPath, JSON.stringify(analysisData, null, 2));
     
+    // Save the processed image for reopening
+    if (reportData.analysisResult.processedImage || reportData.analysisResult.image) {
+      const imageDataUrl = reportData.analysisResult.processedImage || reportData.analysisResult.image;
+      if (imageDataUrl.startsWith('data:image/png;base64,')) {
+        const base64Data = imageDataUrl.replace(/^data:image\/png;base64,/, '');
+        const imagePath = pathModule.join(testFolder, 'analyzed_image.png');
+        await fs.writeFile(imagePath, base64Data, 'base64');
+      }
+    }
+    
     return { 
       success: true, 
       filePath: reportPath,
