@@ -73,9 +73,14 @@ const SearchPage: React.FC = () => {
         processedImage: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
         analysisDate: new Date(),
         cellCounts: {
-          "Red Blood Cell": 150,
-          "White Blood Cell": 25,
-          "Platelet": 75
+          totalCells: 250,
+          normalCells: 225,
+          abnormalCells: 25,
+          detectedCells: {
+            "Neutrophil": 150,
+            "Lymphocyte": 75,
+            "Platelet": 25
+          }
         },
         detectedCells: [],
         abnormalityRate: 0.1,

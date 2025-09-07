@@ -824,11 +824,20 @@ ipcMain.handle('save-report', async (event, reportData) => {
     
     // Save the analysis data as JSON for reopening later
     const analysisDataPath = pathModule.join(testFolder, 'analysis_data.json');
+    const originalCellCounts = reportData.analysisResult.cellCounts || {};
+    const totalCells = Object.values(originalCellCounts).reduce((sum, count) => sum + count, 0);
+    const abnormalCells = Math.floor((reportData.analysisResult.abnormalityRate || 0) * totalCells);
+    
     const analysisData = {
       image: reportData.analysisResult.image,
       processedImage: reportData.analysisResult.processedImage || reportData.analysisResult.image,
       analysisDate: new Date(),
-      cellCounts: reportData.analysisResult.cellCounts || {},
+      cellCounts: {
+        totalCells: totalCells,
+        normalCells: totalCells - abnormalCells,
+        abnormalCells: abnormalCells,
+        detectedCells: originalCellCounts
+      },
       detectedCells: reportData.analysisResult.detectedCells || [],
       abnormalityRate: reportData.analysisResult.abnormalityRate || 0,
       recommendations: reportData.analysisResult.recommendations || [],
