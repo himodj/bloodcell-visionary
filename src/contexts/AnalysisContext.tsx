@@ -74,6 +74,7 @@ interface AnalysisContextType {
   updatePatientInfo: (info: PatientInfo) => void;
   updateCellType: (cellType: CellType) => void;
   updateDoctorNotes: (notes: string) => void;
+  setCurrentReportPath: (path: string | null) => void;
 }
 
 // Create the context
@@ -96,6 +97,32 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
     sampleType: 'Blood Sample',
     clinicalNotes: ''
   });
+  const [currentReportPath, setCurrentReportPath] = useState<string | null>(null);
+
+  // Auto-save function to persist changes to file
+  const saveChangesToFile = async (updatedResult: AnalysisResult) => {
+    if (!currentReportPath || !window.electron) return;
+    
+    try {
+      const reportData = {
+        reportId: `RPT_${Date.now()}`,
+        patientInfo,
+        analysisResult: updatedResult,
+        reportDate: new Date().toISOString(),
+        labConfig: {
+          name: "AI Pathology Laboratory",
+          address: "123 Medical Center Drive",
+          contact: "Phone: (555) 123-4567 | Email: lab@example.com",
+          logo: ""
+        }
+      };
+      
+      // Save updated report to the same path
+      await window.electron.saveReport(reportData);
+    } catch (error) {
+      console.error('Failed to auto-save changes:', error);
+    }
+  };
 
   // Analysis workflow functions
   const startAnalysis = async () => {
@@ -183,18 +210,24 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
   // Update functions
   const updateRecommendations = (recommendations: string[]) => {
     if (!analysisResult) return;
-    setAnalysisResult({
+    const updatedResult = {
       ...analysisResult,
       recommendations,
-    });
+    };
+    setAnalysisResult(updatedResult);
+    // Auto-save changes if this is a loaded report
+    saveChangesToFile(updatedResult);
   };
 
   const updatePossibleConditions = (conditions: string[]) => {
     if (!analysisResult) return;
-    setAnalysisResult({
+    const updatedResult = {
       ...analysisResult,
       possibleConditions: conditions,
-    });
+    };
+    setAnalysisResult(updatedResult);
+    // Auto-save changes if this is a loaded report
+    saveChangesToFile(updatedResult);
   };
 
   const updateProcessedImage = (imageUrl: string) => {
@@ -208,10 +241,13 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
   const updatePatientInfo = (info: PatientInfo) => {
     setPatientInfo(info);
     if (analysisResult) {
-      setAnalysisResult({
+      const updatedResult = {
         ...analysisResult,
         patientInfo: info,
-      });
+      };
+      setAnalysisResult(updatedResult);
+      // Auto-save changes if this is a loaded report
+      saveChangesToFile(updatedResult);
     }
   };
 
@@ -229,10 +265,13 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
 
   const updateDoctorNotes = (notes: string) => {
     if (!analysisResult) return;
-    setAnalysisResult({
+    const updatedResult = {
       ...analysisResult,
       doctorNotes: notes,
-    });
+    };
+    setAnalysisResult(updatedResult);
+    // Auto-save changes if this is a loaded report
+    saveChangesToFile(updatedResult);
   };
 
   // Return the provider
@@ -253,6 +292,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
         updatePatientInfo,
         updateCellType,
         updateDoctorNotes,
+        setCurrentReportPath,
       }}
     >
       {children}

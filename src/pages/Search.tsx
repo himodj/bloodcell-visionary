@@ -105,7 +105,7 @@ const SearchPage: React.FC = () => {
       const result = await window.electron.loadAnalysisFromReport(report.folderPath);
       if (result.success) {
         // Navigate to analysis page with the loaded analysis
-        navigate('/analysis', { state: { loadedAnalysis: result.analysis } });
+        navigate('/analysis', { state: { loadedAnalysis: result.analysis, reportPath: report.folderPath } });
         toast.success('Analysis loaded successfully');
       } else {
         toast.error('Failed to load analysis data');
