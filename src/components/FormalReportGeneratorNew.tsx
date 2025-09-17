@@ -8,7 +8,13 @@ import { toast } from 'sonner';
 import LabSettings, { LabConfiguration } from './LabSettings';
 
 const FormalReportGeneratorNew: React.FC = () => {
-  const { analysisResult, patientInfo } = useAnalysis();
+  const { 
+    analysisResult, 
+    patientInfo, 
+    currentReportPath,
+    setCurrentReportPath, 
+    setOriginalReportData 
+  } = useAnalysis();
   const [labConfig, setLabConfig] = useState<LabConfiguration>({
     labName: '',
     address: '',
@@ -44,11 +50,26 @@ const FormalReportGeneratorNew: React.FC = () => {
         labConfig
       };
 
-      const result = await window.electron.saveReport(reportData);
-      if (result.success) {
-        toast.success(`Report saved to: ${result.filePath}`);
+      // Check if this is an existing report or a new one
+      if (currentReportPath) {
+        // Update existing report
+        const result = await window.electron.updateExistingReport(currentReportPath, reportData);
+        if (result.success) {
+          toast.success('Report updated successfully');
+        } else {
+          toast.error(`Failed to update report: ${result.error}`);
+        }
       } else {
-        toast.error(`Failed to save report: ${result.error}`);
+        // Create new report
+        const result = await window.electron.saveReport(reportData);
+        if (result.success) {
+          toast.success(`Report saved to: ${result.filePath}`);
+          // Set the current report path for future updates
+          setCurrentReportPath(result.filePath);
+          setOriginalReportData(reportData);
+        } else {
+          toast.error(`Failed to save report: ${result.error}`);
+        }
       }
     } catch (error) {
       console.error('Error saving report:', error);

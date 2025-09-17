@@ -64,6 +64,7 @@ interface AnalysisContextType {
   analysisResult: AnalysisResult | null;
   originalImage: string | null;
   patientInfo: PatientInfo;
+  currentReportPath: string | null;
   startAnalysis: () => void;
   finishAnalysis: (result: AnalysisResult) => void;
   resetAnalysis: () => void;
@@ -279,6 +280,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
         analysisResult,
         originalImage,
         patientInfo,
+        currentReportPath,
         startAnalysis,
         finishAnalysis,
         resetAnalysis,

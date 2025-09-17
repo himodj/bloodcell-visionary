@@ -14,7 +14,17 @@ import EditableCellType from './EditableCellType';
 import DoctorNotes from './DoctorNotes';
 
 const AnalysisResults: React.FC = () => {
-  const { analysisResult, updateRecommendations, updatePossibleConditions, updatePatientInfo, patientInfo, updateCellType } = useAnalysis();
+  const { 
+    analysisResult, 
+    updateRecommendations, 
+    updatePossibleConditions, 
+    updatePatientInfo, 
+    patientInfo, 
+    updateCellType,
+    currentReportPath,
+    setCurrentReportPath,
+    setOriginalReportData 
+  } = useAnalysis();
   const [editingRecommendations, setEditingRecommendations] = useState(false);
   const [editingConditions, setEditingConditions] = useState(false);
   const [tempRecommendations, setTempRecommendations] = useState('');
@@ -128,11 +138,26 @@ const AnalysisResults: React.FC = () => {
                       }
                     };
 
-                    const result = await window.electron.saveReport(reportData);
-                    if (result.success) {
-                      toast.success(`Report saved to: ${result.folder}`);
+                    // Check if this is an existing report or a new one
+                    if (currentReportPath) {
+                      // Update existing report
+                      const result = await window.electron.updateExistingReport(currentReportPath, reportData);
+                      if (result.success) {
+                        toast.success('Report updated successfully');
+                      } else {
+                        toast.error(`Failed to update report: ${result.error}`);
+                      }
                     } else {
-                      toast.error(`Failed to save report: ${result.error}`);
+                      // Create new report
+                      const result = await window.electron.saveReport(reportData);
+                      if (result.success) {
+                        toast.success(`Report saved to: ${result.folder}`);
+                        // Set the current report path for future updates
+                        setCurrentReportPath(result.folder);
+                        setOriginalReportData(reportData);
+                      } else {
+                        toast.error(`Failed to save report: ${result.error}`);
+                      }
                     }
                   } catch (error) {
                     console.error('Error saving report:', error);
