@@ -1022,9 +1022,170 @@ ipcMain.handle('load-analysis-from-report', async (event, folderPath) => {
       analysisData.imageDataUrl = `data:image/png;base64,${imageData.toString('base64')}`;
     }
     
-    return { success: true, analysis: analysisData };
+    // Load original report data for updating
+    const reportFiles = fs.readdirSync(folderPath).filter(file => file.startsWith('Report_') && file.endsWith('.html'));
+    let originalData = null;
+    if (reportFiles.length > 0) {
+      const reportId = reportFiles[0].replace('Report_', '').replace('.html', '');
+      originalData = {
+        reportId,
+        reportDate: analysisData.analysisDate,
+        labConfig: {
+          name: "AI Pathology Laboratory",
+          address: "123 Medical Center Drive",
+          contact: "Phone: (555) 123-4567 | Email: lab@example.com",
+          logo: ""
+        }
+      };
+    }
+    
+    return { success: true, analysis: analysisData, originalData };
   } catch (error) {
     console.error('Error loading analysis from report:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Add update existing report function
+ipcMain.handle('update-existing-report', async (event, folderPath, reportData) => {
+  try {
+    const fs = require('fs').promises;
+    const pathModule = require('path');
+    
+    // Update the analysis data JSON
+    const analysisDataPath = pathModule.join(folderPath, 'analysis_data.json');
+    const originalCellCounts = reportData.analysisResult.cellCounts || {};
+    const totalCells = Object.values(originalCellCounts).reduce((sum, count) => sum + count, 0);
+    const abnormalCells = Math.floor((reportData.analysisResult.abnormalityRate || 0) * totalCells);
+    
+    const analysisData = {
+      image: reportData.analysisResult.image,
+      processedImage: reportData.analysisResult.processedImage || reportData.analysisResult.image,
+      analysisDate: reportData.analysisResult.analysisDate,
+      cellCounts: {
+        totalCells: totalCells,
+        normalCells: totalCells - abnormalCells,
+        abnormalCells: abnormalCells,
+        detectedCells: originalCellCounts
+      },
+      detectedCells: reportData.analysisResult.detectedCells || [],
+      abnormalityRate: reportData.analysisResult.abnormalityRate || 0,
+      recommendations: reportData.analysisResult.recommendations || [],
+      possibleConditions: reportData.analysisResult.possibleConditions || reportData.analysisResult.conditions || [],
+      doctorNotes: reportData.analysisResult.doctorNotes || '',
+      patientInfo: reportData.patientInfo
+    };
+    
+    await fs.writeFile(analysisDataPath, JSON.stringify(analysisData, null, 2));
+    
+    // Also update the HTML report with new data
+    const reportFiles = require('fs').readdirSync(folderPath).filter(file => file.startsWith('Report_') && file.endsWith('.html'));
+    if (reportFiles.length > 0) {
+      const reportPath = pathModule.join(folderPath, reportFiles[0]);
+      
+      // Regenerate HTML content with updated data
+      const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lab Report ${reportData.reportId}</title>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+        .header { border-bottom: 3px solid #1e40af; padding-bottom: 20px; margin-bottom: 30px; }
+        .lab-title { font-size: 24px; font-weight: bold; color: #1e40af; margin-bottom: 8px; }
+        .lab-subtitle { font-size: 14px; color: #374151; margin-bottom: 3px; }
+        .patient-box { border: 2px solid #1e40af; padding: 20px; margin: 25px 0; background: #f8fafc; }
+        .patient-title { font-size: 18px; font-weight: bold; color: #1e40af; margin-bottom: 15px; text-align: center; }
+        .patient-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 15px; }
+        .field-label { font-weight: bold; color: #374151; margin-bottom: 3px; }
+        .field-value { color: #111827; border-bottom: 1px solid #d1d5db; padding-bottom: 3px; min-height: 18px; }
+        .image-section { text-align: center; margin: 25px 0; }
+        .section-title { font-size: 18px; font-weight: bold; color: #1e40af; margin-bottom: 15px; border-bottom: 2px solid #cbd5e1; padding-bottom: 5px; }
+        .analysis-image { max-width: 400px; border: 2px solid #d1d5db; border-radius: 8px; }
+        .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin: 25px 0; }
+        .result-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb; }
+        .result-label { font-weight: bold; }
+        .findings-section { background: #fef3c7; border: 2px solid #f59e0b; border-radius: 8px; padding: 20px; margin: 25px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="lab-title">${reportData.labConfig.name}</div>
+        <div class="lab-subtitle">${reportData.labConfig.address}</div>
+        <div class="lab-subtitle">${reportData.labConfig.contact}</div>
+    </div>
+    
+    <div class="patient-box">
+        <div class="patient-title">PATIENT INFORMATION</div>
+        <div class="patient-grid">
+            <div><div class="field-label">Patient Name:</div><div class="field-value">${reportData.patientInfo.name || 'Not specified'}</div></div>
+            <div><div class="field-label">Age:</div><div class="field-value">${reportData.patientInfo.age || 'Not specified'}</div></div>
+            <div><div class="field-label">Gender:</div><div class="field-value">${reportData.patientInfo.gender || 'Not specified'}</div></div>
+        </div>
+        <div><div class="field-label">Sample Type:</div><div class="field-value">${reportData.patientInfo.sampleType || 'Blood Sample'}</div></div>
+        <div style="margin-top: 15px;"><div class="field-label">Clinical Notes:</div><div class="field-value">${reportData.patientInfo.clinicalNotes || 'None'}</div></div>
+    </div>
+    
+    ${reportData.analysisResult.processedImage || reportData.analysisResult.image ? `
+    <div class="image-section">
+        <div class="section-title">ANALYZED SAMPLE IMAGE</div>
+        <img src="analyzed_image.png" alt="Analyzed Sample" class="analysis-image" onerror="this.style.display='none'"/>
+    </div>
+    ` : ''}
+    
+    <div class="section-title">BLOOD CELL ANALYSIS RESULTS</div>
+    <div class="results-grid">
+        <div>
+            <h4>Cell Count Summary</h4>
+            <div class="result-item"><span class="result-label">Total Cells:</span><span>${reportData.analysisResult.cellCounts?.totalCells || 'N/A'}</span></div>
+            <div class="result-item"><span class="result-label">Normal Cells:</span><span>${reportData.analysisResult.cellCounts?.normalCells || 'N/A'}</span></div>
+            <div class="result-item"><span class="result-label">Abnormal Cells:</span><span>${reportData.analysisResult.cellCounts?.abnormalCells || 'N/A'}</span></div>
+            <div class="result-item"><span class="result-label">Abnormality Rate:</span><span>${((reportData.analysisResult.abnormalityRate || 0) * 100).toFixed(1)}%</span></div>
+        </div>
+        <div>
+            <h4>Detected Cell Types</h4>
+            ${Object.entries(reportData.analysisResult.cellCounts?.detectedCells || {}).map(([cellType, count]) => 
+              `<div class="result-item"><span class="result-label">${cellType}:</span><span>${count}</span></div>`
+            ).join('')}
+        </div>
+    </div>
+    
+    ${reportData.analysisResult.recommendations?.length > 0 ? `
+    <div class="findings-section">
+        <div class="section-title">RECOMMENDATIONS</div>
+        <ul>${reportData.analysisResult.recommendations.map(rec => `<li>${rec}</li>`).join('')}</ul>
+    </div>
+    ` : ''}
+    
+    ${reportData.analysisResult.possibleConditions?.length > 0 ? `
+    <div class="findings-section">
+        <div class="section-title">POSSIBLE CONDITIONS</div>
+        <ul>${reportData.analysisResult.possibleConditions.map(condition => `<li>${condition}</li>`).join('')}</ul>
+    </div>
+    ` : ''}
+    
+    ${reportData.analysisResult.doctorNotes ? `
+    <div class="findings-section">
+        <div class="section-title">DOCTOR NOTES</div>
+        <p>${reportData.analysisResult.doctorNotes}</p>
+    </div>
+    ` : ''}
+    
+    <div style="margin-top: 40px; text-align: center; font-size: 12px; color: #6b7280;">
+        <p><strong>Report ID:</strong> ${reportData.reportId} | <strong>Generated:</strong> ${reportData.reportDate}</p>
+        <p>This report was generated using AI-assisted blood cell analysis</p>
+    </div>
+</body>
+</html>
+      `;
+      
+      await fs.writeFile(reportPath, htmlContent);
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating existing report:', error);
     return { success: false, error: error.message };
   }
 });

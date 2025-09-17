@@ -75,6 +75,7 @@ interface AnalysisContextType {
   updateCellType: (cellType: CellType) => void;
   updateDoctorNotes: (notes: string) => void;
   setCurrentReportPath: (path: string | null) => void;
+  setOriginalReportData: (data: any) => void;
 }
 
 // Create the context
@@ -98,27 +99,23 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
     clinicalNotes: ''
   });
   const [currentReportPath, setCurrentReportPath] = useState<string | null>(null);
+  const [originalReportData, setOriginalReportData] = useState<any>(null);
 
   // Auto-save function to persist changes to file
   const saveChangesToFile = async (updatedResult: AnalysisResult) => {
-    if (!currentReportPath || !window.electron) return;
+    if (!currentReportPath || !window.electron || !originalReportData) return;
     
     try {
+      // Use the original report data structure but with updated analysis result
       const reportData = {
-        reportId: `RPT_${Date.now()}`,
+        ...originalReportData,
         patientInfo,
         analysisResult: updatedResult,
-        reportDate: new Date().toISOString(),
-        labConfig: {
-          name: "AI Pathology Laboratory",
-          address: "123 Medical Center Drive",
-          contact: "Phone: (555) 123-4567 | Email: lab@example.com",
-          logo: ""
-        }
+        reportDate: originalReportData.reportDate, // Keep original date
       };
       
-      // Save updated report to the same path
-      await window.electron.saveReport(reportData);
+      // Update the existing report file instead of creating new
+      await window.electron.updateExistingReport(currentReportPath, reportData);
     } catch (error) {
       console.error('Failed to auto-save changes:', error);
     }
@@ -293,6 +290,7 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
         updateCellType,
         updateDoctorNotes,
         setCurrentReportPath,
+        setOriginalReportData,
       }}
     >
       {children}

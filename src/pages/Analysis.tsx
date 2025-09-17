@@ -9,7 +9,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 const Analysis: React.FC = () => {
-  const { analysisResult, finishAnalysis, setCurrentReportPath } = useAnalysis();
+  const { analysisResult, finishAnalysis, setCurrentReportPath, setOriginalReportData } = useAnalysis();
   const location = useLocation();
 
   useEffect(() => {
@@ -18,9 +18,12 @@ const Analysis: React.FC = () => {
     if (loadedAnalysis && !analysisResult) {
       console.log('Loading analysis from navigation state:', loadedAnalysis);
       finishAnalysis(loadedAnalysis);
-      // Set the current report path if provided
+      // Set the current report path and original data if provided
       if (location.state?.reportPath) {
         setCurrentReportPath(location.state.reportPath);
+      }
+      if (location.state?.originalReportData) {
+        setOriginalReportData(location.state.originalReportData);
       }
     }
   }, [location.state, analysisResult, finishAnalysis]);

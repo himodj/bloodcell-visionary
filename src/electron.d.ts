@@ -95,6 +95,11 @@ interface ElectronAPI {
   loadAnalysisFromReport: (folderPath: string) => Promise<{
     success: boolean;
     analysis?: any;
+    originalData?: any;
+    error?: string;
+  }>;
+  updateExistingReport: (folderPath: string, reportData: any) => Promise<{
+    success: boolean;
     error?: string;
   }>;
 }
