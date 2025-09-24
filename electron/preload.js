@@ -374,6 +374,20 @@ try {
     
     // Add loadAnalysisFromReport implementation
     electronAPI.loadAnalysisFromReport = (folderPath) => ipcRenderer.invoke('load-analysis-from-report', folderPath);
+    
+    // Add updateExistingReport implementation
+    electronAPI.updateExistingReport = async (folderPath, reportData) => {
+      try {
+        console.log('Updating existing report...');
+        return await ipcRenderer.invoke('update-existing-report', folderPath, reportData);
+      } catch (error) {
+        console.error('Error updating report:', error);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+    };
   } else {
     console.error('Failed to load axios. The application will use the fallback implementation');
   }
@@ -406,7 +420,8 @@ try {
       saveReport: () => Promise.resolve({ success: false, error: 'Not in Electron environment' }),
       getPatientReports: () => Promise.resolve({ success: false, reports: [] }),
       openReportFolder: () => Promise.resolve(),
-      loadAnalysisFromReport: () => Promise.resolve({ success: false, error: 'Not in Electron environment' })
+      loadAnalysisFromReport: () => Promise.resolve({ success: false, error: 'Not in Electron environment' }),
+      updateExistingReport: () => Promise.resolve({ success: false, error: 'Not in Electron environment' })
     };
     console.log('Created browser fallback for electron API');
   } catch (fallbackError) {
