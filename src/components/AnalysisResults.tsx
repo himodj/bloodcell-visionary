@@ -120,6 +120,11 @@ const AnalysisResults: React.FC = () => {
                 variant="outline" 
                 size="sm"
                 onClick={async () => {
+                  console.log('Save report button clicked');
+                  console.log('Current report path:', currentReportPath);
+                  console.log('Has current report path:', !!currentReportPath);
+                  console.log('Electron API available:', !!window.electron);
+                  
                   if (!analysisResult) return;
                   
                   try {
@@ -141,21 +146,27 @@ const AnalysisResults: React.FC = () => {
                     // Check if this is an existing report or a new one
                     if (currentReportPath) {
                       // Update existing report
+                      console.log('Updating existing report at:', currentReportPath);
                       const result = await window.electron.updateExistingReport(currentReportPath, reportData);
+                      console.log('Update result:', result);
                       if (result.success) {
                         toast.success('Report updated successfully');
                       } else {
+                        console.error('Update failed:', result.error);
                         toast.error(`Failed to update report: ${result.error}`);
                       }
                     } else {
                       // Create new report
+                      console.log('Creating new report');
                       const result = await window.electron.saveReport(reportData);
+                      console.log('Save result:', result);
                       if (result.success) {
                         toast.success(`Report saved to: ${result.folder}`);
                         // Set the current report path for future updates
                         setCurrentReportPath(result.folder);
                         setOriginalReportData(reportData);
                       } else {
+                        console.error('Save failed:', result.error);
                         toast.error(`Failed to save report: ${result.error}`);
                       }
                     }
