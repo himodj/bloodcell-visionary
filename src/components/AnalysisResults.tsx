@@ -115,17 +115,17 @@ const AnalysisResults: React.FC = () => {
               Blood Cell Analysis
             </h3>
             {/* Save Report Button */}
-            {window.electron && (
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={async () => {
-                  console.log('Save report button clicked');
-                  console.log('Current report path:', currentReportPath);
-                  console.log('Has current report path:', !!currentReportPath);
-                  console.log('Electron API available:', !!window.electron);
-                  
-                  if (!analysisResult) return;
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={async () => {
+                if (!analysisResult) return;
+                
+                // Check if running in Electron
+                if (!window.electron) {
+                  toast.error('Save functionality requires Electron desktop app');
+                  return;
+                }
                   
                   try {
                     const reportData = {
@@ -143,44 +143,37 @@ const AnalysisResults: React.FC = () => {
                       }
                     };
 
-                    // Check if this is an existing report or a new one
-                    if (currentReportPath) {
-                      // Update existing report
-                      console.log('Updating existing report at:', currentReportPath);
-                      const result = await window.electron.updateExistingReport(currentReportPath, reportData);
-                      console.log('Update result:', result);
-                      if (result.success) {
-                        toast.success('Report updated successfully');
-                      } else {
-                        console.error('Update failed:', result.error);
-                        toast.error(`Failed to update report: ${result.error}`);
-                      }
+                  // Check if this is an existing report or a new one
+                  if (currentReportPath) {
+                    // Update existing report
+                    const result = await window.electron.updateExistingReport(currentReportPath, reportData);
+                    if (result.success) {
+                      toast.success('Report updated successfully');
                     } else {
-                      // Create new report
-                      console.log('Creating new report');
-                      const result = await window.electron.saveReport(reportData);
-                      console.log('Save result:', result);
-                      if (result.success) {
-                        toast.success(`Report saved to: ${result.folder}`);
-                        // Set the current report path for future updates
-                        setCurrentReportPath(result.folder);
-                        setOriginalReportData(reportData);
-                      } else {
-                        console.error('Save failed:', result.error);
-                        toast.error(`Failed to save report: ${result.error}`);
-                      }
+                      toast.error(`Failed to update report: ${result.error}`);
                     }
-                  } catch (error) {
-                    console.error('Error saving report:', error);
-                    toast.error('Failed to save report');
+                  } else {
+                    // Create new report
+                    const result = await window.electron.saveReport(reportData);
+                    if (result.success) {
+                      toast.success(`Report saved successfully`);
+                      // Set the current report path for future updates
+                      setCurrentReportPath(result.folder);
+                      setOriginalReportData(reportData);
+                    } else {
+                      toast.error(`Failed to save report: ${result.error}`);
+                    }
                   }
-                }}
-                className="text-xs"
-              >
-                <Save size={14} className="mr-1" />
-                Save Report
-              </Button>
-            )}
+                } catch (error) {
+                  console.error('Error saving report:', error);
+                  toast.error('Failed to save report');
+                }
+              }}
+              className="text-xs"
+            >
+              <Save size={14} className="mr-1" />
+              Save Report
+            </Button>
           </div>
           <CardContent className="p-4">
             <div className="flex flex-col divide-y">
