@@ -149,6 +149,11 @@ const AnalysisResults: React.FC = () => {
                     const result = await window.electron.updateExistingReport(currentReportPath, reportData);
                     if (result.success) {
                       toast.success('Report updated successfully');
+                      // Update the current report path if the folder was renamed
+                      const newPath = (result as any).newFolderPath;
+                      if (newPath && newPath !== currentReportPath) {
+                        setCurrentReportPath(newPath);
+                      }
                     } else {
                       toast.error(`Failed to update report: ${result.error}`);
                     }

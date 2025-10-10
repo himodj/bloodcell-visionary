@@ -100,6 +100,7 @@ interface ElectronAPI {
   }>;
   updateExistingReport: (folderPath: string, reportData: any) => Promise<{
     success: boolean;
+    newFolderPath?: string;
     error?: string;
   }>;
 }

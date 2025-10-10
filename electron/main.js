@@ -1052,6 +1052,29 @@ ipcMain.handle('update-existing-report', async (event, folderPath, reportData) =
     const fs = require('fs').promises;
     const pathModule = require('path');
     
+    // Check if the folder name needs to be updated based on patient info
+    const folderName = pathModule.basename(folderPath);
+    const parts = folderName.split('_');
+    
+    // Parse current folder name: CellType_PatientName_ReportID_Timestamp
+    let needsRename = false;
+    let newFolderName = folderName;
+    
+    if (parts.length >= 4) {
+      const currentCellType = parts[0];
+      const currentPatientName = parts[1];
+      const reportId = parts[2];
+      const timestamp = parts.slice(3).join('_');
+      
+      const newCellType = (reportData.patientInfo?.sampleType || currentCellType).replace(/\s+/g, '_');
+      const newPatientName = (reportData.patientInfo?.name || currentPatientName).replace(/\s+/g, '_');
+      
+      if (newCellType !== currentCellType || newPatientName !== currentPatientName) {
+        needsRename = true;
+        newFolderName = `${newCellType}_${newPatientName}_${reportId}_${timestamp}`;
+      }
+    }
+    
     // Update the analysis data JSON
     const analysisDataPath = pathModule.join(folderPath, 'analysis_data.json');
     const originalCellCounts = reportData.analysisResult.cellCounts || {};
@@ -1183,7 +1206,19 @@ ipcMain.handle('update-existing-report', async (event, folderPath, reportData) =
       await fs.writeFile(reportPath, htmlContent);
     }
     
-    return { success: true };
+    // Rename folder if patient info changed
+    let finalFolderPath = folderPath;
+    if (needsRename) {
+      const parentDir = pathModule.dirname(folderPath);
+      const newFolderPath = pathModule.join(parentDir, newFolderName);
+      
+      // Rename the folder
+      await fs.rename(folderPath, newFolderPath);
+      finalFolderPath = newFolderPath;
+      console.log(`Renamed folder from ${folderPath} to ${newFolderPath}`);
+    }
+    
+    return { success: true, newFolderPath: finalFolderPath };
   } catch (error) {
     console.error('Error updating existing report:', error);
     return { success: false, error: error.message };
