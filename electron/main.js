@@ -1115,9 +1115,9 @@ ipcMain.handle('update-existing-report', async (event, folderPath, reportData) =
     await fs.writeFile(analysisDataPath, JSON.stringify(analysisData, null, 2));
     
     // Also update the HTML report with new data
-    const reportFiles = require('fs').readdirSync(folderPath).filter(file => file.startsWith('Report_') && file.endsWith('.html'));
+    const reportFiles = require('fs').readdirSync(absoluteFolderPath).filter(file => file.startsWith('Report_') && file.endsWith('.html'));
     if (reportFiles.length > 0) {
-      const reportPath = pathModule.join(folderPath, reportFiles[0]);
+      const reportPath = pathModule.join(absoluteFolderPath, reportFiles[0]);
       
       // Regenerate HTML content with updated data
       const htmlContent = `
