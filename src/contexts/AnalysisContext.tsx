@@ -116,7 +116,11 @@ export const AnalysisProvider: React.FC<AnalysisProviderProps> = ({ children }) 
       };
       
       // Update the existing report file instead of creating new
-      await window.electron.updateExistingReport(currentReportPath, reportData);
+      const result = await window.electron.updateExistingReport(currentReportPath, reportData);
+      // Update the current report path if the folder was renamed
+      if (result.success && result.newFolderPath && result.newFolderPath !== currentReportPath) {
+        setCurrentReportPath(result.newFolderPath);
+      }
     } catch (error) {
       console.error('Failed to auto-save changes:', error);
     }

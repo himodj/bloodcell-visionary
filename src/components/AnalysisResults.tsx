@@ -150,9 +150,8 @@ const AnalysisResults: React.FC = () => {
                     if (result.success) {
                       toast.success('Report updated successfully');
                       // Update the current report path if the folder was renamed
-                      const newPath = (result as any).newFolderPath;
-                      if (newPath && newPath !== currentReportPath) {
-                        setCurrentReportPath(newPath);
+                      if (result.newFolderPath && result.newFolderPath !== currentReportPath) {
+                        setCurrentReportPath(result.newFolderPath);
                         setOriginalReportData(reportData);
                       }
                     } else {

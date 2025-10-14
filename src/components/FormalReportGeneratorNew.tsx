@@ -56,6 +56,10 @@ const FormalReportGeneratorNew: React.FC = () => {
         const result = await window.electron.updateExistingReport(currentReportPath, reportData);
         if (result.success) {
           toast.success('Report updated successfully');
+          // Update the current report path if the folder was renamed
+          if (result.newFolderPath && result.newFolderPath !== currentReportPath) {
+            setCurrentReportPath(result.newFolderPath);
+          }
         } else {
           toast.error(`Failed to update report: ${result.error}`);
         }
