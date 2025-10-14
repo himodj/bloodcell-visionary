@@ -153,6 +153,7 @@ const AnalysisResults: React.FC = () => {
                       const newPath = (result as any).newFolderPath;
                       if (newPath && newPath !== currentReportPath) {
                         setCurrentReportPath(newPath);
+                        setOriginalReportData(reportData);
                       }
                     } else {
                       toast.error(`Failed to update report: ${result.error}`);
