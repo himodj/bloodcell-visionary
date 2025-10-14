@@ -1052,8 +1052,21 @@ ipcMain.handle('update-existing-report', async (event, folderPath, reportData) =
     const fs = require('fs').promises;
     const pathModule = require('path');
     
+    // Ensure the folderPath is absolute
+    const absoluteFolderPath = pathModule.isAbsolute(folderPath) 
+      ? folderPath 
+      : pathModule.join(process.cwd(), folderPath);
+    
+    // Check if the folder exists
+    try {
+      await fs.access(absoluteFolderPath);
+    } catch (error) {
+      console.error('Folder not found:', absoluteFolderPath);
+      return { success: false, error: `Folder not found: ${absoluteFolderPath}` };
+    }
+    
     // Check if the folder name needs to be updated based on patient info
-    const folderName = pathModule.basename(folderPath);
+    const folderName = pathModule.basename(absoluteFolderPath);
     const parts = folderName.split('_');
     
     // Parse current folder name: CellType_PatientName_ReportID_Timestamp
@@ -1076,7 +1089,7 @@ ipcMain.handle('update-existing-report', async (event, folderPath, reportData) =
     }
     
     // Update the analysis data JSON
-    const analysisDataPath = pathModule.join(folderPath, 'analysis_data.json');
+    const analysisDataPath = pathModule.join(absoluteFolderPath, 'analysis_data.json');
     const originalCellCounts = reportData.analysisResult.cellCounts || {};
     const totalCells = Object.values(originalCellCounts).reduce((sum, count) => sum + count, 0);
     const abnormalCells = Math.floor((reportData.analysisResult.abnormalityRate || 0) * totalCells);
@@ -1207,15 +1220,15 @@ ipcMain.handle('update-existing-report', async (event, folderPath, reportData) =
     }
     
     // Rename folder if patient info changed
-    let finalFolderPath = folderPath;
+    let finalFolderPath = absoluteFolderPath;
     if (needsRename) {
-      const parentDir = pathModule.dirname(folderPath);
+      const parentDir = pathModule.dirname(absoluteFolderPath);
       const newFolderPath = pathModule.join(parentDir, newFolderName);
       
       // Rename the folder
-      await fs.rename(folderPath, newFolderPath);
+      await fs.rename(absoluteFolderPath, newFolderPath);
       finalFolderPath = newFolderPath;
-      console.log(`Renamed folder from ${folderPath} to ${newFolderPath}`);
+      console.log(`Renamed folder from ${absoluteFolderPath} to ${newFolderPath}`);
     }
     
     return { success: true, newFolderPath: finalFolderPath };
