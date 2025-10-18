@@ -102,8 +102,8 @@ const FormalReportGeneratorNew: React.FC = () => {
             }
             
             @page {
-              size: A4 !important;
-              margin: 15mm !important;
+              size: A4 portrait !important;
+              margin: 12mm !important;
             }
             
             .no-print {
@@ -124,8 +124,8 @@ const FormalReportGeneratorNew: React.FC = () => {
               justify-content: space-between !important;
               align-items: center !important;
               border-bottom: 2px solid #1e40af !important;
-              padding-bottom: 10px !important;
-              margin-bottom: 15px !important;
+              padding-bottom: 6px !important;
+              margin-bottom: 8px !important;
             }
             
             .lab-info {
@@ -133,43 +133,44 @@ const FormalReportGeneratorNew: React.FC = () => {
             }
             
             .lab-title {
-              font-size: 14pt !important;
+              font-size: 12pt !important;
               font-weight: bold !important;
               color: #1e40af !important;
-              margin-bottom: 4px !important;
-            }
-            
-            .lab-subtitle {
-              font-size: 8pt !important;
-              color: #374151 !important;
               margin-bottom: 2px !important;
             }
             
+            .lab-subtitle {
+              font-size: 7pt !important;
+              color: #374151 !important;
+              margin-bottom: 1px !important;
+              line-height: 1.2 !important;
+            }
+            
             .lab-logo {
-              height: 45px !important;
+              height: 35px !important;
               object-fit: contain !important;
             }
             
             .patient-box {
               border: 1px solid #1e40af !important;
-              padding: 10px !important;
-              margin-bottom: 12px !important;
+              padding: 6px !important;
+              margin-bottom: 6px !important;
               background: #f8fafc !important;
             }
             
             .patient-title {
-              font-size: 11pt !important;
+              font-size: 9pt !important;
               font-weight: bold !important;
               color: #1e40af !important;
-              margin-bottom: 8px !important;
+              margin-bottom: 4px !important;
               text-align: center !important;
             }
             
             .patient-grid {
               display: grid !important;
               grid-template-columns: repeat(3, 1fr) !important;
-              gap: 8px !important;
-              margin-bottom: 8px !important;
+              gap: 4px !important;
+              margin-bottom: 4px !important;
             }
             
             .patient-field {
@@ -194,118 +195,120 @@ const FormalReportGeneratorNew: React.FC = () => {
             
             .image-section {
               text-align: center !important;
-              margin-bottom: 12px !important;
+              margin-bottom: 6px !important;
               page-break-inside: avoid !important;
             }
             
             .section-title {
-              font-size: 10pt !important;
+              font-size: 8pt !important;
               font-weight: bold !important;
               color: #1e40af !important;
-              margin-bottom: 8px !important;
+              margin-bottom: 4px !important;
               border-bottom: 1px solid #cbd5e1 !important;
-              padding-bottom: 3px !important;
+              padding-bottom: 2px !important;
             }
             
             .analysis-image {
-              max-width: 220px !important;
-              max-height: 220px !important;
+              max-width: 180px !important;
+              max-height: 180px !important;
               border: 1px solid #d1d5db !important;
-              border-radius: 4px !important;
+              border-radius: 3px !important;
             }
             
             .image-caption {
-              font-size: 7pt !important;
-              margin-top: 4px !important;
+              font-size: 6pt !important;
+              margin-top: 2px !important;
               font-style: italic !important;
+              color: #6b7280 !important;
             }
             
             .results-section {
               display: grid !important;
               grid-template-columns: 1fr 1fr !important;
-              gap: 15px !important;
-              margin-bottom: 12px !important;
+              gap: 8px !important;
+              margin-bottom: 6px !important;
             }
             
             .result-item {
               display: flex !important;
               justify-content: space-between !important;
-              padding: 4px 0 !important;
+              padding: 2px 0 !important;
               border-bottom: 1px solid #e5e7eb !important;
             }
             
             .result-label {
               font-weight: bold !important;
-              font-size: 9pt !important;
+              font-size: 8pt !important;
             }
             
             .result-value {
-              font-size: 9pt !important;
+              font-size: 8pt !important;
             }
             
             .findings-section {
               background: #fef3c7 !important;
               border: 1px solid #f59e0b !important;
-              border-radius: 4px !important;
-              padding: 10px !important;
-              margin-bottom: 12px !important;
-            }
-            
-            .findings-title {
-              font-size: 10pt !important;
-              font-weight: bold !important;
-              color: #92400e !important;
+              border-radius: 3px !important;
+              padding: 6px !important;
               margin-bottom: 6px !important;
             }
             
+            .findings-title {
+              font-size: 8pt !important;
+              font-weight: bold !important;
+              color: #92400e !important;
+              margin-bottom: 3px !important;
+            }
+            
             .findings-content {
-              font-size: 9pt !important;
-              line-height: 1.3 !important;
+              font-size: 7pt !important;
+              line-height: 1.2 !important;
             }
             
             .findings-list {
-              margin: 5px 0 !important;
-              padding-left: 15px !important;
+              margin: 2px 0 !important;
+              padding-left: 12px !important;
             }
             
             .findings-list li {
-              margin-bottom: 4px !important;
+              margin-bottom: 2px !important;
             }
             
             .signature-section {
               display: flex !important;
               justify-content: space-between !important;
-              margin-top: 15px !important;
-              padding-top: 10px !important;
+              margin-top: 8px !important;
+              padding-top: 6px !important;
               border-top: 1px solid #d1d5db !important;
             }
             
             .signature-box {
-              width: 150px !important;
+              width: 120px !important;
               text-align: center !important;
             }
             
             .signature-line {
               border-bottom: 1px solid #374151 !important;
-              margin-bottom: 4px !important;
-              height: 25px !important;
+              margin-bottom: 2px !important;
+              height: 18px !important;
             }
             
             .signature-label {
-              font-size: 8pt !important;
+              font-size: 6pt !important;
               color: #374151 !important;
+              line-height: 1.2 !important;
             }
             
             .program-footer {
               position: fixed !important;
-              bottom: 10mm !important;
-              left: 15mm !important;
-              right: 15mm !important;
+              bottom: 8mm !important;
+              left: 12mm !important;
+              right: 12mm !important;
               text-align: center !important;
-              font-size: 7pt !important;
+              font-size: 6pt !important;
               color: #6b7280 !important;
               border-top: 1px solid #e5e7eb !important;
-              padding-top: 5px !important;
+              padding-top: 3px !important;
             }
 
             .print-image-container {
@@ -324,8 +327,8 @@ const FormalReportGeneratorNew: React.FC = () => {
               position: absolute !important;
               background-color: #ef4444 !important;
               color: white !important;
-              padding: 1px 4px !important;
-              font-size: 7pt !important;
+              padding: 1px 3px !important;
+              font-size: 6pt !important;
               font-weight: bold !important;
               border-radius: 2px !important;
               white-space: nowrap !important;
@@ -334,9 +337,10 @@ const FormalReportGeneratorNew: React.FC = () => {
             .report-info {
               display: flex !important;
               justify-content: space-between !important;
-              margin-bottom: 12px !important;
-              font-size: 8pt !important;
+              margin-bottom: 6px !important;
+              font-size: 7pt !important;
               color: #6b7280 !important;
+              line-height: 1.2 !important;
             }
           }
         `}
@@ -561,9 +565,9 @@ const FormalReportGeneratorNew: React.FC = () => {
         
         {/* Doctor Notes */}
         {analysisResult.doctorNotes && (
-          <div style={{ marginBottom: '25px' }}>
+          <div style={{ marginBottom: '6px' }}>
             <div className="section-title">DOCTOR NOTES</div>
-            <div style={{ padding: '15px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '11pt' }}>
+            <div style={{ padding: '4px', border: '1px solid #d1d5db', borderRadius: '3px', fontSize: '7pt', lineHeight: '1.2' }}>
               {analysisResult.doctorNotes}
             </div>
           </div>
@@ -571,9 +575,9 @@ const FormalReportGeneratorNew: React.FC = () => {
 
         {/* Additional Notes */}
         {analysisResult.notes && (
-          <div style={{ marginBottom: '25px' }}>
+          <div style={{ marginBottom: '6px' }}>
             <div className="section-title">ADDITIONAL NOTES</div>
-            <div style={{ padding: '15px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '11pt' }}>
+            <div style={{ padding: '4px', border: '1px solid #d1d5db', borderRadius: '3px', fontSize: '7pt', lineHeight: '1.2' }}>
               {analysisResult.notes}
             </div>
           </div>
