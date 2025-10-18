@@ -4,9 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Search, User, Calendar, ArrowLeft, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface PatientReport {
   id: string;
@@ -25,7 +29,7 @@ const SearchPage: React.FC = () => {
   const [reports, setReports] = useState<PatientReport[]>([]);
   const [ageFilter, setAgeFilter] = useState('');
   const [genderFilter, setGenderFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState<Date | undefined>();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -137,9 +141,9 @@ const SearchPage: React.FC = () => {
     const matchesSearch = report.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       report.cellType.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesAge = !ageFilter || (report.age && report.age.includes(ageFilter));
+    const matchesAge = !ageFilter || (report.age && report.age.toString() === ageFilter);
     const matchesGender = !genderFilter || genderFilter === 'all' || report.gender === genderFilter;
-    const matchesDate = !dateFilter || report.reportDate.includes(dateFilter);
+    const matchesDate = !dateFilter || report.reportDate === format(dateFilter, 'yyyy-MM-dd');
     
     return matchesSearch && matchesAge && matchesGender && matchesDate;
   });
@@ -194,7 +198,7 @@ const SearchPage: React.FC = () => {
               </div>
               
               {/* Filters */}
-              <div className="flex items-center gap-4 mb-4">
+              <div className="flex items-center gap-4 mb-4 flex-wrap">
                 <div className="flex items-center gap-2">
                   <Filter className="h-4 w-4 text-gray-500" />
                   <span className="text-sm font-medium text-gray-700">Filters:</span>
@@ -214,20 +218,38 @@ const SearchPage: React.FC = () => {
                   value={ageFilter}
                   onChange={(e) => setAgeFilter(e.target.value)}
                   className="w-24"
+                  type="number"
                 />
-                <Input
-                  placeholder="Date (YYYY-MM-DD)"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  className="w-40"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-[240px] justify-start text-left font-normal",
+                        !dateFilter && "text-muted-foreground"
+                      )}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {dateFilter ? format(dateFilter, "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={dateFilter}
+                      onSelect={setDateFilter}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
                 <Button 
                   variant="outline" 
                   size="sm"
                   onClick={() => {
                     setAgeFilter('');
                     setGenderFilter('all');
-                    setDateFilter('');
+                    setDateFilter(undefined);
                     setSearchQuery('');
                   }}
                 >

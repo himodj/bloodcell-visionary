@@ -96,9 +96,14 @@ const FormalReportGeneratorNew: React.FC = () => {
               background: white !important;
               color: black !important;
               font-family: 'Arial', sans-serif !important;
-              font-size: 11pt !important;
+              font-size: 9pt !important;
               margin: 0 !important;
               padding: 0 !important;
+            }
+            
+            @page {
+              size: A4 !important;
+              margin: 15mm !important;
             }
             
             .no-print {
@@ -109,7 +114,7 @@ const FormalReportGeneratorNew: React.FC = () => {
               width: 100% !important;
               max-width: none !important;
               margin: 0 !important;
-              padding: 20mm !important;
+              padding: 0 !important;
               box-shadow: none !important;
               border: none !important;
             }
@@ -118,9 +123,9 @@ const FormalReportGeneratorNew: React.FC = () => {
               display: flex !important;
               justify-content: space-between !important;
               align-items: center !important;
-              border-bottom: 3px solid #1e40af !important;
-              padding-bottom: 20px !important;
-              margin-bottom: 30px !important;
+              border-bottom: 2px solid #1e40af !important;
+              padding-bottom: 10px !important;
+              margin-bottom: 15px !important;
             }
             
             .lab-info {
@@ -128,43 +133,43 @@ const FormalReportGeneratorNew: React.FC = () => {
             }
             
             .lab-title {
-              font-size: 20pt !important;
+              font-size: 14pt !important;
               font-weight: bold !important;
               color: #1e40af !important;
-              margin-bottom: 8px !important;
+              margin-bottom: 4px !important;
             }
             
             .lab-subtitle {
-              font-size: 11pt !important;
+              font-size: 8pt !important;
               color: #374151 !important;
-              margin-bottom: 3px !important;
+              margin-bottom: 2px !important;
             }
             
             .lab-logo {
-              height: 60px !important;
+              height: 45px !important;
               object-fit: contain !important;
             }
             
             .patient-box {
-              border: 2px solid #1e40af !important;
-              padding: 20px !important;
-              margin-bottom: 25px !important;
+              border: 1px solid #1e40af !important;
+              padding: 10px !important;
+              margin-bottom: 12px !important;
               background: #f8fafc !important;
             }
             
             .patient-title {
-              font-size: 14pt !important;
+              font-size: 11pt !important;
               font-weight: bold !important;
               color: #1e40af !important;
-              margin-bottom: 15px !important;
+              margin-bottom: 8px !important;
               text-align: center !important;
             }
             
             .patient-grid {
               display: grid !important;
               grid-template-columns: repeat(3, 1fr) !important;
-              gap: 15px !important;
-              margin-bottom: 15px !important;
+              gap: 8px !important;
+              margin-bottom: 8px !important;
             }
             
             .patient-field {
@@ -174,133 +179,133 @@ const FormalReportGeneratorNew: React.FC = () => {
             
             .field-label {
               font-weight: bold !important;
-              font-size: 10pt !important;
+              font-size: 8pt !important;
               color: #374151 !important;
-              margin-bottom: 3px !important;
+              margin-bottom: 1px !important;
             }
             
             .field-value {
-              font-size: 11pt !important;
+              font-size: 9pt !important;
               color: #111827 !important;
               border-bottom: 1px solid #d1d5db !important;
-              padding-bottom: 3px !important;
-              min-height: 18px !important;
+              padding-bottom: 2px !important;
+              min-height: 14px !important;
             }
             
             .image-section {
               text-align: center !important;
-              margin-bottom: 25px !important;
+              margin-bottom: 12px !important;
               page-break-inside: avoid !important;
             }
             
             .section-title {
-              font-size: 14pt !important;
+              font-size: 10pt !important;
               font-weight: bold !important;
               color: #1e40af !important;
-              margin-bottom: 15px !important;
-              border-bottom: 2px solid #cbd5e1 !important;
-              padding-bottom: 5px !important;
+              margin-bottom: 8px !important;
+              border-bottom: 1px solid #cbd5e1 !important;
+              padding-bottom: 3px !important;
             }
             
             .analysis-image {
-              max-width: 300px !important;
-              max-height: 300px !important;
-              border: 2px solid #d1d5db !important;
-              border-radius: 8px !important;
+              max-width: 220px !important;
+              max-height: 220px !important;
+              border: 1px solid #d1d5db !important;
+              border-radius: 4px !important;
             }
             
             .image-caption {
-              font-size: 10pt !important;
-              margin-top: 10px !important;
+              font-size: 7pt !important;
+              margin-top: 4px !important;
               font-style: italic !important;
             }
             
             .results-section {
               display: grid !important;
               grid-template-columns: 1fr 1fr !important;
-              gap: 30px !important;
-              margin-bottom: 25px !important;
+              gap: 15px !important;
+              margin-bottom: 12px !important;
             }
             
             .result-item {
               display: flex !important;
               justify-content: space-between !important;
-              padding: 8px 0 !important;
+              padding: 4px 0 !important;
               border-bottom: 1px solid #e5e7eb !important;
             }
             
             .result-label {
               font-weight: bold !important;
-              font-size: 11pt !important;
+              font-size: 9pt !important;
             }
             
             .result-value {
-              font-size: 11pt !important;
+              font-size: 9pt !important;
             }
             
             .findings-section {
               background: #fef3c7 !important;
-              border: 2px solid #f59e0b !important;
-              border-radius: 8px !important;
-              padding: 20px !important;
-              margin-bottom: 25px !important;
-            }
-            
-            .findings-title {
-              font-size: 13pt !important;
-              font-weight: bold !important;
-              color: #92400e !important;
+              border: 1px solid #f59e0b !important;
+              border-radius: 4px !important;
+              padding: 10px !important;
               margin-bottom: 12px !important;
             }
             
+            .findings-title {
+              font-size: 10pt !important;
+              font-weight: bold !important;
+              color: #92400e !important;
+              margin-bottom: 6px !important;
+            }
+            
             .findings-content {
-              font-size: 11pt !important;
-              line-height: 1.4 !important;
+              font-size: 9pt !important;
+              line-height: 1.3 !important;
             }
             
             .findings-list {
-              margin: 10px 0 !important;
-              padding-left: 20px !important;
+              margin: 5px 0 !important;
+              padding-left: 15px !important;
             }
             
             .findings-list li {
-              margin-bottom: 8px !important;
+              margin-bottom: 4px !important;
             }
             
             .signature-section {
               display: flex !important;
               justify-content: space-between !important;
-              margin-top: 40px !important;
-              padding-top: 20px !important;
+              margin-top: 15px !important;
+              padding-top: 10px !important;
               border-top: 1px solid #d1d5db !important;
             }
             
             .signature-box {
-              width: 200px !important;
+              width: 150px !important;
               text-align: center !important;
             }
             
             .signature-line {
-              border-bottom: 2px solid #374151 !important;
-              margin-bottom: 8px !important;
-              height: 40px !important;
+              border-bottom: 1px solid #374151 !important;
+              margin-bottom: 4px !important;
+              height: 25px !important;
             }
             
             .signature-label {
-              font-size: 10pt !important;
+              font-size: 8pt !important;
               color: #374151 !important;
             }
             
             .program-footer {
               position: fixed !important;
               bottom: 10mm !important;
-              left: 20mm !important;
-              right: 20mm !important;
+              left: 15mm !important;
+              right: 15mm !important;
               text-align: center !important;
-              font-size: 9pt !important;
+              font-size: 7pt !important;
               color: #6b7280 !important;
               border-top: 1px solid #e5e7eb !important;
-              padding-top: 10px !important;
+              padding-top: 5px !important;
             }
 
             .print-image-container {
@@ -310,7 +315,7 @@ const FormalReportGeneratorNew: React.FC = () => {
 
             .print-bounding-box {
               position: absolute !important;
-              border: 2px solid #ef4444 !important;
+              border: 1px solid #ef4444 !important;
               background-color: rgba(239, 68, 68, 0.1) !important;
               pointer-events: none !important;
             }
@@ -319,18 +324,18 @@ const FormalReportGeneratorNew: React.FC = () => {
               position: absolute !important;
               background-color: #ef4444 !important;
               color: white !important;
-              padding: 2px 6px !important;
-              font-size: 9pt !important;
+              padding: 1px 4px !important;
+              font-size: 7pt !important;
               font-weight: bold !important;
-              border-radius: 3px !important;
+              border-radius: 2px !important;
               white-space: nowrap !important;
             }
             
             .report-info {
               display: flex !important;
               justify-content: space-between !important;
-              margin-bottom: 25px !important;
-              font-size: 10pt !important;
+              margin-bottom: 12px !important;
+              font-size: 8pt !important;
               color: #6b7280 !important;
             }
           }

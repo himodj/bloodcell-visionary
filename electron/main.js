@@ -965,17 +965,40 @@ ipcMain.handle('get-patient-reports', async () => {
         try {
           // Parse folder name: CellType_PatientName_ReportID_Timestamp
           const parts = folder.split('_');
-          if (parts.length >= 2) {
+          if (parts.length >= 4) {
             const cellType = parts[0];
             const patientName = parts[1];
-            const reportDate = stat.ctime.toLocaleDateString();
+            
+            // Try to read analysis_data.json to get patient info and original date
+            const analysisDataPath = pathModule.join(folderPath, 'analysis_data.json');
+            let age = '';
+            let gender = '';
+            let reportDate = stat.ctime.toISOString().split('T')[0]; // Default to file creation date
+            
+            if (fs.existsSync(analysisDataPath)) {
+              try {
+                const analysisData = JSON.parse(fs.readFileSync(analysisDataPath, 'utf8'));
+                if (analysisData.patientInfo) {
+                  age = analysisData.patientInfo.age || '';
+                  gender = analysisData.patientInfo.gender || '';
+                }
+                // Use the original analysis date from the data
+                if (analysisData.analysisDate) {
+                  reportDate = new Date(analysisData.analysisDate).toISOString().split('T')[0];
+                }
+              } catch (parseErr) {
+                console.error('Error parsing analysis data:', parseErr);
+              }
+            }
             
             reports.push({
               id: folder,
               patientName: patientName.replace(/_/g, ' '),
               cellType: cellType.replace(/_/g, ' '),
               reportDate: reportDate,
-              folderPath: folderPath
+              folderPath: folderPath,
+              age: age,
+              gender: gender
             });
           }
         } catch (err) {
