@@ -963,46 +963,65 @@ ipcMain.handle('get-patient-reports', async () => {
       
       if (stat.isDirectory()) {
         try {
-          // Parse folder name: CellType_PatientName_ReportID_Timestamp
-          const parts = folder.split('_');
-          if (parts.length >= 4) {
-            const cellType = parts[0];
-            const patientName = parts[1];
-            
-            // Try to read analysis_data.json to get patient info and original date
-            const analysisDataPath = pathModule.join(folderPath, 'analysis_data.json');
-            let age = '';
-            let gender = '';
-            let reportDate = stat.ctime.toISOString().split('T')[0]; // Default to file creation date
-            
-            if (fs.existsSync(analysisDataPath)) {
-              try {
-                const analysisData = JSON.parse(fs.readFileSync(analysisDataPath, 'utf8'));
-                if (analysisData.patientInfo) {
-                  age = analysisData.patientInfo.age || '';
-                  gender = analysisData.patientInfo.gender || '';
-                }
-                // Use the original analysis date from the data
-                if (analysisData.analysisDate) {
-                  reportDate = new Date(analysisData.analysisDate).toISOString().split('T')[0];
-                }
-              } catch (parseErr) {
-                console.error('Error parsing analysis data:', parseErr);
+          // Try to read analysis_data.json first for accurate patient info
+          const analysisDataPath = pathModule.join(folderPath, 'analysis_data.json');
+          let patientName = 'Unknown Patient';
+          let cellType = 'Blood Sample';
+          let age = '';
+          let gender = '';
+          let reportDate = stat.ctime.toISOString().split('T')[0]; // Default to file creation date
+          
+          if (fs.existsSync(analysisDataPath)) {
+            try {
+              const analysisData = JSON.parse(fs.readFileSync(analysisDataPath, 'utf8'));
+              
+              // Get patient info from analysis data
+              if (analysisData.patientInfo) {
+                patientName = analysisData.patientInfo.name || 'Unknown Patient';
+                age = analysisData.patientInfo.age || '';
+                gender = analysisData.patientInfo.gender || '';
+              }
+              
+              // Get cell type from detected cells
+              if (analysisData.detectedCells && analysisData.detectedCells.length > 0) {
+                cellType = analysisData.detectedCells[0].type || 'Blood Sample';
+              }
+              
+              // Use the original analysis date
+              if (analysisData.analysisDate) {
+                reportDate = new Date(analysisData.analysisDate).toISOString().split('T')[0];
+              }
+            } catch (parseErr) {
+              console.error('Error parsing analysis data:', parseErr);
+              // Fall back to parsing folder name
+              const parts = folder.split('_');
+              if (parts.length >= 5) {
+                // Format: Blood_Sample_CellType_PatientName_ReportID_Timestamp
+                cellType = parts[2] || 'Blood Sample';
+                patientName = parts.slice(3, -2).join(' ') || 'Unknown Patient';
               }
             }
-            
-            reports.push({
-              id: folder,
-              patientName: patientName.replace(/_/g, ' '),
-              cellType: cellType.replace(/_/g, ' '),
-              reportDate: reportDate,
-              folderPath: folderPath,
-              age: age,
-              gender: gender
-            });
+          } else {
+            // Fall back to parsing folder name if no analysis data
+            const parts = folder.split('_');
+            if (parts.length >= 5) {
+              // Format: Blood_Sample_CellType_PatientName_ReportID_Timestamp
+              cellType = parts[2] || 'Blood Sample';
+              patientName = parts.slice(3, -2).join(' ') || 'Unknown Patient';
+            }
           }
+          
+          reports.push({
+            id: folder,
+            patientName: patientName,
+            cellType: cellType,
+            reportDate: reportDate,
+            folderPath: folderPath,
+            age: age,
+            gender: gender
+          });
         } catch (err) {
-          console.error('Error parsing folder name:', folder, err);
+          console.error('Error processing folder:', folder, err);
         }
       }
     }
