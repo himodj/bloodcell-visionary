@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Analysis from "./pages/Analysis";
 import Management from "./pages/Management";
 import Search from "./pages/Search";
+import ReportTemplate from "./pages/ReportTemplate";
 import NotFound from "./pages/NotFound";
 import { AnalysisProvider } from "./contexts/AnalysisContext";
 
@@ -25,6 +26,7 @@ const App = () => (
             <Route path="/analysis" element={<Analysis />} />
             <Route path="/management" element={<Management />} />
             <Route path="/search" element={<Search />} />
+            <Route path="/report-template" element={<ReportTemplate />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AnalysisProvider>

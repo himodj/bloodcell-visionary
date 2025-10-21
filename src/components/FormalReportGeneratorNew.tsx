@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAnalysis } from '../contexts/AnalysisContext';
 import { formatReportDate, generateReportId } from '../utils/analysisUtils';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Printer, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import LabSettings, { LabConfiguration } from './LabSettings';
+import { ReportTemplateConfig } from './ReportTemplateDesigner';
 
 const FormalReportGeneratorNew: React.FC = () => {
   const { 
@@ -23,6 +24,19 @@ const FormalReportGeneratorNew: React.FC = () => {
     licenseNumber: '',
     logo: null
   });
+
+  const [templateConfig, setTemplateConfig] = useState<ReportTemplateConfig | null>(null);
+
+  useEffect(() => {
+    const savedTemplate = localStorage.getItem('reportTemplateConfig');
+    if (savedTemplate) {
+      try {
+        setTemplateConfig(JSON.parse(savedTemplate));
+      } catch (e) {
+        console.error('Failed to load template config', e);
+      }
+    }
+  }, []);
   
   if (!analysisResult) return null;
   
@@ -94,19 +108,19 @@ const FormalReportGeneratorNew: React.FC = () => {
             }
             
             @page {
-              size: A4 portrait;
-              margin: 10mm;
+              size: ${templateConfig?.pageSize || 'A4'} ${templateConfig?.orientation || 'portrait'};
+              margin: ${templateConfig?.marginTop || 10}mm ${templateConfig?.marginRight || 10}mm ${templateConfig?.marginBottom || 10}mm ${templateConfig?.marginLeft || 10}mm;
             }
             
             html, body {
-              width: 210mm;
-              height: 297mm;
+              width: ${templateConfig?.pageSize === 'Letter' ? '8.5in' : '210mm'};
+              height: ${templateConfig?.pageSize === 'Letter' ? '11in' : '297mm'};
               margin: 0;
               padding: 0;
               background: white !important;
-              color: #000 !important;
-              font-family: 'Times New Roman', serif !important;
-              font-size: 10pt !important;
+              color: ${templateConfig?.textColor || '#000'} !important;
+              font-family: '${templateConfig?.fontFamily || 'Times New Roman'}', serif !important;
+              font-size: ${templateConfig?.baseFontSize || 10}pt !important;
               line-height: 1.3 !important;
             }
             
@@ -117,14 +131,14 @@ const FormalReportGeneratorNew: React.FC = () => {
             .print-container {
               width: 100% !important;
               height: 100% !important;
-              max-width: 190mm !important;
+              max-width: ${templateConfig?.pageSize === 'Letter' ? '8in' : '190mm'} !important;
               margin: 0 auto !important;
-              padding: 8mm !important;
+              padding: ${(templateConfig?.sectionGap || 3) * 1.5}mm !important;
               box-shadow: none !important;
               border: none !important;
               background: white !important;
               page-break-after: avoid !important;
-              display: flex !important;
+              display: ${templateConfig?.showLogo !== false || templateConfig?.showReportInfo !== false || templateConfig?.showPatientBox !== false ? 'flex' : 'block'} !important;
               flex-direction: column !important;
             }
             
@@ -133,9 +147,9 @@ const FormalReportGeneratorNew: React.FC = () => {
               display: flex !important;
               justify-content: space-between !important;
               align-items: flex-start !important;
-              border-bottom: 3px double #2563eb !important;
-              padding-bottom: 4mm !important;
-              margin-bottom: 4mm !important;
+              border-bottom: ${templateConfig?.borderWidth || 2}px ${templateConfig?.borderStyle || 'solid'} ${templateConfig?.primaryColor || '#2563eb'} !important;
+              padding-bottom: ${templateConfig?.sectionGap || 3}mm !important;
+              margin-bottom: ${templateConfig?.sectionGap || 3}mm !important;
               page-break-inside: avoid !important;
             }
             
@@ -144,16 +158,16 @@ const FormalReportGeneratorNew: React.FC = () => {
             }
             
             .lab-title {
-              font-size: 16pt !important;
+              font-size: ${templateConfig?.headerFontSize || 16}pt !important;
               font-weight: bold !important;
-              color: #1e40af !important;
+              color: ${templateConfig?.secondaryColor || '#1e40af'} !important;
               margin: 0 0 2mm 0 !important;
               letter-spacing: 0.5px !important;
               text-transform: uppercase !important;
             }
             
             .lab-subtitle {
-              font-size: 9pt !important;
+              font-size: ${(templateConfig?.baseFontSize || 10) - 1}pt !important;
               color: #374151 !important;
               margin: 0 0 1mm 0 !important;
               line-height: 1.4 !important;
@@ -164,6 +178,7 @@ const FormalReportGeneratorNew: React.FC = () => {
               max-width: 30mm !important;
               object-fit: contain !important;
               margin-left: 5mm !important;
+              display: ${templateConfig?.showLogo === false ? 'none' : 'block'} !important;
             }
             
             /* Report Info Banner */
@@ -172,32 +187,33 @@ const FormalReportGeneratorNew: React.FC = () => {
               border: 1px solid #cbd5e1 !important;
               border-radius: 2mm !important;
               padding: 2mm 3mm !important;
-              margin-bottom: 3mm !important;
-              display: grid !important;
+              margin-bottom: ${templateConfig?.sectionGap || 3}mm !important;
+              display: ${templateConfig?.showReportInfo === false ? 'none' : 'grid'} !important;
               grid-template-columns: 1fr 1fr !important;
               gap: 3mm !important;
-              font-size: 9pt !important;
+              font-size: ${(templateConfig?.baseFontSize || 10) - 1}pt !important;
               page-break-inside: avoid !important;
             }
             
             .report-info strong {
-              color: #1e40af !important;
+              color: ${templateConfig?.secondaryColor || '#1e40af'} !important;
               font-weight: 600 !important;
             }
             
             /* Patient Information Box */
             .patient-box {
-              border: 2px solid #2563eb !important;
+              border: ${templateConfig?.borderWidth || 2}px ${templateConfig?.borderStyle || 'solid'} ${templateConfig?.primaryColor || '#2563eb'} !important;
               background: #fafafa !important;
-              padding: 3mm !important;
-              margin-bottom: 3mm !important;
+              padding: ${templateConfig?.sectionGap || 3}mm !important;
+              margin-bottom: ${templateConfig?.sectionGap || 3}mm !important;
               page-break-inside: avoid !important;
+              display: ${templateConfig?.showPatientBox === false ? 'none' : 'block'} !important;
             }
             
             .patient-title {
-              font-size: 11pt !important;
+              font-size: ${(templateConfig?.baseFontSize || 10) + 1}pt !important;
               font-weight: bold !important;
-              color: #1e40af !important;
+              color: ${templateConfig?.secondaryColor || '#1e40af'} !important;
               text-align: center !important;
               margin: 0 0 2mm 0 !important;
               padding-bottom: 1mm !important;
@@ -218,14 +234,14 @@ const FormalReportGeneratorNew: React.FC = () => {
             
             .field-label {
               font-weight: 600 !important;
-              font-size: 8.5pt !important;
+              font-size: ${(templateConfig?.baseFontSize || 10) - 1.5}pt !important;
               color: #475569 !important;
               margin-bottom: 0.5mm !important;
             }
             
             .field-value {
-              font-size: 9.5pt !important;
-              color: #000 !important;
+              font-size: ${(templateConfig?.baseFontSize || 10) - 0.5}pt !important;
+              color: ${templateConfig?.textColor || '#000'} !important;
               border-bottom: 1px solid #cbd5e1 !important;
               padding-bottom: 1mm !important;
               min-height: 5mm !important;
@@ -242,10 +258,10 @@ const FormalReportGeneratorNew: React.FC = () => {
             }
             
             .section-title {
-              font-size: 10pt !important;
+              font-size: ${templateConfig?.baseFontSize || 10}pt !important;
               font-weight: bold !important;
-              color: #1e40af !important;
-              border-bottom: 2px solid #2563eb !important;
+              color: ${templateConfig?.secondaryColor || '#1e40af'} !important;
+              border-bottom: ${templateConfig?.borderWidth || 2}px ${templateConfig?.borderStyle || 'solid'} ${templateConfig?.primaryColor || '#2563eb'} !important;
               padding-bottom: 1mm !important;
               margin-bottom: 2mm !important;
               text-transform: uppercase !important;
@@ -273,8 +289,9 @@ const FormalReportGeneratorNew: React.FC = () => {
             /* Image Section - Compact */
             .image-section {
               text-align: center !important;
-              margin-bottom: 3mm !important;
+              margin-bottom: ${templateConfig?.sectionGap || 3}mm !important;
               page-break-inside: avoid !important;
+              display: ${templateConfig?.showImage === false ? 'none' : 'block'} !important;
             }
             
             .print-image-container {
@@ -322,8 +339,9 @@ const FormalReportGeneratorNew: React.FC = () => {
               border: 1px solid #eab308 !important;
               border-left: 3px solid #ca8a04 !important;
               padding: 2mm 3mm !important;
-              margin-bottom: 3mm !important;
+              margin-bottom: ${templateConfig?.sectionGap || 3}mm !important;
               page-break-inside: avoid !important;
+              display: ${templateConfig?.showClinicalFindings === false ? 'none' : 'block'} !important;
             }
             
             .findings-title {
@@ -351,8 +369,9 @@ const FormalReportGeneratorNew: React.FC = () => {
             
             /* Notes Sections */
             .notes-section {
-              margin-bottom: 2mm !important;
+              margin-bottom: ${templateConfig?.sectionGap || 3}mm !important;
               page-break-inside: avoid !important;
+              display: ${templateConfig?.showDoctorNotes === false ? 'none' : 'block'} !important;
             }
             
             .notes-content {
@@ -367,7 +386,7 @@ const FormalReportGeneratorNew: React.FC = () => {
             
             /* Signature Section */
             .signature-section {
-              display: flex !important;
+              display: ${templateConfig?.showSignatures === false ? 'none' : 'flex'} !important;
               justify-content: space-around !important;
               margin-top: 5mm !important;
               padding-top: 3mm !important;

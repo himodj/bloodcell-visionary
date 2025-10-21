@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
 import { useAnalysis } from '../contexts/AnalysisContext';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, HelpCircle } from 'lucide-react';
+import { ArrowLeft, HelpCircle, FileText } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,7 @@ import {
 
 const Header: React.FC = () => {
   const { analysisResult, resetAnalysis } = useAnalysis();
+  const navigate = useNavigate();
   const [helpOpen, setHelpOpen] = useState(false);
   
   return (
@@ -43,6 +45,15 @@ const Header: React.FC = () => {
         </div>
         
         <div className="flex items-center space-x-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => navigate('/report-template')}
+            className="text-muted-foreground"
+          >
+            <FileText size={16} className="mr-1" />
+            <span>Design Report Template</span>
+          </Button>
           <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
             <DialogTrigger asChild>
               <Button variant="ghost" size="sm" className="text-muted-foreground">
