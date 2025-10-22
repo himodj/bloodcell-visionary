@@ -59,15 +59,7 @@ const Analysis: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <Header />
       <main className="container mx-auto px-4 py-8 space-y-8">
-        <div className="flex items-center gap-4 mb-6">
-          <Link to="/">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Analysis
-            </Button>
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-800">Analysis Results</h1>
-        </div>
+        <h1 className="text-3xl font-bold text-gray-800 mb-6">Analysis Results</h1>
         
         <AnalysisResults />
         <FormalReportGeneratorNew />

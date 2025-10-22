@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Save, RotateCcw, Eye } from 'lucide-react';
+import { Save, RotateCcw, Eye, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 export interface ReportTemplateConfig {
@@ -78,6 +79,7 @@ const defaultConfig: ReportTemplateConfig = {
 };
 
 const ReportTemplateDesigner: React.FC<ReportTemplateDesignerProps> = ({ onTemplateChange }) => {
+  const navigate = useNavigate();
   const [config, setConfig] = useState<ReportTemplateConfig>(defaultConfig);
 
   useEffect(() => {
@@ -117,6 +119,17 @@ const ReportTemplateDesigner: React.FC<ReportTemplateDesignerProps> = ({ onTempl
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
+      <div className="mb-4">
+        <Button 
+          variant="outline" 
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft size={16} />
+          Back
+        </Button>
+      </div>
+      
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-medical-dark">Report Template Designer</h1>

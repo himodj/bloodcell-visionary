@@ -101,6 +101,24 @@ const FormalReportGeneratorNew: React.FC = () => {
       <style>
         {`
           @media print {
+            /* Hide everything by default */
+            body * {
+              visibility: hidden !important;
+            }
+            
+            /* Only show the print container and its children */
+            .print-container,
+            .print-container * {
+              visibility: visible !important;
+            }
+            
+            /* Position print container at top of page */
+            .print-container {
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+            }
+            
             * {
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
