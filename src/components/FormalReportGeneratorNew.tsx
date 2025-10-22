@@ -127,7 +127,7 @@ const FormalReportGeneratorNew: React.FC = () => {
             
             @page {
               size: ${templateConfig?.pageSize || 'A4'} ${templateConfig?.orientation || 'portrait'};
-              margin: ${templateConfig?.marginTop || 10}mm ${templateConfig?.marginRight || 10}mm ${templateConfig?.marginBottom || 10}mm ${templateConfig?.marginLeft || 10}mm;
+              margin: ${templateConfig?.marginTop || 8}mm ${templateConfig?.marginRight || 8}mm ${templateConfig?.marginBottom || 8}mm ${templateConfig?.marginLeft || 8}mm;
             }
             
             html, body {
@@ -139,7 +139,7 @@ const FormalReportGeneratorNew: React.FC = () => {
               color: ${templateConfig?.textColor || '#000'} !important;
               font-family: '${templateConfig?.fontFamily || 'Times New Roman'}', serif !important;
               font-size: ${templateConfig?.baseFontSize || 10}pt !important;
-              line-height: 1.3 !important;
+              line-height: 1.2 !important;
             }
             
             .no-print {
@@ -148,15 +148,15 @@ const FormalReportGeneratorNew: React.FC = () => {
             
             .print-container {
               width: 100% !important;
-              height: 100% !important;
-              max-width: ${templateConfig?.pageSize === 'Letter' ? '8in' : '190mm'} !important;
-              margin: 0 auto !important;
-              padding: ${(templateConfig?.sectionGap || 3) * 1.5}mm !important;
+              height: auto !important;
+              max-width: 100% !important;
+              margin: 0 !important;
+              padding: 0 !important;
               box-shadow: none !important;
               border: none !important;
               background: white !important;
               page-break-after: avoid !important;
-              display: ${templateConfig?.showLogo !== false || templateConfig?.showReportInfo !== false || templateConfig?.showPatientBox !== false ? 'flex' : 'block'} !important;
+              display: flex !important;
               flex-direction: column !important;
             }
             
@@ -333,22 +333,13 @@ const FormalReportGeneratorNew: React.FC = () => {
               color: #64748b !important;
             }
             
+            /* Hide bounding boxes in print */
             .print-bounding-box {
-              position: absolute !important;
-              border: 1.5px solid #ef4444 !important;
-              background-color: rgba(239, 68, 68, 0.08) !important;
-              pointer-events: none !important;
+              display: none !important;
             }
             
             .print-cell-label {
-              position: absolute !important;
-              background-color: #ef4444 !important;
-              color: white !important;
-              padding: 0.5mm 1.5mm !important;
-              font-size: 7pt !important;
-              font-weight: bold !important;
-              border-radius: 1mm !important;
-              white-space: nowrap !important;
+              display: none !important;
             }
             
             /* Clinical Findings */

@@ -35,7 +35,10 @@ const Header: React.FC = () => {
           {analysisResult && (
             <Button 
               variant="ghost" 
-              onClick={resetAnalysis}
+              onClick={() => {
+                resetAnalysis();
+                navigate('/');
+              }}
               className="group ml-6"
             >
               <ArrowLeft size={18} className="mr-2 transition-transform group-hover:-translate-x-1" />
