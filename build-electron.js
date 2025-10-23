@@ -16,7 +16,7 @@ if (!fs.existsSync(modelPath)) {
     output: process.stdout
   });
   
-  readline.question('\x1b[33m%s\x1b[0m', 'Continue without model.h5? (y/N): ', (answer) => {
+  readline.question('Continue without model.h5? (y/N): ', (answer) => {
     readline.close();
     if (answer.toLowerCase() === 'y') {
       console.warn('\x1b[33m%s\x1b[0m', 'Continuing with build process without model.h5...\n');

@@ -7,9 +7,30 @@ const isDev = process.env.NODE_ENV === 'development';
 const http = require('http');
 
 let mainWindow;
+let splashWindow;
 let pythonProcess = null;
 let loadAttempts = 0;
 const MAX_LOAD_ATTEMPTS = 30; // Maximum number of retries
+
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 500,
+    height: 400,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  });
+
+  const splashPath = path.join(__dirname, 'loading.html');
+  splashWindow.loadFile(splashPath);
+  splashWindow.center();
+}
 
 function createWindow() {
   // Determine the correct preload script path - use absolute path
@@ -32,6 +53,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    show: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -41,8 +63,18 @@ function createWindow() {
       enableRemoteModule: false,
       allowRunningInsecureContent: false,
     },
-    title: "BloodCell Analyzer",
-    icon: path.join(__dirname, 'icon.ico')
+    title: "BloodCellVision - AI-Powered Blood Cell Analysis",
+    icon: path.join(__dirname, 'icon.png')
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    setTimeout(() => {
+      if (splashWindow && !splashWindow.isDestroyed()) {
+        splashWindow.close();
+      }
+      mainWindow.show();
+      mainWindow.focus();
+    }, 2000);
   });
 
   mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
@@ -309,6 +341,7 @@ function startActualPythonServer() {
 }
 
 app.on('ready', () => {
+  createSplashWindow();
   createWindow();
   startPythonServer();
 });

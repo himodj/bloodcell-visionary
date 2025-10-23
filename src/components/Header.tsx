@@ -24,7 +24,7 @@ const Header: React.FC = () => {
         <div className="flex items-center space-x-4">
           <div className="flex items-center">
             <img 
-              src="/lovable-uploads/623308ff-1ed1-4208-9ef4-41e4d60d733d.png" 
+              src="/logo.png" 
               alt="BloodCellVision Logo" 
               className="h-10 w-10 mr-3"
             />

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loading BloodCellVision</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .loading-container {
+            text-align: center;
+            color: white;
+        }
+        
+        .logo {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 30px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .logo img {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.3));
+        }
+        
+        h1 {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            letter-spacing: -0.5px;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+            margin-bottom: 40px;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            margin: 0 auto;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            margin-top: 20px;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-container">
+        <div class="logo">
+            <img src="icon.png" alt="BloodCellVision Logo">
+        </div>
+        <h1>BloodCellVision</h1>
+        <p class="subtitle">AI-Powered Blood Cell Analysis System</p>
+        <div class="spinner"></div>
+        <p class="loading-text">Loading application...</p>
+    </div>
+</body>
+</html>
