@@ -43,7 +43,7 @@
         "target": "nsis",
         "arch": ["x64"]
       },
-      "icon": "icon.png"
+      "icon": "icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -52,9 +52,9 @@
       "createStartMenuShortcut": true,
       "shortcutName": "BloodCellVision",
       "license": "LICENSE.txt",
-      "installerIcon": "icon.png",
-      "uninstallerIcon": "icon.png",
-      "installerHeaderIcon": "icon.png"
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
+      "installerHeaderIcon": "icon.ico"
     },
     "linux": {
       "target": ["AppImage", "deb"],
