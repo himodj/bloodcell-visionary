@@ -18,6 +18,7 @@
       "preload.js",
       "loading.html",
       "icon.png",
+      "icon.ico",
       "../dist/**/*"
     ],
     "extraResources": [
