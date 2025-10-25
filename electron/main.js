@@ -74,6 +74,11 @@ function createWindow() {
       }
       mainWindow.show();
       mainWindow.focus();
+      
+      // Open DevTools to help with debugging
+      if (!isDev) {
+        mainWindow.webContents.openDevTools();
+      }
     }, 2000);
   });
 
@@ -88,12 +93,23 @@ function createWindow() {
   if (isDev) {
     loadDevServer();
   } else {
+    // In production, the dist folder is packaged with the app
+    let indexPath;
+    if (app.isPackaged) {
+      // When packaged, dist is in the resources folder
+      indexPath = path.join(process.resourcesPath, 'app.asar', 'dist', 'index.html');
+    } else {
+      // When running unpackaged build
+      indexPath = path.join(__dirname, '../dist/index.html');
+    }
+    
     const startUrl = url.format({
-      pathname: path.join(__dirname, '../dist/index.html'),
+      pathname: indexPath,
       protocol: 'file:',
       slashes: true,
     });
     console.log('Loading production URL:', startUrl);
+    console.log('File exists:', fs.existsSync(indexPath));
     mainWindow.loadURL(startUrl);
   }
 

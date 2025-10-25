@@ -32,37 +32,48 @@ if (!fs.existsSync(modelPath)) {
 }
 
 function buildApp() {
-  // Change directory to electron folder
-  process.chdir(path.join(__dirname, 'electron'));
-
-  // Install dependencies if needed
-  console.log('Installing dependencies...');
-  exec('npm install', (error, stdout, stderr) => {
+  // First, build the React app
+  console.log('Building React app...');
+  exec('npm run build', (error, stdout, stderr) => {
     if (error) {
-      console.error(`Error installing dependencies: ${error}`);
+      console.error(`Error building React app: ${error}`);
+      console.error(stderr);
       return;
     }
+    console.log('✅ React app built successfully.');
     
-    console.log('Building Electron app...');
-    // Build the Electron app
-    const buildProcess = exec('npm run build', (error, stdout, stderr) => {
+    // Change directory to electron folder
+    process.chdir(path.join(__dirname, 'electron'));
+
+    // Install dependencies if needed
+    console.log('Installing Electron dependencies...');
+    exec('npm install', (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Error installing dependencies: ${error}`);
+        return;
+      }
+      
+      console.log('Building Electron app...');
+      // Build the Electron app
+      const buildProcess = exec('npm run build', (error, stdout, stderr) => {
       if (error) {
         console.error(`Error building Electron app: ${error}`);
         return;
       }
       
-      console.log('\x1b[32m%s\x1b[0m', '\nBuild completed successfully!');
-      console.log('\x1b[32m%s\x1b[0m', 'The packaged application is in the electron-dist folder.');
-      console.log('\x1b[32m%s\x1b[0m', 'You can distribute this package to other computers.');
-    });
+        console.log('\x1b[32m%s\x1b[0m', '\nBuild completed successfully!');
+        console.log('\x1b[32m%s\x1b[0m', 'The packaged application is in the electron-dist folder.');
+        console.log('\x1b[32m%s\x1b[0m', 'You can distribute this package to other computers.');
+      });
 
-    // Forward stdout and stderr to console
-    buildProcess.stdout.on('data', (data) => {
-      console.log(data);
-    });
+      // Forward stdout and stderr to console
+      buildProcess.stdout.on('data', (data) => {
+        console.log(data);
+      });
 
-    buildProcess.stderr.on('data', (data) => {
-      console.error(data);
+      buildProcess.stderr.on('data', (data) => {
+        console.error(data);
+      });
     });
   });
 }
