@@ -12,7 +12,7 @@
   "build": {
     "appId": "com.bloodcellvision.app",
     "productName": "BloodCellVision",
-    "copyright": "Copyright © 2024 ${author}",
+    "copyright": "Copyright © 2025 ibrahim ammar",
     "files": [
       "main.js",
       "preload.js",
@@ -62,7 +62,7 @@
       "category": "Medical"
     }
   },
-  "author": "",
+  "author": "ibrahim ammar",
   "license": "ISC",
   "devDependencies": {
     "electron": "^35.0.1",
