@@ -136,9 +136,9 @@ function createWindow() {
   if (isDev) {
     loadDevServer();
   } else {
-    // In production, electron-builder copies ../dist/** to the app root alongside main.js
-    // When packaged, files are in app.asar, so dist is directly in __dirname
-    const indexPath = path.join(__dirname, 'dist', 'index.html');
+    // In production, electron-builder copies ../dist/** contents (not the folder) to app.asar root
+    // So index.html is directly in __dirname, not in a dist subfolder
+    const indexPath = path.join(__dirname, 'index.html');
     
     writeLog(`Looking for index.html at: ${indexPath}`);
     writeLog(`File exists: ${fs.existsSync(indexPath)}`);
