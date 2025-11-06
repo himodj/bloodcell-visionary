@@ -12,6 +12,26 @@ let pythonProcess = null;
 let loadAttempts = 0;
 const MAX_LOAD_ATTEMPTS = 30; // Maximum number of retries
 
+// Create log file for debugging
+const logPath = path.join(app.getPath('userData'), 'app-debug.log');
+function writeLog(message) {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}\n`;
+  console.log(logMessage.trim());
+  try {
+    fs.appendFileSync(logPath, logMessage);
+  } catch (err) {
+    console.error('Failed to write to log file:', err);
+  }
+}
+
+writeLog('=== Application Starting ===');
+writeLog(`Log file location: ${logPath}`);
+writeLog(`isDev: ${isDev}`);
+writeLog(`__dirname: ${__dirname}`);
+writeLog(`app.getAppPath(): ${app.getAppPath()}`);
+writeLog(`process.resourcesPath: ${process.resourcesPath}`);
+
 function createSplashWindow() {
   splashWindow = new BrowserWindow({
     width: 500,
@@ -67,7 +87,30 @@ function createWindow() {
     icon: path.join(__dirname, 'icon.png')
   });
 
+  // Add error handlers
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    writeLog(`FAILED TO LOAD: ${errorDescription} (code: ${errorCode})`);
+    writeLog(`Failed URL: ${validatedURL}`);
+    
+    dialog.showMessageBox(mainWindow, {
+      type: 'error',
+      title: 'Load Error',
+      message: `Failed to load application`,
+      detail: `Error: ${errorDescription}\nURL: ${validatedURL}\n\nCheck log file at:\n${logPath}`,
+      buttons: ['OK']
+    });
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    writeLog('Page loaded successfully!');
+  });
+
+  mainWindow.webContents.on('crashed', () => {
+    writeLog('RENDERER PROCESS CRASHED!');
+  });
+
   mainWindow.once('ready-to-show', () => {
+    writeLog('Window ready to show');
     setTimeout(() => {
       if (splashWindow && !splashWindow.isDestroyed()) {
         splashWindow.close();
@@ -75,7 +118,7 @@ function createWindow() {
       mainWindow.show();
       mainWindow.focus();
       
-      // Open DevTools to help with debugging
+      // Always open DevTools in production to see errors
       if (!isDev) {
         mainWindow.webContents.openDevTools();
       }
@@ -93,19 +136,57 @@ function createWindow() {
   if (isDev) {
     loadDevServer();
   } else {
-    // In production, the dist folder is in the same directory as main.js when packaged
-    const indexPath = path.join(__dirname, 'dist', 'index.html');
+    // Try multiple possible locations for index.html
+    const possiblePaths = [
+      path.join(__dirname, 'dist', 'index.html'),
+      path.join(__dirname, '..', 'dist', 'index.html'),
+      path.join(app.getAppPath(), 'dist', 'index.html'),
+      path.join(process.resourcesPath, 'dist', 'index.html'),
+      path.join(process.resourcesPath, 'app', 'dist', 'index.html')
+    ];
+
+    writeLog('Searching for index.html in production mode...');
+    possiblePaths.forEach(p => {
+      writeLog(`  Checking: ${p} - Exists: ${fs.existsSync(p)}`);
+    });
+
+    // Also list directory contents
+    try {
+      writeLog(`Contents of __dirname (${__dirname}):`);
+      const dirContents = fs.readdirSync(__dirname);
+      dirContents.forEach(item => {
+        const itemPath = path.join(__dirname, item);
+        const stats = fs.statSync(itemPath);
+        writeLog(`  ${stats.isDirectory() ? '[DIR]' : '[FILE]'} ${item}`);
+      });
+    } catch (err) {
+      writeLog(`Error reading directory: ${err.message}`);
+    }
+
+    let indexPath = possiblePaths.find(p => fs.existsSync(p));
+    
+    if (!indexPath) {
+      writeLog('ERROR: index.html not found in any location!');
+      dialog.showErrorBox(
+        'Application Error',
+        `Could not find index.html file.\n\nSearched locations:\n${possiblePaths.join('\n')}\n\nLog file: ${logPath}`
+      );
+      return;
+    }
+
+    writeLog(`Found index.html at: ${indexPath}`);
     
     const startUrl = url.format({
       pathname: indexPath,
       protocol: 'file:',
       slashes: true,
     });
-    console.log('Loading production URL:', startUrl);
-    console.log('Index path:', indexPath);
-    console.log('File exists:', fs.existsSync(indexPath));
-    console.log('__dirname:', __dirname);
-    mainWindow.loadURL(startUrl);
+    
+    writeLog(`Loading URL: ${startUrl}`);
+    mainWindow.loadURL(startUrl).catch(err => {
+      writeLog(`ERROR loading URL: ${err.message}`);
+      dialog.showErrorBox('Load Error', `Failed to load: ${err.message}\n\nLog: ${logPath}`);
+    });
   }
 
   if (isDev) {
