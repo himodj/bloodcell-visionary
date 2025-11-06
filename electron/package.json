@@ -19,7 +19,11 @@
       "loading.html",
       "icon.png",
       "icon.ico",
-      "../dist/**/*"
+      {
+        "from": "../dist",
+        "to": "dist",
+        "filter": ["**/*"]
+      }
     ],
     "extraResources": [
       {
