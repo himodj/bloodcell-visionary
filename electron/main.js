@@ -136,21 +136,14 @@ function createWindow() {
   if (isDev) {
     loadDevServer();
   } else {
-    // Try multiple possible locations for index.html
-    const possiblePaths = [
-      path.join(__dirname, 'dist', 'index.html'),
-      path.join(__dirname, '..', 'dist', 'index.html'),
-      path.join(app.getAppPath(), 'dist', 'index.html'),
-      path.join(process.resourcesPath, 'dist', 'index.html'),
-      path.join(process.resourcesPath, 'app', 'dist', 'index.html')
-    ];
-
-    writeLog('Searching for index.html in production mode...');
-    possiblePaths.forEach(p => {
-      writeLog(`  Checking: ${p} - Exists: ${fs.existsSync(p)}`);
-    });
-
-    // Also list directory contents
+    // In production, electron-builder copies ../dist/** to the app root alongside main.js
+    // When packaged, files are in app.asar, so dist is directly in __dirname
+    const indexPath = path.join(__dirname, 'dist', 'index.html');
+    
+    writeLog(`Looking for index.html at: ${indexPath}`);
+    writeLog(`File exists: ${fs.existsSync(indexPath)}`);
+    
+    // List directory contents for debugging
     try {
       writeLog(`Contents of __dirname (${__dirname}):`);
       const dirContents = fs.readdirSync(__dirname);
@@ -159,17 +152,25 @@ function createWindow() {
         const stats = fs.statSync(itemPath);
         writeLog(`  ${stats.isDirectory() ? '[DIR]' : '[FILE]'} ${item}`);
       });
+      
+      // If dist folder exists, list its contents
+      const distPath = path.join(__dirname, 'dist');
+      if (fs.existsSync(distPath)) {
+        writeLog(`Contents of dist folder (${distPath}):`);
+        const distContents = fs.readdirSync(distPath);
+        distContents.forEach(item => {
+          writeLog(`  ${item}`);
+        });
+      }
     } catch (err) {
       writeLog(`Error reading directory: ${err.message}`);
     }
 
-    let indexPath = possiblePaths.find(p => fs.existsSync(p));
-    
-    if (!indexPath) {
-      writeLog('ERROR: index.html not found in any location!');
+    if (!fs.existsSync(indexPath)) {
+      writeLog('ERROR: index.html not found!');
       dialog.showErrorBox(
         'Application Error',
-        `Could not find index.html file.\n\nSearched locations:\n${possiblePaths.join('\n')}\n\nLog file: ${logPath}`
+        `Could not find index.html file at:\n${indexPath}\n\nCheck log file at:\n${logPath}`
       );
       return;
     }
