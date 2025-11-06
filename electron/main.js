@@ -93,15 +93,8 @@ function createWindow() {
   if (isDev) {
     loadDevServer();
   } else {
-    // In production, the dist folder is packaged with the app
-    let indexPath;
-    if (app.isPackaged) {
-      // When packaged, dist is in the resources folder
-      indexPath = path.join(process.resourcesPath, 'app.asar', 'dist', 'index.html');
-    } else {
-      // When running unpackaged build
-      indexPath = path.join(__dirname, '../dist/index.html');
-    }
+    // In production, the dist folder is in the same directory as main.js when packaged
+    const indexPath = path.join(__dirname, 'dist', 'index.html');
     
     const startUrl = url.format({
       pathname: indexPath,
@@ -109,7 +102,9 @@ function createWindow() {
       slashes: true,
     });
     console.log('Loading production URL:', startUrl);
+    console.log('Index path:', indexPath);
     console.log('File exists:', fs.existsSync(indexPath));
+    console.log('__dirname:', __dirname);
     mainWindow.loadURL(startUrl);
   }
 
