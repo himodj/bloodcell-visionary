@@ -136,8 +136,8 @@ function createWindow() {
   if (isDev) {
     loadDevServer();
   } else {
-    // In production, dist folder is copied to app.asar/dist
-    const indexPath = path.join(__dirname, 'dist', 'index.html');
+    // In production, dist folder is in extraResources (outside asar)
+    const indexPath = path.join(process.resourcesPath, 'dist', 'index.html');
     
     writeLog(`Looking for index.html at: ${indexPath}`);
     writeLog(`File exists: ${fs.existsSync(indexPath)}`);

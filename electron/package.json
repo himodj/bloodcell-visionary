@@ -18,14 +18,13 @@
       "preload.js",
       "loading.html",
       "icon.png",
-      "icon.ico",
-      {
-        "from": "../dist",
-        "to": "dist",
-        "filter": ["**/*"]
-      }
+      "icon.ico"
     ],
     "extraResources": [
+      {
+        "from": "../dist",
+        "to": "dist"
+      },
       {
         "from": "../model.h5",
         "to": "model.h5"
