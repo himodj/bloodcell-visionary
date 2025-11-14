@@ -714,9 +714,9 @@ ipcMain.handle('save-report', async (event, reportData) => {
     const fs = require('fs').promises;
     const pathModule = require('path');
     
-    // Create test archive folder in the same directory as the application
-    const appDir = process.cwd();
-    const testArchiveDir = pathModule.join(appDir, 'test archive');
+    // Create reports folder in user's Documents directory
+    const documentsDir = app.getPath('documents');
+    const testArchiveDir = pathModule.join(documentsDir, 'BloodCellVision Reports');
     
     // Create directory if it doesn't exist
     try {
@@ -1071,8 +1071,8 @@ ipcMain.handle('check-file-exists', async (event, filePath) => {
 ipcMain.handle('get-patient-reports', async () => {
   try {
     const pathModule = require('path');
-    const appDir = process.cwd();
-    const testArchiveDir = pathModule.join(appDir, 'test archive');
+    const documentsDir = app.getPath('documents');
+    const testArchiveDir = pathModule.join(documentsDir, 'BloodCellVision Reports');
     
     if (!fs.existsSync(testArchiveDir)) {
       return { success: true, reports: [] };
@@ -1219,9 +1219,11 @@ ipcMain.handle('update-existing-report', async (event, folderPath, reportData) =
     const pathModule = require('path');
     
     // Ensure the folderPath is absolute
+    const documentsDir = app.getPath('documents');
+    const reportsDir = pathModule.join(documentsDir, 'BloodCellVision Reports');
     const absoluteFolderPath = pathModule.isAbsolute(folderPath) 
       ? folderPath 
-      : pathModule.join(process.cwd(), folderPath);
+      : pathModule.join(reportsDir, folderPath);
     
     // Check if the folder exists
     try {
