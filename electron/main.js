@@ -137,7 +137,12 @@ function createWindow() {
     loadDevServer();
   } else {
     // In production, dist folder is in extraResources (outside asar)
-    const indexPath = path.join(process.resourcesPath, 'dist', 'index.html');
+    // Use app.getAppPath() parent directory to get to resources folder
+    const resourcesPath = process.resourcesPath || path.join(path.dirname(app.getAppPath()), '..');
+    const indexPath = path.join(resourcesPath, 'dist', 'index.html');
+    
+    writeLog(`Process resources path: ${process.resourcesPath}`);
+    writeLog(`Calculated resources path: ${resourcesPath}`);
     
     writeLog(`Looking for index.html at: ${indexPath}`);
     writeLog(`File exists: ${fs.existsSync(indexPath)}`);
