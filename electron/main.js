@@ -176,15 +176,9 @@ function createWindow() {
 
     writeLog(`Found index.html at: ${indexPath}`);
     
-    const startUrl = url.format({
-      pathname: indexPath,
-      protocol: 'file:',
-      slashes: true,
-    });
-    
-    writeLog(`Loading URL: ${startUrl}`);
-    mainWindow.loadURL(startUrl).catch(err => {
-      writeLog(`ERROR loading URL: ${err.message}`);
+    writeLog(`Loading file: ${indexPath}`);
+    mainWindow.loadFile(indexPath).catch(err => {
+      writeLog(`ERROR loading file: ${err.message}`);
       dialog.showErrorBox('Load Error', `Failed to load: ${err.message}\n\nLog: ${logPath}`);
     });
   }
