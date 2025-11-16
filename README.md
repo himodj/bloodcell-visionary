@@ -1,69 +1,79 @@
-# Welcome to your Lovable project
+# BloodCellVision - AI-Powered Blood Cell Analysis System
 
-## Project info
+## About
 
-**URL**: https://lovable.dev/projects/83e30fde-0499-406a-991e-4bc7a544c843
+BloodCellVision is a professional desktop application for analyzing blood cell images using AI-powered machine learning models. The system provides accurate cell detection, classification, and comprehensive reporting capabilities for medical laboratories.
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+- **AI-Powered Analysis**: Advanced machine learning models for blood cell detection and classification
+- **Patient Management**: Track and manage patient information and analysis history
+- **Comprehensive Reporting**: Generate professional PDF reports with customizable templates
+- **Laboratory Configuration**: Customize lab information, logos, and report templates
+- **Data Archiving**: Automatic saving and retrieval of patient reports
 
-**Use Lovable**
+## Technologies
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/83e30fde-0499-406a-991e-4bc7a544c843) and start prompting.
+This project is built with:
 
-Changes made via Lovable will be committed automatically to this repo.
+- **Electron**: Desktop application framework
+- **React**: UI framework
+- **TypeScript**: Type-safe development
+- **Vite**: Fast build tool
+- **TailwindCSS**: Utility-first styling
+- **Python/TensorFlow**: AI model backend
+- **shadcn-ui**: Component library
 
-**Use your preferred IDE**
+## Development
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Prerequisites
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- Node.js & npm ([install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating))
+- Python 3.x
+- TensorFlow and required Python packages
 
-Follow these steps:
+### Setup
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Install dependencies
+npm install
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
+
+# Build Electron app
+node build-electron.cjs
 ```
 
-**Edit a file directly in GitHub**
+### Running in Development Mode
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```sh
+# Start web development server
+npm run dev
 
-**Use GitHub Codespaces**
+# Run Electron in development
+node run-electron-dev.js
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Building for Production
 
-## What technologies are used for this project?
+```sh
+# Build the complete Electron application
+node build-electron.cjs
+```
 
-This project is built with .
+The built application will be available in the `electron/dist` directory.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Model Requirements
 
-## How can I deploy this project?
+Place your trained `model.h5` file in the project root directory before building the application.
 
-Simply open [Lovable](https://lovable.dev/projects/83e30fde-0499-406a-991e-4bc7a544c843) and click on Share -> Publish.
+## Reports Storage
 
-## I want to use a custom domain - is that possible?
+Patient reports are automatically saved to:
+- **Windows**: `C:\Users\[YourUsername]\Documents\BloodCellVision Reports`
+- **macOS/Linux**: `~/Documents/BloodCellVision Reports`
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+## License
+
+BloodCellVision © 2025 - All Rights Reserved

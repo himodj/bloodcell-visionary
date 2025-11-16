@@ -694,7 +694,6 @@ const FormalReportGeneratorNew: React.FC = () => {
         
         {/* Program Footer */}
         <div className="program-footer" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <img src="/logo.png" alt="BloodCellVision Logo" style={{ width: '24px', height: '24px' }} />
           <div style={{ flex: 1 }}>
             <div><strong>BloodCellVision</strong> - AI-Powered Blood Cell Analysis System</div>
             <div style={{ fontSize: '7pt', marginTop: '2mm' }}>
