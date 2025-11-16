@@ -27,7 +27,7 @@ const LabSettings: React.FC<LabSettingsProps> = ({ onConfigurationChange }) => {
     phone: '',
     hematologyDoctorName: '',
     licenseNumber: '',
-    logo: '/lovable-uploads/623308ff-1ed1-4208-9ef4-41e4d60d733d.png'
+    logo: ''
   });
 
   // Load configuration from localStorage on component mount

@@ -33,7 +33,7 @@ const Management: React.FC = () => {
     phone: '',
     hematologyDoctorName: '',
     licenseNumber: '',
-    logo: '/lovable-uploads/623308ff-1ed1-4208-9ef4-41e4d60d733d.png'
+    logo: ''
   });
 
   useEffect(() => {
@@ -72,11 +72,6 @@ const Management: React.FC = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <img 
-              src="/lovable-uploads/623308ff-1ed1-4208-9ef4-41e4d60d733d.png" 
-              alt="BloodCellVision Logo" 
-              className="h-12 w-12"
-            />
             <h1 className="text-4xl font-bold">
               <span className="text-gray-800">BloodCell</span>
               <span style={{ color: '#D21A1A' }}>Vision</span>
