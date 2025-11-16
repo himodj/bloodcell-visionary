@@ -23,6 +23,11 @@ const Header: React.FC = () => {
       <div className="container mx-auto flex justify-between items-center">
         <div className="flex items-center space-x-4">
           <div className="flex items-center">
+            <img 
+              src="./logo.png" 
+              alt="BloodCellVision Logo" 
+              className="h-10 w-10 mr-3"
+            />
             <h1 className="text-2xl font-display font-semibold text-medical-dark">
               BloodCell<span style={{ color: '#D21A1A' }}>Vision</span>
             </h1>
