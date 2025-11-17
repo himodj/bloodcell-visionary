@@ -247,11 +247,18 @@ function loadDevServer() {
 }
 
 function startPythonServer() {
+  // In production with bundled executable, skip all package checking
+  if (!isDev) {
+    console.log('Using bundled Python server (no package installation needed)');
+    startActualPythonServer();
+    return;
+  }
+  
+  // In development, check and install packages as before
   const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
   
-  // Install necessary packages first
   try {
-    console.log('Checking required Python packages (skip downloads if up-to-date)...');
+    console.log('Development mode: Checking required Python packages...');
 
     const required = {
       'flask': '3.0.0',
@@ -299,7 +306,7 @@ function startPythonServer() {
     }
 
     if (needUpgrade.length === 0) {
-      console.log('All required Python packages are up to date. Skipping pip install.');
+      console.log('All required Python packages are up to date.');
       startActualPythonServer();
       return;
     }
@@ -326,56 +333,76 @@ function startPythonServer() {
 }
 
 function startActualPythonServer() {
-  const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
   const env = Object.assign({}, process.env);
   env.MODEL_PATH = getModelPath();
   
-  let scriptPath;
+  let executablePath;
+  
   if (isDev) {
-    scriptPath = path.join(__dirname, '..', 'python', 'model_server.py');
-  } else {
-    scriptPath = path.join(process.resourcesPath, 'python', 'model_server.py');
-  }
-  
-  console.log('Python script path:', scriptPath);
-  
-  const pythonDir = path.dirname(scriptPath);
-  if (!fs.existsSync(pythonDir)) {
-    try {
-      fs.mkdirSync(pythonDir, { recursive: true });
-    } catch (err) {
-      console.error(`Could not create python directory: ${err.message}`);
-    }
-  }
-  
-  if (!fs.existsSync(scriptPath)) {
-    const possibleSourcePaths = [
-      path.join(app.getAppPath(), 'python', 'model_server.py'),
-      path.join(__dirname, '..', 'python', 'model_server.py'),
-      path.join(process.resourcesPath, 'app.asar', 'python', 'model_server.py')
-    ];
+    // In development, use Python interpreter with the script
+    const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
+    const scriptPath = path.join(__dirname, '..', 'python', 'model_server.py');
     
-    let sourceFile = null;
-    for (const sourcePath of possibleSourcePaths) {
-      if (fs.existsSync(sourcePath)) {
-        sourceFile = sourcePath;
-        console.log(`Found source Python script at: ${sourcePath}`);
-        break;
-      }
-    }
-    
-    if (sourceFile) {
-      fs.mkdirSync(path.dirname(scriptPath), { recursive: true });
-      fs.copyFileSync(sourceFile, scriptPath);
-      console.log(`Copied Python script from ${sourceFile} to ${scriptPath}`);
-    } else {
-      console.error(`Python script not found at any of the expected locations`);
-      
+    console.log('Starting Python server in development mode...');
+    console.log('Python script path:', scriptPath);
+  
+    if (!fs.existsSync(scriptPath)) {
+      console.error(`Python script not found at: ${scriptPath}`);
       if (mainWindow) {
         dialog.showMessageBox(mainWindow, {
           type: 'error',
           title: 'Server Error',
-          message: `Python script not found. The application may not work correctly.`,
+          message: 'Python script not found in development mode.',
+          buttons: ['OK']
+        });
+      }
+      return;
+    }
+    
+    try {
+      pythonProcess = spawn(pythonCommand, [scriptPath], {
+        env: env,
+        stdio: 'pipe'
+      });
+    } catch (error) {
+      console.error('Error starting Python server:', error);
+      return;
+    }
+  } else {
+    // In production, use the bundled executable
+    const exeName = process.platform === 'win32' ? 'model_server.exe' : 'model_server';
+    executablePath = path.join(process.resourcesPath, 'python-server', exeName);
+    
+    console.log('Starting bundled Python server in production mode...');
+    console.log('Executable path:', executablePath);
+    
+    if (!fs.existsSync(executablePath)) {
+      console.error(`Bundled Python executable not found at: ${executablePath}`);
+      if (mainWindow) {
+        dialog.showMessageBox(mainWindow, {
+          type: 'error',
+          title: 'Server Error',
+          message: 'Python backend not found. The application may not have been built correctly.',
+          detail: `Expected location: ${executablePath}`,
+          buttons: ['OK']
+        });
+      }
+      return;
+    }
+    
+    console.log('Starting bundled Python model server...');
+    try {
+      pythonProcess = spawn(executablePath, [], {
+        env: env,
+        stdio: 'pipe'
+      });
+    } catch (error) {
+      console.error('Error starting bundled Python server:', error);
+      if (mainWindow) {
+        dialog.showMessageBox(mainWindow, {
+          type: 'error',
+          title: 'Server Error',
+          message: `Failed to start Python server: ${error.message}`,
           buttons: ['OK']
         });
       }
@@ -383,12 +410,11 @@ function startActualPythonServer() {
     }
   }
   
-  console.log('Starting Python model server...');
-  try {
-    pythonProcess = spawn(pythonCommand, [scriptPath], {
-      env: env,
-      stdio: 'pipe'
-    });
+  // Common logging for both dev and production
+  if (!pythonProcess) {
+    console.error('Failed to create Python process');
+    return;
+  }
     
     pythonProcess.stdout.on('data', (data) => {
       console.log(`Python server: ${data}`);
