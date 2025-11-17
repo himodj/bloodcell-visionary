@@ -65,7 +65,7 @@ block_cipher = None
 tensorflow_datas = collect_data_files('tensorflow')
 keras_datas = collect_data_files('keras')
 
-# Collect all necessary submodules
+# Collect only essential submodules (avoiding full scan to prevent bytecode errors)
 hiddenimports = [
     'flask',
     'flask_cors',
@@ -79,22 +79,29 @@ hiddenimports = [
     'PIL',
     'PIL._imaging',
     'numpy',
+    'numpy.core',
     'h5py',
     'h5py._hl',
     'h5py.defs',
     'h5py.utils',
     'h5py.h5ac',
     'tensorflow',
-    'tensorflow._api',
     'tensorflow.python',
+    'tensorflow.python.keras',
+    'tensorflow.python.keras.saving',
+    'tensorflow.python.keras.models',
+    'tensorflow.python.keras.layers',
+    'tensorflow.python.framework',
+    'tensorflow.python.platform',
+    'tensorflow.python.ops',
+    'tensorflow.python.util',
     'keras',
-    'keras.api',
-    'keras.api._v2',
+    'keras.models',
+    'keras.layers',
+    'keras.saving',
 ]
 
-# Add all TensorFlow submodules
-hiddenimports.extend(collect_submodules('tensorflow'))
-hiddenimports.extend(collect_submodules('keras'))
+# Note: Not collecting all submodules to avoid PyInstaller bytecode parsing issues
 
 a = Analysis(
     ['${path.join(PYTHON_DIR, 'model_server.py').replace(/\\/g, '\\\\')}'],
