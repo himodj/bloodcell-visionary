@@ -7,6 +7,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
+    "prebuild": "node ../bundle-python.cjs",
     "build": "electron-builder"
   },
   "build": {
@@ -30,8 +31,9 @@
         "to": "model.h5"
       },
       {
-        "from": "../python",
-        "to": "python"
+        "from": "../python-bundle/dist/model_server",
+        "to": "python-server",
+        "filter": ["**/*"]
       }
     ],
     "directories": {
