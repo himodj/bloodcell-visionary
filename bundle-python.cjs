@@ -57,75 +57,69 @@ console.log('\n📝 Step 3: Creating PyInstaller configuration...');
 const specContent = `# -*- mode: python ; coding: utf-8 -*-
 
 import sys
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+import os
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
 
 block_cipher = None
 
-# Collect TensorFlow and Keras data files
-tensorflow_datas = collect_data_files('tensorflow')
-keras_datas = collect_data_files('keras')
+# Collect only essential data files - not submodules to avoid bytecode errors
+tensorflow_datas = collect_data_files('tensorflow', include_py_files=False)
+keras_datas = collect_data_files('keras', include_py_files=False)
 
-# Collect only essential submodules (avoiding full scan to prevent bytecode errors)
+# Collect dynamic libraries
+tensorflow_binaries = collect_dynamic_libs('tensorflow')
+
+# Minimal hiddenimports - only what's directly needed
 hiddenimports = [
     'flask',
     'flask_cors',
-    'werkzeug',
-    'werkzeug.serving',
-    'werkzeug.middleware.proxy_fix',
-    'click',
-    'itsdangerous',
-    'jinja2',
-    'markupsafe',
     'PIL',
-    'PIL._imaging',
+    'PIL.Image',
     'numpy',
-    'numpy.core',
     'h5py',
-    'h5py._hl',
-    'h5py.defs',
-    'h5py.utils',
-    'h5py.h5ac',
-    'tensorflow',
-    'tensorflow.python',
-    'tensorflow.python.keras',
-    'tensorflow.python.keras.saving',
-    'tensorflow.python.keras.models',
-    'tensorflow.python.keras.layers',
-    'tensorflow.python.framework',
-    'tensorflow.python.platform',
-    'tensorflow.python.ops',
-    'tensorflow.python.util',
-    'keras',
-    'keras.models',
-    'keras.layers',
-    'keras.saving',
 ]
 
-# Note: Not collecting all submodules to avoid PyInstaller bytecode parsing issues
+# Aggressive module exclusions to prevent bytecode parsing errors
+excludes = [
+    # Exclude optional TensorFlow backends
+    'tensorflow.python.framework.fast_tensor_util',
+    'tensorflow.python.ops.numpy_ops',
+    'tensorflow.compiler',
+    'tensorboard',
+    'tensorflow.lite',
+    'tensorflow.tools',
+    # Exclude other heavy/optional packages
+    'matplotlib',
+    'scipy',
+    'pandas',
+    'sklearn',
+    'pytest',
+    'tk',
+    'tcl',
+    '_tkinter',
+    'IPython',
+    'notebook',
+    'jupyter',
+]
 
 a = Analysis(
     ['${path.join(PYTHON_DIR, 'model_server.py').replace(/\\/g, '\\\\')}'],
     pathex=[],
-    binaries=[],
+    binaries=tensorflow_binaries,
     datas=tensorflow_datas + keras_datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[
-        'matplotlib',
-        'scipy',
-        'pandas',
-        'sklearn',
-        'pytest',
-        'tk',
-        'tcl',
-        '_tkinter'
-    ],
+    excludes=excludes,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
     noarchive=False,
+    module_collection_mode={
+        'tensorflow': 'pyz',
+        'keras': 'pyz',
+    }
 )
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
