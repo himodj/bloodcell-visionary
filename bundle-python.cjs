@@ -21,8 +21,20 @@ console.log('\n📋 Step 1: Checking Python installation...');
 try {
   const pythonVersion = execSync('python --version', { encoding: 'utf8' });
   console.log('✅ Python found:', pythonVersion.trim());
+  
+  // Check for Python 3.10.0 specifically (has a bytecode bug)
+  if (pythonVersion.includes('Python 3.10.0')) {
+    console.error('\n❌ CRITICAL: Python 3.10.0 has a bytecode bug that breaks PyInstaller!');
+    console.error('   This causes "IndexError: tuple index out of range" errors.');
+    console.error('\n   SOLUTION: Please upgrade to Python 3.10.1 or later:');
+    console.error('   • Download from: https://www.python.org/downloads/');
+    console.error('   • Minimum required: Python 3.10.1');
+    console.error('   • Recommended: Python 3.11 or later');
+    console.error('\n   After upgrading, run this script again.');
+    process.exit(1);
+  }
 } catch (error) {
-  console.error('❌ Python not found! Please install Python 3.10 or 3.11');
+  console.error('❌ Python not found! Please install Python 3.10.1+ or 3.11');
   console.error('   Download from: https://www.python.org/downloads/');
   process.exit(1);
 }
