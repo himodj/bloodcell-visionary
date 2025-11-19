@@ -48,8 +48,7 @@ const requirements = [
   'keras>=3.0.0',
   'pillow>=10.0.0',
   'numpy>=1.24.0',
-  'h5py>=3.8.0',
-  'pyinstaller>=6.0.0'
+  'h5py>=3.8.0'
 ];
 
 try {
@@ -60,6 +59,18 @@ try {
   console.log('✅ All packages installed successfully');
 } catch (error) {
   console.error('❌ Failed to install Python packages');
+  console.error('   Error:', error.message);
+  process.exit(1);
+}
+
+// Step 2.5: Force reinstall PyInstaller to fix launcher issues
+console.log('\n🔧 Step 2.5: Ensuring PyInstaller is correctly installed...');
+try {
+  execSync('python -m pip uninstall -y pyinstaller', { stdio: 'inherit' });
+  execSync('python -m pip install --force-reinstall pyinstaller>=6.0.0', { stdio: 'inherit' });
+  console.log('✅ PyInstaller installed for current Python version');
+} catch (error) {
+  console.error('❌ Failed to install PyInstaller');
   console.error('   Error:', error.message);
   process.exit(1);
 }
