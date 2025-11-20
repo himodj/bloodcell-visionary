@@ -333,8 +333,28 @@ function startPythonServer() {
 }
 
 function startActualPythonServer() {
+  const modelPath = getModelPath();
+  console.log('=== Python Server Startup Configuration ===');
+  console.log('Model path for server:', modelPath);
+  console.log('Process resources path:', process.resourcesPath);
+  
   const env = Object.assign({}, process.env);
-  env.MODEL_PATH = getModelPath();
+  
+  // For production, use the model inside python-server directory as primary
+  // This ensures the bundled Python server can always access the model
+  if (!isDev) {
+    const bundledModelPath = path.join(process.resourcesPath, 'python-server', 'model.h5');
+    env.MODEL_PATH = bundledModelPath;
+    console.log('Using bundled model path:', env.MODEL_PATH);
+  } else {
+    env.MODEL_PATH = modelPath;
+  }
+  
+  // Ensure the path is absolute and uses correct separators
+  if (env.MODEL_PATH) {
+    env.MODEL_PATH = path.resolve(env.MODEL_PATH);
+    console.log('Resolved MODEL_PATH:', env.MODEL_PATH);
+  }
   
   let executablePath;
   
@@ -391,10 +411,14 @@ function startActualPythonServer() {
     }
     
     console.log('Starting bundled Python model server...');
+    console.log('Environment variables for Python server:');
+    console.log('  MODEL_PATH:', env.MODEL_PATH);
+    
     try {
       pythonProcess = spawn(executablePath, [], {
         env: env,
-        stdio: 'pipe'
+        stdio: 'pipe',
+        cwd: path.dirname(executablePath)
       });
     } catch (error) {
       console.error('Error starting bundled Python server:', error);
