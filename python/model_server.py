@@ -46,7 +46,7 @@ CLASS_LABELS = [
 ]
 
 def load_model_with_latest_versions(model_file_path):
-    """Load H5 model using latest TensorFlow/Keras versions."""
+    """Load H5 model with Keras 2.x compatibility."""
     global model, model_path, model_loaded
     
     logger.info(f"Loading model from: {model_file_path}")
@@ -58,8 +58,24 @@ def load_model_with_latest_versions(model_file_path):
         logger.info(f"TensorFlow version: {tf.__version__}")
         logger.info(f"Keras version: {keras.__version__}")
         
-        # Load the model directly - should work with latest TF/Keras
-        model = keras.models.load_model(model_file_path)
+        # For Keras 3.x compatibility with old models, we need to use tf.keras instead
+        # Load the model with compile=False to avoid optimizer issues
+        try:
+            model = tf.keras.models.load_model(model_file_path, compile=False)
+            logger.info("Model loaded successfully with tf.keras (compile=False)")
+        except Exception as e1:
+            logger.warning(f"First load attempt failed: {str(e1)}")
+            logger.info("Trying alternative loading method...")
+            # Try loading with custom objects handling
+            model = tf.keras.models.load_model(
+                model_file_path, 
+                compile=False,
+                safe_mode=False
+            )
+            logger.info("Model loaded with safe_mode=False")
+        
+        # Manually compile the model for inference
+        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
         
         model_path = model_file_path
         model_loaded = True
@@ -73,6 +89,9 @@ def load_model_with_latest_versions(model_file_path):
         
     except Exception as e:
         logger.error(f"Failed to load model: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         model_loaded = False
         return False
 
