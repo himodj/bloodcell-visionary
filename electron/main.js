@@ -411,10 +411,11 @@ function startActualPythonServer() {
   }
   
   // Common logging for both dev and production
-  if (!pythonProcess) {
-    console.error('Failed to create Python process');
-    return;
-  }
+  try {
+    if (!pythonProcess) {
+      console.error('Failed to create Python process');
+      return;
+    }
     
     pythonProcess.stdout.on('data', (data) => {
       console.log(`Python server: ${data}`);
