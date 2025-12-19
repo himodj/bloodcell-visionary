@@ -1,8 +1,10 @@
+# Pinned versions for legacy .h5 model compatibility (Keras 2 / TF 2.15)
+# Note: TensorFlow 2.15 supports Python 3.10–3.11.
+flask==3.0.3
+flask-cors==4.0.0
+pillow==10.4.0
+numpy<2.0
+h5py<4.0
+tensorflow==2.15.1
+keras==2.15.0
 
-flask>=3.0.0
-flask-cors>=4.0.0
-tensorflow>=2.15.0 --upgrade
-keras>=3.0.0 --upgrade
-pillow>=10.0.0
-numpy>=1.24.0
-h5py>=3.8.0
