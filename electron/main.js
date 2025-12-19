@@ -292,17 +292,7 @@ function startPythonServer() {
   try {
     console.log('Development mode: Checking required Python packages...');
 
-    // Pinned for legacy H5 compatibility.
-    const required = {
-      'flask': '3.0.3',
-      'flask-cors': '4.0.0',
-      'tensorflow': '2.15.1',
-      'keras': '2.15.0',
-      'pillow': '10.4.0',
-      'numpy': '1.0.0', // we pin <2.0 via requirements; keep a low min here
-      'h5py': '3.8.0'
-    };
-
+    // Check if TensorFlow 2.15.1 is installed (it bundles Keras 2.15)
     const getInstalledVersion = (pkg) => {
       try {
         const res = spawnSync(pythonCommand, ['-m', 'pip', 'show', pkg], { encoding: 'utf8' });
@@ -314,46 +304,54 @@ function startPythonServer() {
       }
     };
 
-    const cmp = (a, b) => {
-      const pa = (a || '').split('.').map(x => parseInt(x, 10) || 0);
-      const pb = (b || '').split('.').map(x => parseInt(x, 10) || 0);
-      const len = Math.max(pa.length, pb.length);
-      for (let i = 0; i < len; i++) {
-        const ai = pa[i] || 0;
-        const bi = pb[i] || 0;
-        if (ai > bi) return 1;
-        if (ai < bi) return -1;
+    const tfVersion = getInstalledVersion('tensorflow');
+    const kerasVersion = getInstalledVersion('keras');
+    const numpyVersion = getInstalledVersion('numpy');
+    
+    console.log(`Current versions - TensorFlow: ${tfVersion}, Keras: ${kerasVersion}, NumPy: ${numpyVersion}`);
+    
+    // Check if we need to install/fix packages
+    // TensorFlow 2.15.1 bundles Keras 2.15 - do NOT install keras separately as >= 3.0
+    const needsInstall = !tfVersion || !tfVersion.startsWith('2.15') || 
+                         (kerasVersion && kerasVersion.startsWith('3.'));
+    
+    if (needsInstall) {
+      console.log('Installing/fixing Python packages for legacy H5 model compatibility...');
+      
+      // First uninstall keras if it's 3.x (incompatible with TF 2.15)
+      if (kerasVersion && kerasVersion.startsWith('3.')) {
+        console.log('Removing incompatible Keras 3.x...');
+        spawnSync(pythonCommand, ['-m', 'pip', 'uninstall', 'keras', '-y'], { encoding: 'utf8' });
       }
-      return 0;
-    };
+      
+      // Install pinned versions
+      const packages = [
+        'tensorflow==2.15.1',
+        'numpy==1.26.4',
+        'h5py==3.10.0',
+        'flask==3.0.3',
+        'flask-cors==4.0.0',
+        'pillow==10.4.0'
+      ];
+      
+      const pipInstall = spawn(pythonCommand, ['-m', 'pip', 'install', '--upgrade', ...packages]);
 
-    const needUpgrade = [];
-    for (const [pkg, minV] of Object.entries(required)) {
-      const curV = getInstalledVersion(pkg);
-      if (!curV || cmp(curV, minV) < 0) {
-        needUpgrade.push(`${pkg}>=${minV}`);
-        console.log(`Package ${pkg} ${curV || '(not installed)'} -> requires >= ${minV}`);
-      }
-    }
+      pipInstall.stdout.on('data', (data) => {
+        console.log(`pip install output: ${data}`);
+      });
 
-    // Enforce numpy<2 and h5py<4 (these break older TF/Keras combos).
-    needUpgrade.push('numpy<2.0', 'h5py<4.0', 'tensorflow==2.15.1', 'keras==2.15.0');
+      pipInstall.stderr.on('data', (data) => {
+        console.log(`pip install error: ${data}`);
+      });
 
-    console.log('Installing Python packages (pinned for compatibility)...');
-    const pipInstall = spawn(pythonCommand, ['-m', 'pip', 'install', '--upgrade', ...needUpgrade]);
-
-    pipInstall.stdout.on('data', (data) => {
-      console.log(`pip install output: ${data}`);
-    });
-
-    pipInstall.stderr.on('data', (data) => {
-      console.log(`pip install error: ${data}`);
-    });
-
-    pipInstall.on('close', (code) => {
-      console.log(`pip install exited with code ${code}`);
+      pipInstall.on('close', (code) => {
+        console.log(`pip install exited with code ${code}`);
+        startActualPythonServer();
+      });
+    } else {
+      console.log('All required Python packages are correctly installed.');
       startActualPythonServer();
-    });
+    }
   } catch (error) {
     console.error('Error checking/installing Python packages:', error);
     startActualPythonServer();
