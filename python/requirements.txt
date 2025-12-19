@@ -1,10 +1,10 @@
 # Pinned versions for legacy .h5 model compatibility (Keras 2 / TF 2.15)
+# IMPORTANT: TensorFlow 2.15 bundles Keras 2.15 - do NOT install keras separately
 # Note: TensorFlow 2.15 supports Python 3.10–3.11.
 flask==3.0.3
 flask-cors==4.0.0
 pillow==10.4.0
-numpy<2.0
-h5py<4.0
+numpy==1.26.4
+h5py==3.10.0
 tensorflow==2.15.1
-keras==2.15.0
 
