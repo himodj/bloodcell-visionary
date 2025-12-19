@@ -46,47 +46,31 @@ CLASS_LABELS = [
 ]
 
 def load_model_with_latest_versions(model_file_path):
-    """Load H5 model with Keras 2.x compatibility."""
+    """Load legacy .h5 model using TF/Keras 2.15 (pinned via requirements)."""
     global model, model_path, model_loaded
-    
+
     logger.info(f"Loading model from: {model_file_path}")
-    
+
     try:
         import tensorflow as tf
-        from tensorflow import keras
-        
+
         logger.info(f"TensorFlow version: {tf.__version__}")
-        logger.info(f"Keras version: {keras.__version__}")
-        
-        # For Keras 3.x compatibility with old models, we need to use tf.keras instead
-        # Load the model with compile=False to avoid optimizer issues
-        try:
-            model = tf.keras.models.load_model(model_file_path, compile=False)
-            logger.info("Model loaded successfully with tf.keras (compile=False)")
-        except Exception as e1:
-            logger.warning(f"First load attempt failed: {str(e1)}")
-            logger.info("Trying alternative loading method...")
-            # Try loading with custom objects handling
-            model = tf.keras.models.load_model(
-                model_file_path, 
-                compile=False,
-                safe_mode=False
-            )
-            logger.info("Model loaded with safe_mode=False")
-        
-        # Manually compile the model for inference
-        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        
+        logger.info(f"tf.keras version: {tf.keras.__version__}")
+
+        # Legacy H5 models are most reliable under TF/Keras 2.x.
+        # compile=False avoids training-only objects; inference works fine.
+        model = tf.keras.models.load_model(model_file_path, compile=False)
+
         model_path = model_file_path
         model_loaded = True
-        
-        logger.info(f"Model loaded successfully!")
+
+        logger.info("Model loaded successfully!")
         logger.info(f"Model input shape: {model.input_shape}")
         logger.info(f"Model output shape: {model.output_shape}")
         logger.info(f"Number of layers: {len(model.layers)}")
-        
+
         return True
-        
+
     except Exception as e:
         logger.error(f"Failed to load model: {str(e)}")
         logger.error(f"Error type: {type(e).__name__}")
@@ -250,13 +234,12 @@ if __name__ == '__main__':
     # Print environment info
     try:
         import tensorflow as tf
-        import keras
         import numpy as np
         import h5py
-        
+
         logger.info(f"Python version: {sys.version}")
         logger.info(f"Tensorflow version: {tf.__version__}")
-        logger.info(f"Keras version: {keras.__version__}")
+        logger.info(f"tf.keras version: {tf.keras.__version__}")
         logger.info(f"Numpy version: {np.__version__}")
         logger.info(f"H5py version: {h5py.__version__}")
     except ImportError as e:
