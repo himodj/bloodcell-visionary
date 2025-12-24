@@ -1,8 +1,7 @@
-
 flask>=3.0.0
 flask-cors>=4.0.0
-tensorflow>=2.15.0 --upgrade
-keras>=3.0.0 --upgrade
+tensorflow>=2.15.0
+tf-keras>=2.15.0
 pillow>=10.0.0
 numpy>=1.24.0
 h5py>=3.8.0

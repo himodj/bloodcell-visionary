@@ -46,105 +46,93 @@ CLASS_LABELS = [
 ]
 
 def load_model_with_latest_versions(model_file_path):
-    """Load H5 model using latest TensorFlow/Keras versions with legacy compatibility."""
+    """Load H5 model with Keras 2/3 compatibility handling."""
     global model, model_path, model_loaded
     
     logger.info(f"Loading model from: {model_file_path}")
     
+    load_error = None
+    
+    # Strategy 1: Try tf-keras (Keras 2 compatibility layer) FIRST
+    try:
+        logger.info("Attempting to load with tf-keras (Keras 2 compatibility)...")
+        import tf_keras as keras2
+        model = keras2.models.load_model(model_file_path, compile=False)
+        logger.info("Successfully loaded with tf-keras!")
+        model_path = model_file_path
+        model_loaded = True
+        logger.info(f"Model input shape: {model.input_shape}")
+        logger.info(f"Model output shape: {model.output_shape}")
+        return True
+    except ImportError:
+        logger.info("tf-keras not installed, trying other methods...")
+    except Exception as e:
+        logger.warning(f"tf-keras loading failed: {e}")
+        load_error = e
+    
+    # Strategy 2: Try standard tensorflow.keras with Keras 3
     try:
         import tensorflow as tf
-        
         logger.info(f"TensorFlow version: {tf.__version__}")
         
-        # Check Keras version for compatibility handling
+        # Check Keras version
         try:
             import keras
             keras_version = keras.__version__
-            logger.info(f"Keras version: {keras_version}")
             is_keras_3 = int(keras_version.split('.')[0]) >= 3
         except:
-            keras_version = tf.keras.__version__
-            logger.info(f"TF-Keras version: {keras_version}")
+            keras_version = "unknown"
             is_keras_3 = False
         
-        # Try multiple loading strategies for compatibility
-        load_error = None
+        logger.info(f"Keras version: {keras_version}")
         
-        # Strategy 1: Try with compile=False and safe_mode=False (Keras 3)
         if is_keras_3:
+            # Try with safe_mode=False for Keras 3
             try:
                 logger.info("Attempting Keras 3 loading with safe_mode=False...")
                 model = tf.keras.models.load_model(model_file_path, compile=False, safe_mode=False)
-                logger.info("Successfully loaded with Keras 3 safe_mode=False")
-            except Exception as e1:
-                logger.warning(f"Keras 3 safe_mode loading failed: {e1}")
-                load_error = e1
-                
-                # Strategy 2: Try using tf.keras.saving.load_model
-                try:
-                    logger.info("Attempting tf.keras.saving.load_model...")
-                    model = tf.keras.saving.load_model(model_file_path, compile=False, safe_mode=False)
-                    logger.info("Successfully loaded with tf.keras.saving.load_model")
-                    load_error = None
-                except Exception as e2:
-                    logger.warning(f"tf.keras.saving loading failed: {e2}")
-                    load_error = e2
-        
-        # Strategy 3: Standard loading (works for Keras 2 or compatible models)
-        if load_error is not None or not is_keras_3:
+                logger.info("Successfully loaded with Keras 3!")
+                model_path = model_file_path
+                model_loaded = True
+                logger.info(f"Model input shape: {model.input_shape}")
+                logger.info(f"Model output shape: {model.output_shape}")
+                return True
+            except Exception as e:
+                logger.warning(f"Keras 3 loading failed: {e}")
+                load_error = e
+        else:
+            # Standard Keras 2 loading
             try:
                 logger.info("Attempting standard tf.keras loading...")
                 model = tf.keras.models.load_model(model_file_path, compile=False)
-                logger.info("Successfully loaded with standard tf.keras")
-                load_error = None
-            except Exception as e3:
-                logger.warning(f"Standard loading failed: {e3}")
-                if load_error is None:
-                    load_error = e3
-        
-        # Strategy 4: Try loading with custom_objects for legacy layers
-        if load_error is not None:
-            try:
-                logger.info("Attempting loading with legacy layer handling...")
-                import h5py
+                logger.info("Successfully loaded with tf.keras!")
+                model_path = model_file_path
+                model_loaded = True
+                logger.info(f"Model input shape: {model.input_shape}")
+                logger.info(f"Model output shape: {model.output_shape}")
+                return True
+            except Exception as e:
+                logger.warning(f"Standard loading failed: {e}")
+                load_error = e
                 
-                # Check if model uses legacy format
-                with h5py.File(model_file_path, 'r') as f:
-                    if 'model_config' in f.attrs:
-                        logger.info("Found legacy model format, attempting conversion...")
-                
-                # Try with custom objects to handle legacy layers
-                model = tf.keras.models.load_model(
-                    model_file_path, 
-                    compile=False,
-                    custom_objects={'InputLayer': tf.keras.layers.InputLayer}
-                )
-                logger.info("Successfully loaded with custom_objects")
-                load_error = None
-            except Exception as e4:
-                logger.warning(f"Legacy loading failed: {e4}")
-                load_error = e4
-        
-        if load_error is not None:
-            raise load_error
-        
-        model_path = model_file_path
-        model_loaded = True
-        
-        logger.info(f"Model loaded successfully!")
-        logger.info(f"Model input shape: {model.input_shape}")
-        logger.info(f"Model output shape: {model.output_shape}")
-        logger.info(f"Number of layers: {len(model.layers)}")
-        
-        return True
-        
     except Exception as e:
-        logger.error(f"Failed to load model: {str(e)}")
-        logger.error("This may be a Keras 2 vs Keras 3 compatibility issue.")
-        logger.error("Consider re-saving the model with your current Keras version,")
-        logger.error("or install tf-keras: pip install tf-keras")
-        model_loaded = False
-        return False
+        logger.error(f"TensorFlow import failed: {e}")
+        load_error = e
+    
+    # If we get here, all strategies failed
+    logger.error(f"Failed to load model: {load_error}")
+    logger.error("=" * 60)
+    logger.error("MODEL COMPATIBILITY ERROR")
+    logger.error("=" * 60)
+    logger.error("Your model was saved with Keras 2.x but you have Keras 3.x installed.")
+    logger.error("")
+    logger.error("To fix this, run:")
+    logger.error("  pip install tf-keras")
+    logger.error("")
+    logger.error("This will install the Keras 2 compatibility package.")
+    logger.error("=" * 60)
+    model_loaded = False
+    return False
 
 def preprocess_image(image_data_url, target_size=(360, 360)):
     """Preprocess image for model prediction."""
