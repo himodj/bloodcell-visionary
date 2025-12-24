@@ -415,45 +415,33 @@ function startActualPythonServer() {
     console.error('Failed to create Python process');
     return;
   }
+  
+  pythonProcess.stdout.on('data', (data) => {
+    console.log(`Python server: ${data}`);
+  });
+  
+  pythonProcess.stderr.on('data', (data) => {
+    console.error(`Python server error: ${data}`);
+  });
+  
+  pythonProcess.on('close', (code) => {
+    console.log(`Python server exited with code ${code}`);
+    pythonProcess = null;
     
-    pythonProcess.stdout.on('data', (data) => {
-      console.log(`Python server: ${data}`);
-    });
-    
-    pythonProcess.stderr.on('data', (data) => {
-      console.error(`Python server error: ${data}`);
-    });
-    
-    pythonProcess.on('close', (code) => {
-      console.log(`Python server exited with code ${code}`);
-      pythonProcess = null;
-      
-      if (code !== 0 && mainWindow) {
-        dialog.showMessageBox(mainWindow, {
-          type: 'warning',
-          title: 'Server Error',
-          message: `Python server exited unexpectedly with code ${code}. Image analysis may not work correctly.`,
-          buttons: ['OK']
-        });
-      }
-    });
-    
-    if (pythonProcess.pid) {
-      console.log(`Python server started with PID ${pythonProcess.pid}`);
-    } else {
-      console.error('Failed to start Python server - no PID assigned');
-    }
-  } catch (error) {
-    console.error('Error starting Python server:', error);
-    
-    if (mainWindow) {
+    if (code !== 0 && mainWindow) {
       dialog.showMessageBox(mainWindow, {
-        type: 'error',
+        type: 'warning',
         title: 'Server Error',
-        message: `Failed to start Python server: ${error.message}`,
+        message: `Python server exited unexpectedly with code ${code}. Image analysis may not work correctly.`,
         buttons: ['OK']
       });
     }
+  });
+  
+  if (pythonProcess.pid) {
+    console.log(`Python server started with PID ${pythonProcess.pid}`);
+  } else {
+    console.error('Failed to start Python server - no PID assigned');
   }
 }
 
