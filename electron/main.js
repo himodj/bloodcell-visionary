@@ -256,43 +256,22 @@ function startPythonServer() {
   
   // In development, check and install packages as before
   const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
-  const spawnSync = require('child_process').spawnSync;
-
-  // Hard requirement: legacy .h5 needs TF/Keras 2.15 which does NOT support Python 3.13.
-  // We guard here to avoid the "Invalid dtype: tuple" crash and endless 503 health checks.
-  try {
-    const verRes = spawnSync(pythonCommand, ['-c', 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")'], { encoding: 'utf8' });
-    const pyVer = (verRes.stdout || '').trim();
-    console.log('Detected Python version:', pyVer || '(unknown)');
-
-    const allowed = new Set(['3.10', '3.11']);
-    if (!allowed.has(pyVer)) {
-      const msg = `Unsupported Python version: ${pyVer || 'unknown'}\n\n` +
-        `This app requires Python 3.10 or 3.11 in development mode (TensorFlow 2.15 / Keras 2.15).\n` +
-        `Python 3.13 installs Keras 3.x and causes: Invalid dtype: tuple (model load fails) -> /health returns 503.\n\n` +
-        `Fix: Install Python 3.11 (64-bit) and make sure it's first in PATH, then re-run.`;
-
-      console.error(msg);
-      if (mainWindow) {
-        dialog.showMessageBox(mainWindow, {
-          type: 'error',
-          title: 'Python Version Not Supported',
-          message: 'Python 3.10/3.11 is required for this model.',
-          detail: msg,
-          buttons: ['OK']
-        });
-      }
-      // Don’t start the server with an incompatible Python.
-      return;
-    }
-  } catch (e) {
-    console.warn('Could not determine Python version, continuing:', e);
-  }
-
+  
   try {
     console.log('Development mode: Checking required Python packages...');
 
-    // Check if TensorFlow 2.15.1 is installed (it bundles Keras 2.15)
+    const required = {
+      'flask': '3.0.0',
+      'flask-cors': '4.0.0',
+      'tensorflow': '2.15.0',
+      'keras': '3.0.0',
+      'pillow': '10.0.0',
+      'numpy': '1.24.0',
+      'h5py': '3.8.0'
+    };
+
+    const spawnSync = require('child_process').spawnSync;
+
     const getInstalledVersion = (pkg) => {
       try {
         const res = spawnSync(pythonCommand, ['-m', 'pip', 'show', pkg], { encoding: 'utf8' });
@@ -304,54 +283,49 @@ function startPythonServer() {
       }
     };
 
-    const tfVersion = getInstalledVersion('tensorflow');
-    const kerasVersion = getInstalledVersion('keras');
-    const numpyVersion = getInstalledVersion('numpy');
-    
-    console.log(`Current versions - TensorFlow: ${tfVersion}, Keras: ${kerasVersion}, NumPy: ${numpyVersion}`);
-    
-    // Check if we need to install/fix packages
-    // TensorFlow 2.15.1 bundles Keras 2.15 - do NOT install keras separately as >= 3.0
-    const needsInstall = !tfVersion || !tfVersion.startsWith('2.15') || 
-                         (kerasVersion && kerasVersion.startsWith('3.'));
-    
-    if (needsInstall) {
-      console.log('Installing/fixing Python packages for legacy H5 model compatibility...');
-      
-      // First uninstall keras if it's 3.x (incompatible with TF 2.15)
-      if (kerasVersion && kerasVersion.startsWith('3.')) {
-        console.log('Removing incompatible Keras 3.x...');
-        spawnSync(pythonCommand, ['-m', 'pip', 'uninstall', 'keras', '-y'], { encoding: 'utf8' });
+    const cmp = (a, b) => {
+      const pa = (a || '').split('.').map(x => parseInt(x, 10) || 0);
+      const pb = (b || '').split('.').map(x => parseInt(x, 10) || 0);
+      const len = Math.max(pa.length, pb.length);
+      for (let i = 0; i < len; i++) {
+        const ai = pa[i] || 0;
+        const bi = pb[i] || 0;
+        if (ai > bi) return 1;
+        if (ai < bi) return -1;
       }
-      
-      // Install pinned versions
-      const packages = [
-        'tensorflow==2.15.1',
-        'numpy==1.26.4',
-        'h5py==3.10.0',
-        'flask==3.0.3',
-        'flask-cors==4.0.0',
-        'pillow==10.4.0'
-      ];
-      
-      const pipInstall = spawn(pythonCommand, ['-m', 'pip', 'install', '--upgrade', ...packages]);
+      return 0;
+    };
 
-      pipInstall.stdout.on('data', (data) => {
-        console.log(`pip install output: ${data}`);
-      });
-
-      pipInstall.stderr.on('data', (data) => {
-        console.log(`pip install error: ${data}`);
-      });
-
-      pipInstall.on('close', (code) => {
-        console.log(`pip install exited with code ${code}`);
-        startActualPythonServer();
-      });
-    } else {
-      console.log('All required Python packages are correctly installed.');
-      startActualPythonServer();
+    const needUpgrade = [];
+    for (const [pkg, minV] of Object.entries(required)) {
+      const curV = getInstalledVersion(pkg);
+      if (!curV || cmp(curV, minV) < 0) {
+        needUpgrade.push(`${pkg}>=${minV}`);
+        console.log(`Package ${pkg} ${curV || '(not installed)'} -> requires >= ${minV}`);
+      }
     }
+
+    if (needUpgrade.length === 0) {
+      console.log('All required Python packages are up to date.');
+      startActualPythonServer();
+      return;
+    }
+
+    console.log('Installing/upgrading Python packages:', needUpgrade.join(', '));
+    const pipInstall = spawn(pythonCommand, ['-m', 'pip', 'install', '--upgrade', ...needUpgrade]);
+
+    pipInstall.stdout.on('data', (data) => {
+      console.log(`pip install output: ${data}`);
+    });
+
+    pipInstall.stderr.on('data', (data) => {
+      console.log(`pip install error: ${data}`);
+    });
+
+    pipInstall.on('close', (code) => {
+      console.log(`pip install exited with code ${code}`);
+      startActualPythonServer();
+    });
   } catch (error) {
     console.error('Error checking/installing Python packages:', error);
     startActualPythonServer();
@@ -359,28 +333,8 @@ function startPythonServer() {
 }
 
 function startActualPythonServer() {
-  const modelPath = getModelPath();
-  console.log('=== Python Server Startup Configuration ===');
-  console.log('Model path for server:', modelPath);
-  console.log('Process resources path:', process.resourcesPath);
-  
   const env = Object.assign({}, process.env);
-  
-  // For production, use the model inside python-server directory as primary
-  // This ensures the bundled Python server can always access the model
-  if (!isDev) {
-    const bundledModelPath = path.join(process.resourcesPath, 'python-server', 'model.h5');
-    env.MODEL_PATH = bundledModelPath;
-    console.log('Using bundled model path:', env.MODEL_PATH);
-  } else {
-    env.MODEL_PATH = modelPath;
-  }
-  
-  // Ensure the path is absolute and uses correct separators
-  if (env.MODEL_PATH) {
-    env.MODEL_PATH = path.resolve(env.MODEL_PATH);
-    console.log('Resolved MODEL_PATH:', env.MODEL_PATH);
-  }
+  env.MODEL_PATH = getModelPath();
   
   let executablePath;
   
@@ -437,14 +391,10 @@ function startActualPythonServer() {
     }
     
     console.log('Starting bundled Python model server...');
-    console.log('Environment variables for Python server:');
-    console.log('  MODEL_PATH:', env.MODEL_PATH);
-    
     try {
       pythonProcess = spawn(executablePath, [], {
         env: env,
-        stdio: 'pipe',
-        cwd: path.dirname(executablePath)
+        stdio: 'pipe'
       });
     } catch (error) {
       console.error('Error starting bundled Python server:', error);
@@ -461,11 +411,10 @@ function startActualPythonServer() {
   }
   
   // Common logging for both dev and production
-  try {
-    if (!pythonProcess) {
-      console.error('Failed to create Python process');
-      return;
-    }
+  if (!pythonProcess) {
+    console.error('Failed to create Python process');
+    return;
+  }
     
     pythonProcess.stdout.on('data', (data) => {
       console.log(`Python server: ${data}`);

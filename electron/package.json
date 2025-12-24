@@ -31,10 +31,6 @@
         "to": "model.h5"
       },
       {
-        "from": "../model.h5",
-        "to": "python-server/model.h5"
-      },
-      {
         "from": "../python-bundle/dist/model_server",
         "to": "python-server",
         "filter": ["**/*"]
