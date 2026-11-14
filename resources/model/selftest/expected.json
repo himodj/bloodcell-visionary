@@ -1,0 +1,40 @@
+{
+  "source": "Reference images from the public PBC dataset (Acevedo et al., Mendeley Data, CC BY 4.0).",
+  "samples": [
+    {
+      "file": "ig.jpg",
+      "label": "IG Immature White Cell",
+      "original": "MY_100463.jpg"
+    },
+    {
+      "file": "basophil.jpg",
+      "label": "Basophil",
+      "original": "BA_101611.jpg"
+    },
+    {
+      "file": "eosinophil.jpg",
+      "label": "Eosinophil",
+      "original": "EO_105010.jpg"
+    },
+    {
+      "file": "erythroblast.jpg",
+      "label": "Erythroblast",
+      "original": "ERB_106275.jpg"
+    },
+    {
+      "file": "lymphocyte.jpg",
+      "label": "Lymphocyte",
+      "original": "LY_104129.jpg"
+    },
+    {
+      "file": "monocyte.jpg",
+      "label": "Monocyte",
+      "original": "MO_114341.jpg"
+    },
+    {
+      "file": "neutrophil.jpg",
+      "label": "Neutrophil",
+      "original": "SNE_102049.jpg"
+    }
+  ]
+}

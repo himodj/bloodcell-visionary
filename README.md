@@ -5,6 +5,27 @@ granulocyte, basophil, eosinophil, erythroblast, lymphocyte, monocyte, neutrophi
 with the EfficientNetV2B0-BloodCellVision model. It handles single-cell images and fields
 with several cells, files every analysis in a report archive and prints a laboratory report.
 
+## Download
+
+Click the installer for your Windows version. The download starts immediately.
+
+| Your Windows | Download |
+|---|---|
+| **Windows 10 or 11** (64-bit) | [BloodCellVision-Setup-2.1.1.exe](https://github.com/himodj/bloodcell-visionary/raw/main/installers/BloodCellVision-Setup-2.1.1.exe) (99 MB) |
+| **Windows 7 SP1, 8 or 8.1** (64-bit) | [BloodCellVision-Setup-2.1.1-Win7-64bit.exe](https://github.com/himodj/bloodcell-visionary/raw/main/installers/BloodCellVision-Setup-2.1.1-Win7-64bit.exe) (87 MB) |
+| **Windows 7 SP1, 8 or 8.1** (32-bit) | [BloodCellVision-Setup-2.1.1-Win7-32bit.exe](https://github.com/himodj/bloodcell-visionary/raw/main/installers/BloodCellVision-Setup-2.1.1-Win7-32bit.exe) (83 MB) |
+
+Not sure which one? Right-click **This PC** (or **Computer**), choose **Properties** and read
+"System type".
+
+Then:
+
+1. Run the downloaded file. It is not code-signed, so Windows SmartScreen may warn: choose
+   "More info", then "Run anyway".
+2. Start BloodCellVision and click **Self-test** on the home screen. It should report 7 of 7.
+
+## About this version
+
 Version 2 runs the model **inside the app**. There is no Python, TensorFlow or Keras on the
 user's computer, no background server and no network access. The installer is about 100 MB
 (version 1 was 367 MB).
@@ -14,6 +35,11 @@ user's computer, no background server and no network access. The installer is ab
 Run `BloodCellVision-Setup-2.1.1.exe`. It installs for the current Windows user (no
 administrator rights), adds Desktop and Start Menu shortcuts and an entry in
 "Apps & features" for uninstalling. Windows 10 or 11, 64-bit.
+
+For Windows 7 SP1, 8 and 8.1 use `BloodCellVision-Setup-2.1.1-Win7-64bit.exe` or
+`...-Win7-32bit.exe`. These are the same application built on Electron 22, the last
+version that runs on those systems (it no longer receives security updates). When printing
+directly, the page footer with the page count is missing; "Save as PDF" has it.
 
 If BloodCellVision 1.0 is installed, uninstall it first (your saved reports in
 `Documents\BloodCellVision Reports` are kept and open in version 2).
@@ -121,6 +147,8 @@ Requires Node.js 20 or newer. Nothing else.
 npm install
 npm start          # build the UI and run the app
 npm run dist       # build release/BloodCellVision-Setup-<version>.exe
+npm run dist:win7-x64   # Windows 7/8 build, 64-bit
+npm run dist:win7-x86   # Windows 7/8 build, 32-bit
 ```
 
 `npm run dist` works on Windows, macOS and Linux. It packages the app with
