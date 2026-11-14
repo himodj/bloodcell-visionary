@@ -9,6 +9,19 @@ Version 2 runs the model **inside the app**. There is no Python, TensorFlow or K
 user's computer, no background server and no network access. The installer is about 100 MB
 (version 1 was 367 MB).
 
+## Download
+
+Installers are in the [`installers`](installers) folder. Open the file and click "Download raw file".
+
+| File | For |
+|---|---|
+| `BloodCellVision-Setup-2.1.1.exe` | Windows 10 and 11, 64-bit |
+| `BloodCellVision-Setup-2.1.1-Win7-64bit.exe` | Windows 7 SP1, 8 and 8.1, 64-bit |
+| `BloodCellVision-Setup-2.1.1-Win7-32bit.exe` | Windows 7 SP1, 8 and 8.1, 32-bit |
+
+The installers are not code-signed, so Windows SmartScreen may warn: choose "More info",
+then "Run anyway".
+
 ## Install (end users)
 
 Run `BloodCellVision-Setup-2.1.1.exe`. It installs for the current Windows user (no
