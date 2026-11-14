@@ -15,6 +15,11 @@ Run `BloodCellVision-Setup-2.1.1.exe`. It installs for the current Windows user 
 administrator rights), adds Desktop and Start Menu shortcuts and an entry in
 "Apps & features" for uninstalling. Windows 10 or 11, 64-bit.
 
+For Windows 7 SP1, 8 and 8.1 use `BloodCellVision-Setup-2.1.1-Win7-64bit.exe` or
+`...-Win7-32bit.exe`. These are the same application built on Electron 22, the last
+version that runs on those systems (it no longer receives security updates). When printing
+directly, the page footer with the page count is missing; "Save as PDF" has it.
+
 If BloodCellVision 1.0 is installed, uninstall it first (your saved reports in
 `Documents\BloodCellVision Reports` are kept and open in version 2).
 
@@ -121,6 +126,8 @@ Requires Node.js 20 or newer. Nothing else.
 npm install
 npm start          # build the UI and run the app
 npm run dist       # build release/BloodCellVision-Setup-<version>.exe
+npm run dist:win7-x64   # Windows 7/8 build, 64-bit
+npm run dist:win7-x86   # Windows 7/8 build, 32-bit
 ```
 
 `npm run dist` works on Windows, macOS and Linux. It packages the app with

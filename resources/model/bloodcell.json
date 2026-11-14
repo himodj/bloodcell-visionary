@@ -1,0 +1,31 @@
+{
+  "name": "EfficientNetV2B0-BloodCellVision",
+  "version": "1.0",
+  "description": "EfficientNetV2-B0 classifier for eight peripheral blood cell types (single-cell images).",
+  "format": "onnx",
+  "inputSize": 360,
+  "inputLayout": "NHWC",
+  "colorOrder": "RGB",
+  "scale": 0.00392156862745098,
+  "scaleNote": "Pixels are divided by 255 before entering the network, exactly as during training (ImageDataGenerator rescale=1/255). Do not change.",
+  "labels": [
+    "IG Immature White Cell",
+    "Basophil",
+    "Eosinophil",
+    "Erythroblast",
+    "Lymphocyte",
+    "Monocyte",
+    "Neutrophil",
+    "Platelet"
+  ],
+  "abnormalLabels": [
+    "IG Immature White Cell",
+    "Basophil",
+    "Eosinophil"
+  ],
+  "source": {
+    "file": "model.h5",
+    "kerasVersion": "3.8.0",
+    "convertedWith": "tools/convert_h5_to_onnx.py"
+  }
+}
