@@ -5,22 +5,30 @@ granulocyte, basophil, eosinophil, erythroblast, lymphocyte, monocyte, neutrophi
 with the EfficientNetV2B0-BloodCellVision model. It handles single-cell images and fields
 with several cells, files every analysis in a report archive and prints a laboratory report.
 
+## Download
+
+Click the installer for your Windows version. The download starts immediately.
+
+| Your Windows | Download |
+|---|---|
+| **Windows 10 or 11** (64-bit) | [BloodCellVision-Setup-2.1.1.exe](https://github.com/himodj/bloodcell-visionary/raw/main/installers/BloodCellVision-Setup-2.1.1.exe) (99 MB) |
+| **Windows 7 SP1, 8 or 8.1** (64-bit) | [BloodCellVision-Setup-2.1.1-Win7-64bit.exe](https://github.com/himodj/bloodcell-visionary/raw/main/installers/BloodCellVision-Setup-2.1.1-Win7-64bit.exe) (87 MB) |
+| **Windows 7 SP1, 8 or 8.1** (32-bit) | [BloodCellVision-Setup-2.1.1-Win7-32bit.exe](https://github.com/himodj/bloodcell-visionary/raw/main/installers/BloodCellVision-Setup-2.1.1-Win7-32bit.exe) (83 MB) |
+
+Not sure which one? Right-click **This PC** (or **Computer**), choose **Properties** and read
+"System type".
+
+Then:
+
+1. Run the downloaded file. It is not code-signed, so Windows SmartScreen may warn: choose
+   "More info", then "Run anyway".
+2. Start BloodCellVision and click **Self-test** on the home screen. It should report 7 of 7.
+
+## About this version
+
 Version 2 runs the model **inside the app**. There is no Python, TensorFlow or Keras on the
 user's computer, no background server and no network access. The installer is about 100 MB
 (version 1 was 367 MB).
-
-## Download
-
-Installers are in the [`installers`](installers) folder. Open the file and click "Download raw file".
-
-| File | For |
-|---|---|
-| `BloodCellVision-Setup-2.1.1.exe` | Windows 10 and 11, 64-bit |
-| `BloodCellVision-Setup-2.1.1-Win7-64bit.exe` | Windows 7 SP1, 8 and 8.1, 64-bit |
-| `BloodCellVision-Setup-2.1.1-Win7-32bit.exe` | Windows 7 SP1, 8 and 8.1, 32-bit |
-
-The installers are not code-signed, so Windows SmartScreen may warn: choose "More info",
-then "Run anyway".
 
 ## Install (end users)
 
